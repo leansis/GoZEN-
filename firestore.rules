@@ -87,12 +87,11 @@ service cloud.firestore {
       );
     }
     function isGlobalAdmin() {
-      // Use email if available, otherwise role from DB
-      let email = request.auth.token.email.lower();
+      let email = toSafeString(request.auth.token.get('email', '')).lower();
       return isAuthenticated() && 
         (email == "leansisproductivity@gmail.com" || 
          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'));
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'admin'));
     }
     function isAdmin() {
       let email = toSafeString(request.auth.token.get('email', '')).lower();
@@ -203,20 +202,20 @@ service cloud.firestore {
 
     function isValidProcess(data) {
       return data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
-             data.description is string && data.description.size() <= 1000 &&
+             data.description is string &&
              data.companyId is string &&
-             (!('activityId' in data) || (data.activityId is string && data.activityId.size() <= 100)) &&
+             (!('activityId' in data) || (data.activityId is string)) &&
              (!('order' in data) || (data.order is number)) &&
              (!('id' in data) || (data.id is string));
     }
 
     function isValidTask(data) {
       return data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
-             data.processId is string && data.processId.size() > 0 && data.processId.size() < 100 &&
-             data.criteriaId is string && data.criteriaId.size() > 0 && data.criteriaId.size() < 100 &&
-             data.attachments is list && data.attachments.size() <= 50 &&
+             data.processId is string &&
+             data.criteriaId is string &&
+             data.attachments is list &&
              data.companyId is string &&
-             (!('activityId' in data) || (data.activityId is string && data.activityId.size() <= 100)) &&
+             (!('activityId' in data) || (data.activityId is string)) &&
              (!('order' in data) || (data.order is number)) &&
              (!('id' in data) || (data.id is string));
     }

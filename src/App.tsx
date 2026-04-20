@@ -14,6 +14,7 @@ import AdminActivities from './pages/admin/Activities';
 import AdminProcesses from './pages/admin/Processes';
 import AdminTasks from './pages/admin/Tasks';
 import AdminCriteria from './pages/admin/Criteria';
+import AdminMasterData from './pages/admin/MasterData';
 import MasterUsers from './pages/admin/MasterUsers';
 import { AuthContext } from './AuthContext';
 import { doc, getDoc } from 'firebase/firestore';
@@ -332,6 +333,7 @@ export default function App() {
                 <Route path="admin/processes" element={<ProtectedRoute requireAdmin><AdminProcesses /></ProtectedRoute>} />
                 <Route path="admin/tasks" element={<ProtectedRoute requireAdmin><AdminTasks /></ProtectedRoute>} />
                 <Route path="admin/criteria" element={<ProtectedRoute requireAdmin><AdminCriteria /></ProtectedRoute>} />
+                <Route path="admin/master-data" element={<ProtectedRoute requireAdmin><AdminMasterData /></ProtectedRoute>} />
               </Route>
             </Routes>
           </Router>

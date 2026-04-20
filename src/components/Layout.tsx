@@ -15,7 +15,8 @@ import {
   ChevronDown,
   ChevronRight,
   Folder,
-  Building2
+  Building2,
+  Database
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -46,6 +47,7 @@ export default function Layout() {
     { name: 'Procesos', path: '/admin/processes', icon: Settings },
     { name: 'Tareas', path: '/admin/tasks', icon: CheckSquare },
     { name: 'Criterios', path: '/admin/criteria', icon: ListChecks },
+    { name: 'Datos Maestros', path: '/admin/master-data', icon: Database },
   ];
 
   return (
