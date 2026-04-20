@@ -19,7 +19,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 
 export interface Column<T> {
-  header: string;
+  header: React.ReactNode;
   accessor: keyof T | ((item: T) => React.ReactNode);
   sortable?: boolean;
   sortAccessor?: (item: T) => string | number;

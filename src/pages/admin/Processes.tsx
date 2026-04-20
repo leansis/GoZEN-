@@ -164,8 +164,26 @@ export default function Processes() {
               <Table<Process>
                 data={filteredActivityProcesses}
                 columns={[
-                  { header: 'Proceso', accessor: 'name', sortable: true },
-                  { header: 'Descripción', accessor: 'description', sortable: true },
+                  { 
+                    header: (
+                      <div className="flex items-center gap-1.5 -ml-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingProcess({ activityId: activity.id });
+                          }}
+                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                          title="Añadir proceso a esta actividad"
+                        >
+                          <Plus className="w-4 h-4" />
+                        </button>
+                        <span>Proceso</span>
+                      </div>
+                    ),
+                    accessor: 'name', 
+                    sortable: false 
+                  },
+                  { header: 'Descripción', accessor: 'description', sortable: false },
                 ]}
                 onEdit={setEditingProcess}
                 onDelete={setProcessToDelete}
@@ -185,8 +203,26 @@ export default function Processes() {
             <Table<Process>
               data={filterProcesses(unassignedProcesses)}
               columns={[
-                { header: 'Proceso', accessor: 'name', sortable: true },
-                { header: 'Descripción', accessor: 'description', sortable: true },
+                { 
+                  header: (
+                    <div className="flex items-center gap-1.5 -ml-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingProcess({ activityId: '' });
+                        }}
+                        className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                        title="Añadir proceso sin actividad"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
+                      <span>Proceso</span>
+                    </div>
+                  ), 
+                  accessor: 'name', 
+                  sortable: false 
+                },
+                { header: 'Descripción', accessor: 'description', sortable: false },
               ]}
               onEdit={setEditingProcess}
               onDelete={setProcessToDelete}

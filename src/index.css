@@ -27,3 +27,18 @@
     @apply bg-bg-base text-text-main font-sans;
   }
 }
+
+@layer utilities {
+  .markdown-body ul {
+    @apply list-disc pl-5 my-2 space-y-1;
+  }
+  .markdown-body ol {
+    @apply list-decimal pl-5 my-2 space-y-1;
+  }
+  .markdown-body p {
+    @apply mb-2 last:mb-0;
+  }
+  .markdown-body strong {
+    @apply font-bold text-gray-900;
+  }
+}

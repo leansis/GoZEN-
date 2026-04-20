@@ -66,6 +66,7 @@ export default function Tasks() {
     try {
       const taskData: any = {
         name: editingTask.name,
+        description: editingTask.description || '',
         processId: editingTask.processId,
         criteriaId: editingTask.criteriaId,
         attachments: (editingTask.attachments || []).filter(att => {
@@ -228,11 +229,29 @@ export default function Tasks() {
                       <Table<Task>
                         data={filteredProcessTasks}
                         columns={[
-                          { header: 'Tarea', accessor: 'name', sortable: true },
+                          { 
+                            header: (
+                              <div className="flex items-center gap-1.5 -ml-2">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditingTask({ processId: process.id, attachments: [] });
+                                  }}
+                                  className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                                  title="Añadir tarea a este proceso"
+                                >
+                                  <Plus className="w-4 h-4" />
+                                </button>
+                                <span>Tarea</span>
+                              </div>
+                            ),
+                            accessor: 'name', 
+                            sortable: false 
+                          },
                           { 
                             header: 'Criterio', 
                             accessor: (t) => criteria.find(c => c.id === t.criteriaId)?.name || 'Desconocido',
-                            sortable: true,
+                            sortable: false,
                             sortAccessor: (t) => criteria.find(c => c.id === t.criteriaId)?.name || ''
                           },
                           { header: 'Adjuntos', accessor: (t) => t.attachments?.length || 0 },
@@ -280,11 +299,29 @@ export default function Tasks() {
                     <Table<Task>
                       data={filteredProcessTasks}
                       columns={[
-                        { header: 'Tarea', accessor: 'name', sortable: true },
+                        { 
+                          header: (
+                            <div className="flex items-center gap-1.5 -ml-2">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingTask({ processId: process.id, attachments: [] });
+                                }}
+                                className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                                title="Añadir tarea a este proceso"
+                              >
+                                <Plus className="w-4 h-4" />
+                              </button>
+                              <span>Tarea</span>
+                            </div>
+                          ),
+                          accessor: 'name', 
+                          sortable: false 
+                        },
                         { 
                           header: 'Criterio', 
                           accessor: (t) => criteria.find(c => c.id === t.criteriaId)?.name || 'Desconocido',
-                          sortable: true,
+                          sortable: false,
                           sortAccessor: (t) => criteria.find(c => c.id === t.criteriaId)?.name || ''
                         },
                         { header: 'Adjuntos', accessor: (t) => t.attachments?.length || 0 },
@@ -311,11 +348,29 @@ export default function Tasks() {
             <Table<Task>
               data={filterTasks(unassignedTasks)}
               columns={[
-                { header: 'Tarea', accessor: 'name', sortable: true },
+                { 
+                  header: (
+                    <div className="flex items-center gap-1.5 -ml-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingTask({ processId: '', attachments: [] });
+                        }}
+                        className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                        title="Añadir tarea sin proceso"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
+                      <span>Tarea</span>
+                    </div>
+                  ),
+                  accessor: 'name', 
+                  sortable: false 
+                },
                 { 
                   header: 'Criterio', 
                   accessor: (t) => criteria.find(c => c.id === t.criteriaId)?.name || 'Desconocido',
-                  sortable: true,
+                  sortable: false,
                   sortAccessor: (t) => criteria.find(c => c.id === t.criteriaId)?.name || ''
                 },
                 { header: 'Adjuntos', accessor: (t) => t.attachments?.length || 0 },
@@ -363,6 +418,18 @@ export default function Tasks() {
                 value={editingTask.name || ''}
                 onChange={(e) => setEditingTask({ ...editingTask, name: e.target.value })}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border focus:border-blue-500 focus:ring-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Contenido / Descripción</label>
+              <p className="text-xs text-gray-500 mb-1">Puedes usar Markdown para el formato (añade `- ` o `* ` al inicio de línea para listas, o `**texto**` para negrita).</p>
+              <textarea
+                value={editingTask.description || ''}
+                onChange={(e) => setEditingTask({ ...editingTask, description: e.target.value })}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border focus:border-blue-500 focus:ring-blue-500"
+                rows={4}
+                placeholder="- Elemento 1&#10;- Elemento 2&#10;**Nota:** Detalles."
               />
             </div>
             

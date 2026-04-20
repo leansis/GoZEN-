@@ -6,6 +6,7 @@ import { useAuth } from '../AuthContext';
 import { useAppData } from '../contexts/AppDataContext';
 import { handleFirestoreError, OperationType } from '../lib/firestore-utils';
 import { ArrowLeftRight } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import { Team, Process, Task, UserTaskLevel, Criterion, TrainingAction } from '../types';
 import Modal from '../components/Modal';
 
@@ -82,7 +83,9 @@ export default function Matrix() {
   const sortedMembers = [...(selectedTeam?.members || [])].sort((a, b) => a.name.localeCompare(b.name));
   const isTeamSupervisor = isCurrentUser(selectedTeam?.supervisorId || '');
   const selectedProcess = processes.find(p => p.id === selectedProcessId);
-  const filteredTasks = tasks.filter(t => t.processId === selectedProcessId);
+  const filteredTasks = tasks
+    .filter(t => t.processId === selectedProcessId)
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
 
   const getLevelData = (userId: string, taskId: string) => {
     return userTaskLevels.find(l => l.userId === userId && l.taskId === taskId) || {
@@ -482,12 +485,12 @@ export default function Matrix() {
         <div className="space-y-6">
           {showTargets && !isPivoted && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
-              <table className="w-full text-sm text-left">
+              <table className="w-full text-sm text-left table-fixed" style={{ minWidth: `${192 + Math.max(1, filteredTasks.length) * 160}px` }}>
                 <thead className="text-xs text-gray-700 uppercase bg-gray-50 border-b">
                   <tr>
                     <th className="px-6 py-4 border-r sticky left-0 bg-gray-50 z-10 w-48">Resumen</th>
                     {filteredTasks.map(task => (
-                      <th key={task.id} className="px-4 py-4 text-center min-w-[120px]">
+                      <th key={task.id} className="px-4 py-4 text-center break-words">
                         {task.name}
                       </th>
                     ))}
@@ -586,14 +589,14 @@ export default function Matrix() {
           )}
 
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
-            <table className="w-full text-sm text-left">
+            <table className="w-full text-sm text-left table-fixed" style={{ minWidth: isPivoted ? `${192 + (showTargets ? 128 : 0) + Math.max(1, sortedMembers.length) * 140}px` : `${192 + Math.max(1, filteredTasks.length) * 160}px` }}>
               {!isPivoted ? (
                 <>
                   <thead className="text-xs text-gray-700 uppercase bg-gray-50 border-b">
               <tr>
                 <th className="px-6 py-4 border-r sticky left-0 bg-gray-50 z-10 w-48">Usuarios</th>
                 {filteredTasks.map(task => (
-                  <th key={task.id} className="px-4 py-4 text-center min-w-[120px]">
+                  <th key={task.id} className="px-4 py-4 text-center break-words">
                     <div 
                       className="font-medium cursor-pointer hover:text-blue-600 flex items-center justify-center gap-1" 
                       title="Ver documentación"
@@ -655,7 +658,7 @@ export default function Matrix() {
                 <tr>
                   <th className="px-6 py-4 border-r sticky left-0 bg-gray-50 z-10 w-48">Tareas</th>
                   {showTargets && (
-                    <th className="px-4 py-4 text-center min-w-[80px] border-r bg-yellow-50/50">
+                    <th className="px-4 py-4 text-center w-32 border-r bg-yellow-50/50">
                       Objetivo
                     </th>
                   )}
@@ -663,7 +666,7 @@ export default function Matrix() {
                     const userObj = users.find(u => u.uid === member.uid);
                     const photoURL = userObj?.photoURL || (member as any).photoURL;
                     return (
-                      <th key={member.uid} className="px-4 py-4 text-center min-w-[120px]">
+                      <th key={member.uid} className="px-4 py-4 text-center break-words">
                         <div className="flex flex-col items-center space-y-1">
                           {photoURL ? (
                             <img 
@@ -774,7 +777,13 @@ export default function Matrix() {
           title={`Documentación: ${selectedTaskDoc.name}`}
         >
           <div className="space-y-4">
-            <p className="text-gray-600">{selectedTaskDoc.description}</p>
+            {selectedTaskDoc.description ? (
+              <div className="markdown-body text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg p-4 prose prose-sm max-w-none prose-blue">
+                <ReactMarkdown>{selectedTaskDoc.description}</ReactMarkdown>
+              </div>
+            ) : (
+              <p className="text-gray-500 italic">No hay descripción disponible para esta tarea.</p>
+            )}
             
             {selectedTaskDoc.attachments && selectedTaskDoc.attachments.length > 0 ? (
               <div className="mt-4">
