@@ -14,4 +14,4 @@ jobs:
           repoToken: '${{ secrets.GITHUB_TOKEN }}'
           firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_PROJECT_CCB31AC7_2F69_4BF5_B7F }}'
           channelId: live
-          projectId: gozen-493919
+          projectId: focus-9c1cb
