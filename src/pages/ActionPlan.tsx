@@ -15,6 +15,7 @@ import {
   Edit2,
   Tag,
   Search,
+  XCircle,
   X
 } from 'lucide-react';
 import { 
@@ -50,7 +51,8 @@ import { es } from 'date-fns/locale';
 
 const STATUS_OPTIONS: { value: ActionStatus; label: string; color: string; bg: string }[] = [
   { value: 'pendiente', label: 'Pendiente', color: 'text-gray-600', bg: 'bg-gray-100' },
-  { value: 'en_progreso', label: 'En Progreso', color: 'text-blue-600', bg: 'bg-blue-100' },
+  { value: 'en_progreso', label: 'En Curso', color: 'text-blue-600', bg: 'bg-blue-100' },
+  { value: 'retrasada', label: 'Retrasada', color: 'text-red-600', bg: 'bg-red-100' },
   { value: 'finalizada', label: 'Finalizada', color: 'text-green-600', bg: 'bg-green-100' },
   { value: 'bloqueada', label: 'Bloqueada', color: 'text-red-600', bg: 'bg-red-100' },
   { value: 'cancelada', label: 'Cancelada', color: 'text-gray-400', bg: 'bg-gray-200' },
@@ -80,17 +82,31 @@ export default function ActionPlanPage() {
 
   const companyId = dbUser?.companyId || activeCompanyId;
 
+  const calculateAutomaticStatus = (targetDate: string, currentStatus: ActionStatus): ActionStatus => {
+    if (currentStatus === 'finalizada' || currentStatus === 'cancelada' || currentStatus === 'bloqueada') {
+      return currentStatus;
+    }
+    
+    if (!targetDate) return 'pendiente';
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const deadline = new Date(targetDate);
+    deadline.setHours(0, 0, 0, 0);
+
+    if (deadline < today) {
+      return 'retrasada';
+    }
+    return 'en_progreso';
+  };
+
   // Filter actions based on permissions
   const filteredActions = React.useMemo(() => {
-    if (isAdmin) return actions;
-    
     const supervisorTeams = teams.filter(t => t.supervisorId === dbUser?.uid || t.supervisorId === dbUser?.email);
     const managedUserIds = new Set<string>();
-    supervisorTeams.forEach(t => {
-      t.members?.forEach((m: any) => managedUserIds.add(m.uid));
-    });
+    supervisorTeams.forEach(t => t.members?.forEach((m: any) => managedUserIds.add(m.uid)));
 
-    return actions.filter(action => {
+    const list = isAdmin ? actions : actions.filter(action => {
       const isCreator = action.createdBy === dbUser?.uid;
       const isAssignee = action.assignedTo.includes(dbUser?.uid || '');
       const isInManagedTeam = action.assignedTo.some(uid => managedUserIds.has(uid));
@@ -100,6 +116,11 @@ export default function ActionPlanPage() {
       }
       return isCreator || isAssignee;
     });
+
+    return list.map(a => ({
+      ...a,
+      status: calculateAutomaticStatus(a.targetDate, a.status)
+    }));
   }, [actions, isAdmin, isSupervisor, dbUser, teams]);
 
   // Filter assignable users based on hierarchy
@@ -221,10 +242,12 @@ export default function ActionPlanPage() {
 
       // Create a clean object with only the fields we want to save
       // This prevents sending 'id' field to addDoc or 'undefined' values
+      const autoStatus = calculateAutomaticStatus(editingAction.targetDate, editingAction.status || 'pendiente');
+      
       const actionPayload: any = {
         title: editingAction.title,
         description: editingAction.description || '',
-        status: editingAction.status || 'pendiente',
+        status: autoStatus,
         priority: editingAction.priority || 'media',
         categoryId: editingAction.categoryId || '',
         categoryName: categories.find(c => c.id === editingAction.categoryId)?.name || '',
@@ -262,6 +285,7 @@ export default function ActionPlanPage() {
           if (originalAction && originalAction.targetDate !== editingAction.targetDate) {
             restrictedData.dateChangeCount = (originalAction.dateChangeCount || 0) + 1;
             restrictedData.targetDate = editingAction.targetDate;
+            restrictedData.status = calculateAutomaticStatus(editingAction.targetDate, editingAction.status || 'pendiente');
           }
           await updateDoc(doc(db, 'actionPlans', editingAction.id), restrictedData);
         } else {
@@ -380,6 +404,21 @@ export default function ActionPlanPage() {
     }
   };
 
+  const handleCancelAction = async (action: ActionPlan) => {
+    try {
+      await updateDoc(doc(db, 'actionPlans', action.id), {
+        status: 'cancelada',
+        updatedAt: new Date().toISOString()
+      });
+      if (editingAction?.id === action.id) {
+        setEditingAction({ ...editingAction, status: 'cancelada' });
+      }
+    } catch (err) {
+      console.error("Error cancelling action:", err);
+      setError("Error al cancelar la acción.");
+    }
+  };
+
   const openEditModal = (action: ActionPlan) => {
     setEditingAction({ ...action });
     setTempSubActions(subActions.filter(s => s.actionId === action.id));
@@ -471,13 +510,22 @@ export default function ActionPlanPage() {
             )}
           </div>
           <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-            {action.status !== 'finalizada' && (
+            {action.status !== 'finalizada' && action.status !== 'cancelada' && (
               <button 
                 onClick={(e) => { e.stopPropagation(); handleFinalizeAction(action); }}
                 className="p-1 hover:bg-gray-100 rounded text-gray-400 hover:text-green-600"
                 title="Finalizar"
               >
                 <CheckCircle2 size={14} />
+              </button>
+            )}
+            {action.status !== 'cancelada' && (
+              <button 
+                onClick={(e) => { e.stopPropagation(); handleCancelAction(action); }}
+                className="p-1 hover:bg-gray-100 rounded text-gray-400 hover:text-orange-600"
+                title="Cerrar / Cancelar"
+              >
+                <XCircle size={14} />
               </button>
             )}
             <button 
@@ -790,16 +838,26 @@ export default function ActionPlanPage() {
                     </select>
                   </div>
                   <div className="sm:col-span-1">
-                    <label className="block text-sm font-semibold text-gray-700 mb-1">Estado</label>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">
+                      Estado {editingAction?.status === 'pendiente' || editingAction?.status === 'en_progreso' || editingAction?.status === 'retrasada' ? '(Auto)' : ''}
+                    </label>
                     <select 
                       value={editingAction?.status || 'pendiente'}
                       onChange={(e) => setEditingAction({ ...editingAction, status: e.target.value as ActionStatus })}
                       className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm bg-white text-sm"
                     >
-                      {STATUS_OPTIONS.map(s => (
-                        <option key={s.value} value={s.value}>{s.label}</option>
-                      ))}
+                      {STATUS_OPTIONS.map(s => {
+                        const isAuto = s.value === 'retrasada' || s.value === 'en_progreso' || s.value === 'pendiente';
+                        return (
+                          <option key={s.value} value={s.value}>
+                            {s.label} {isAuto ? ' (Automático)' : ''}
+                          </option>
+                        );
+                      })}
                     </select>
+                    {(editingAction?.status === 'pendiente' || editingAction?.status === 'en_progreso' || editingAction?.status === 'retrasada') && (
+                      <p className="text-[10px] text-gray-400 mt-1 italic">Este estado se calcula según la fecha.</p>
+                    )}
                   </div>
                   <div className="sm:col-span-1">
                     <label className="block text-sm font-semibold text-gray-700 mb-1">Vencimiento</label>
@@ -999,14 +1057,24 @@ export default function ActionPlanPage() {
           </div>
 
           <div className="pt-6 mt-6 flex flex-col sm:flex-row justify-end gap-3 border-t border-gray-100">
-            {editingAction?.id && editingAction.status !== 'finalizada' && (
+            {editingAction?.id && editingAction.status !== 'finalizada' && editingAction.status !== 'cancelada' && (
               <button
                 type="button"
                 onClick={() => handleFinalizeAction(editingAction as ActionPlan)}
                 className="w-full sm:w-auto px-6 py-3 text-sm font-bold text-green-600 hover:bg-green-50 rounded-xl transition-all border border-green-100 flex items-center justify-center gap-2"
               >
                 <CheckCircle2 size={18} />
-                Finalizar Acción
+                Finalizar
+              </button>
+            )}
+            {editingAction?.id && editingAction.status !== 'cancelada' && (
+              <button
+                type="button"
+                onClick={() => handleCancelAction(editingAction as ActionPlan)}
+                className="w-full sm:w-auto px-6 py-3 text-sm font-bold text-orange-600 hover:bg-orange-50 rounded-xl transition-all border border-orange-100 flex items-center justify-center gap-2"
+              >
+                <XCircle size={18} />
+                Cancelar Acción
               </button>
             )}
             <button

@@ -130,7 +130,7 @@ export interface TrainingAction {
   companyId: string;
 }
 
-export type ActionStatus = 'pendiente' | 'en_progreso' | 'finalizada' | 'bloqueada' | 'cancelada';
+export type ActionStatus = 'pendiente' | 'en_progreso' | 'finalizada' | 'bloqueada' | 'cancelada' | 'retrasada';
 export type ActionPriority = 'baja' | 'media' | 'alta' | 'critica';
 
 export interface ActionPlan {

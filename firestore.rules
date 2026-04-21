@@ -277,7 +277,7 @@ service cloud.firestore {
              (!('createdByName' in data) || data.createdByName is string) &&
              (!('assignedTo' in data) || data.assignedTo is list) &&
              (!('assignedToNames' in data) || data.assignedToNames is list) &&
-             data.status in ['pendiente', 'en_progreso', 'finalizada', 'bloqueada', 'cancelada'] &&
+             data.status in ['pendiente', 'en_progreso', 'finalizada', 'bloqueada', 'cancelada', 'retrasada'] &&
              data.priority in ['baja', 'media', 'alta', 'critica'] &&
              data.targetDate is string &&
              data.companyId is string &&
