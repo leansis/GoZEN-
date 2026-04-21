@@ -178,6 +178,7 @@
         "status": { "type": "string", "enum": ["pendiente", "en_progreso", "finalizada", "bloqueada", "cancelada"] },
         "priority": { "type": "string", "enum": ["baja", "media", "alta", "critica"] },
         "targetDate": { "type": "string" },
+        "dateChangeCount": { "type": "number" },
         "notes": { "type": "string" },
         "companyId": { "type": "string" },
         "createdAt": { "type": "string" },

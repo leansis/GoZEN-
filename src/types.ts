@@ -146,6 +146,7 @@ export interface ActionPlan {
   status: ActionStatus;
   priority: ActionPriority;
   targetDate: string; // Projected end date
+  dateChangeCount?: number;
   notes?: string;
   companyId: string;
   createdAt: string;

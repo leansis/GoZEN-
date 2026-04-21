@@ -229,6 +229,7 @@ export default function ActionPlanPage() {
         categoryId: editingAction.categoryId || '',
         categoryName: categories.find(c => c.id === editingAction.categoryId)?.name || '',
         targetDate: editingAction.targetDate,
+        dateChangeCount: editingAction.dateChangeCount || 0,
         notes: editingAction.notes || '',
         companyId: companyId,
         updatedAt: now,
@@ -252,13 +253,22 @@ export default function ActionPlanPage() {
 
         if (isAssignee && !isCreator && !isSupervisor && !isAdmin) {
           // Rule: Assignee can only change status and notes
-          const restrictedData = {
+          const restrictedData: any = {
             status: editingAction.status,
             notes: editingAction.notes,
             updatedAt: now
           };
+          // If the date changed (even if restricted, we check for logic consistency)
+          if (originalAction && originalAction.targetDate !== editingAction.targetDate) {
+            restrictedData.dateChangeCount = (originalAction.dateChangeCount || 0) + 1;
+            restrictedData.targetDate = editingAction.targetDate;
+          }
           await updateDoc(doc(db, 'actionPlans', editingAction.id), restrictedData);
         } else {
+          // Check if date changed to increment count
+          if (originalAction && originalAction.targetDate !== editingAction.targetDate) {
+            actionPayload.dateChangeCount = (originalAction.dateChangeCount || 0) + 1;
+          }
           await updateDoc(doc(db, 'actionPlans', editingAction.id), actionPayload);
         }
       } else {
@@ -494,9 +504,15 @@ export default function ActionPlanPage() {
             <UserIcon size={12} className="text-gray-400" />
             <span className="truncate">{assignedNames}</span>
           </div>
-          <div className="flex items-center text-[10px] text-gray-500 gap-1.5">
+          <div className="flex items-center text-[10px] text-gray-500 gap-1.5 font-medium">
             <Calendar size={12} className="text-gray-400" />
             <span>Fin: {formatDateSafe(action.targetDate)}</span>
+            {action.dateChangeCount && action.dateChangeCount > 0 ? (
+              <span className="flex items-center gap-0.5 text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded-full border border-orange-100 ml-1" title={`${action.dateChangeCount} cambios de fecha`}>
+                <History size={10} />
+                {action.dateChangeCount}
+              </span>
+            ) : null}
           </div>
         </div>
 
@@ -580,9 +596,15 @@ export default function ActionPlanPage() {
     {
       header: 'Fecha Fin',
       accessor: (a) => (
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 min-w-[120px]">
           <Calendar size={14} className="text-gray-400" />
           <span className="text-xs">{a.targetDate ? format(new Date(a.targetDate), 'dd/MM/yyyy') : 'N/A'}</span>
+          {a.dateChangeCount && a.dateChangeCount > 0 ? (
+            <span className="flex items-center gap-0.5 text-orange-600 bg-orange-50 px-1 hover:bg-orange-100 rounded text-[10px] border border-orange-100" title={`${a.dateChangeCount} cambios`}>
+              <History size={10} />
+              {a.dateChangeCount}
+            </span>
+          ) : null}
         </div>
       ),
       sortable: true,

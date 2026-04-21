@@ -287,6 +287,7 @@ service cloud.firestore {
              (!('notes' in data) || data.notes is string) &&
              (!('categoryId' in data) || data.categoryId is string) &&
              (!('categoryName' in data) || data.categoryName is string) &&
+             (!('dateChangeCount' in data) || data.dateChangeCount is number) &&
              (!('id' in data) || (data.id is string));
     }
 
