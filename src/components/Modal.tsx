@@ -1,19 +1,21 @@
 import React from 'react';
 import { X } from 'lucide-react';
+import clsx from 'clsx';
 
 interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
   title: string;
   children: React.ReactNode;
+  maxWidth?: string;
 }
 
-export default function Modal({ isOpen, onClose, title, children }: ModalProps) {
+export default function Modal({ isOpen, onClose, title, children, maxWidth = 'max-w-2xl' }: ModalProps) {
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto overflow-x-hidden bg-black/50">
-      <div className="relative w-full max-w-2xl p-4">
+      <div className={clsx("relative w-full p-4 transition-all duration-300", maxWidth)}>
         <div className="relative bg-white rounded-xl shadow-lg">
           <div className="flex items-center justify-between p-4 border-b">
             <h3 className="text-xl font-semibold text-gray-900">{title}</h3>

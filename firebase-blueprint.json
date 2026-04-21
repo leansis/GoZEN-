@@ -163,6 +163,62 @@
         "companyId": { "type": "string" }
       },
       "required": ["teamId", "processId", "taskId", "targetCounts", "companyId"]
+    },
+    "ActionPlan": {
+      "title": "ActionPlan",
+      "description": "An action plan item",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "createdByName": { "type": "string" },
+        "assignedTo": { "type": "array", "items": { "type": "string" } },
+        "assignedToNames": { "type": "array", "items": { "type": "string" } },
+        "status": { "type": "string", "enum": ["pendiente", "en_progreso", "finalizada", "bloqueada", "cancelada"] },
+        "priority": { "type": "string", "enum": ["baja", "media", "alta", "critica"] },
+        "targetDate": { "type": "string" },
+        "notes": { "type": "string" },
+        "companyId": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["title", "createdBy", "status", "priority", "targetDate", "companyId", "createdAt", "updatedAt"]
+    },
+    "SubAction": {
+      "title": "SubAction",
+      "description": "A sub-action belonging to an action plan",
+      "type": "object",
+      "properties": {
+        "actionId": { "type": "string" },
+        "title": { "type": "string" },
+        "completed": { "type": "boolean" },
+        "currentProposedDate": { "type": "string" },
+        "dateHistory": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "date": { "type": "string" },
+              "setAt": { "type": "string" },
+              "setBy": { "type": "string" }
+            }
+          }
+        }
+      },
+      "required": ["actionId", "title", "completed"]
+    },
+    "ActionCategory": {
+      "title": "ActionCategory",
+      "description": "A category for action plans",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "companyId": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["name", "companyId", "createdAt"]
     }
   },
   "firestore": {
@@ -205,6 +261,18 @@
     "/teamTargets/{teamTargetId}": {
       "schema": { "$ref": "#/entities/TeamTarget" },
       "description": "Team targets for tasks"
+    },
+    "/actionPlans/{actionPlanId}": {
+      "schema": { "$ref": "#/entities/ActionPlan" },
+      "description": "Action plans"
+    },
+    "/subActions/{subActionId}": {
+      "schema": { "$ref": "#/entities/SubAction" },
+      "description": "Sub-actions of action plans"
+    },
+    "/actionCategories/{categoryId}": {
+      "schema": { "$ref": "#/entities/ActionCategory" },
+      "description": "Categories for action plans"
     }
   }
 }

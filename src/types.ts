@@ -129,3 +129,48 @@ export interface TrainingAction {
   description?: string;
   companyId: string;
 }
+
+export type ActionStatus = 'pendiente' | 'en_progreso' | 'finalizada' | 'bloqueada' | 'cancelada';
+export type ActionPriority = 'baja' | 'media' | 'alta' | 'critica';
+
+export interface ActionPlan {
+  id: string;
+  title: string;
+  description: string;
+  categoryId?: string;
+  categoryName?: string;
+  createdBy: string;
+  createdByName: string;
+  assignedTo: string[]; // List of user IDs
+  assignedToNames: string[];
+  status: ActionStatus;
+  priority: ActionPriority;
+  targetDate: string; // Projected end date
+  notes?: string;
+  companyId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SubActionAudit {
+  date: string; // The proposed completion date
+  setAt: string; // When it was set
+  setBy: string; // Who set it
+}
+
+export interface SubAction {
+  id: string;
+  actionId: string;
+  title: string;
+  completed: boolean;
+  currentProposedDate: string;
+  dateHistory: SubActionAudit[];
+  companyId: string;
+}
+
+export interface ActionCategory {
+  id: string;
+  name: string;
+  companyId: string;
+  createdAt: string;
+}

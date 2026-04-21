@@ -270,6 +270,46 @@ service cloud.firestore {
              (!('id' in data) || (data.id is string));
     }
 
+    function isValidActionPlan(data) {
+      return data.keys().hasAll(['title', 'createdBy', 'status', 'priority', 'targetDate', 'companyId', 'createdAt', 'updatedAt']) &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
+             data.createdBy is string &&
+             (!('createdByName' in data) || data.createdByName is string) &&
+             (!('assignedTo' in data) || data.assignedTo is list) &&
+             (!('assignedToNames' in data) || data.assignedToNames is list) &&
+             data.status in ['pendiente', 'en_progreso', 'finalizada', 'bloqueada', 'cancelada'] &&
+             data.priority in ['baja', 'media', 'alta', 'critica'] &&
+             data.targetDate is string &&
+             data.companyId is string &&
+             data.createdAt is string &&
+             data.updatedAt is string &&
+             (!('description' in data) || data.description is string) &&
+             (!('notes' in data) || data.notes is string) &&
+             (!('categoryId' in data) || data.categoryId is string) &&
+             (!('categoryName' in data) || data.categoryName is string) &&
+             (!('id' in data) || (data.id is string));
+    }
+
+    function isValidSubAction(data) {
+      return data.keys().hasAll(['actionId', 'title', 'completed']) &&
+             data.actionId is string &&
+             data.title is string && data.title.size() >= 0 && data.title.size() < 200 &&
+             data.completed is bool &&
+             (!('companyId' in data) || data.companyId is string) &&
+             (!('currentProposedDate' in data) || data.currentProposedDate is string) &&
+             (!('dateHistory' in data) || data.dateHistory is list) &&
+             (!('id' in data) || (data.id is string));
+    }
+
+    function isValidActionCategory(data) {
+      return data.keys().hasAll(['name', 'companyId', 'createdAt']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.companyId is string &&
+             data.createdAt is string &&
+             (!('updatedAt' in data) || data.updatedAt is string) &&
+             (!('id' in data) || (data.id is string));
+    }
+
     // ===============================================================
     // Rules
     // ===============================================================
@@ -380,6 +420,39 @@ service cloud.firestore {
       allow read: if belongsToCompany(resource.data.companyId);
       allow create: if (isAdmin() || isSupervisor()) && isValidTeamTarget(request.resource.data) && belongsToCompany(request.resource.data.companyId);
       allow update: if (isAdmin() || isSupervisor()) && isValidTeamTarget(request.resource.data) && belongsToCompany(request.resource.data.companyId);
+      allow delete: if isAdmin() && belongsToCompany(resource.data.companyId);
+    }
+
+    match /actionPlans/{actionPlanId} {
+      allow read: if isAuthenticated() && belongsToCompany(resource.data.companyId);
+      allow create: if isAuthenticated() && 
+                    isValidActionPlan(request.resource.data) && 
+                    belongsToCompany(request.resource.data.companyId) &&
+                    (request.resource.data.createdBy == request.auth.uid || isSupervisor());
+      allow update: if isAuthenticated() && 
+                    isValidActionPlan(request.resource.data) && 
+                    belongsToCompany(resource.data.companyId) &&
+                    (
+                      request.auth.uid == resource.data.createdBy || 
+                      isSupervisor() || 
+                      (request.auth.uid in resource.data.assignedTo && 
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'notes', 'updatedAt']))
+                    );
+      allow delete: if isAuthenticated() && 
+                    belongsToCompany(resource.data.companyId) && 
+                    (request.auth.uid == resource.data.createdBy || isAdmin());
+    }
+
+    match /subActions/{subActionId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidSubAction(request.resource.data);
+      allow update: if isAuthenticated() && isValidSubAction(request.resource.data);
+      allow delete: if isAuthenticated();
+    }
+
+    match /actionCategories/{categoryId} {
+      allow read: if isAuthenticated() && belongsToCompany(resource.data.companyId);
+      allow create, update: if isAdmin() && isValidActionCategory(request.resource.data) && belongsToCompany(request.resource.data.companyId);
       allow delete: if isAdmin() && belongsToCompany(resource.data.companyId);
     }
   }

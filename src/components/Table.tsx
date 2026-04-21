@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Pencil, Trash2, ArrowUpDown, Search, GripVertical } from 'lucide-react';
+import { Pencil, Trash2, ArrowUpDown, Search, GripVertical, CheckCircle2 } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -30,6 +30,7 @@ interface TableProps<T> {
   data: T[];
   onEdit?: (item: T) => void;
   onDelete?: (item: T) => void;
+  onFinalize?: (item: T) => void;
   searchable?: boolean;
   onReorder?: (items: T[]) => void;
 }
@@ -39,12 +40,14 @@ function SortableRow<T extends { id: string }>({
   columns, 
   onEdit, 
   onDelete,
+  onFinalize,
   isDragEnabled
 }: { 
   item: T; 
   columns: Column<T>[]; 
   onEdit?: (item: T) => void; 
   onDelete?: (item: T) => void;
+  onFinalize?: (item: T) => void;
   isDragEnabled: boolean;
 }) {
   const {
@@ -83,8 +86,17 @@ function SortableRow<T extends { id: string }>({
             : (item[col.accessor] as React.ReactNode)}
         </td>
       ))}
-      {(onEdit || onDelete) && (
+      {((onEdit || onDelete || onFinalize)) && (
         <td className="px-6 py-4 text-right space-x-2">
+          {onFinalize && (item as any).status !== 'finalizada' && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onFinalize(item); }}
+              className="inline-flex items-center justify-center p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+              title="Finalizar"
+            >
+              <CheckCircle2 className="w-4 h-4" />
+            </button>
+          )}
           {onEdit && (
             <button
               onClick={() => onEdit(item)}
@@ -109,7 +121,7 @@ function SortableRow<T extends { id: string }>({
   );
 }
 
-export default function Table<T extends { id: string }>({ columns, data, onEdit, onDelete, searchable = true, onReorder }: TableProps<T>) {
+export default function Table<T extends { id: string }>({ columns, data, onEdit, onDelete, onFinalize, searchable = true, onReorder }: TableProps<T>) {
   const [sortConfig, setSortConfig] = useState<{ key: number; direction: 'asc' | 'desc' } | null>(null);
   const [filterText, setFilterText] = useState('');
 
@@ -231,7 +243,7 @@ export default function Table<T extends { id: string }>({ columns, data, onEdit,
                     </div>
                   </th>
                 ))}
-                {(onEdit || onDelete) && (
+                {(onEdit || onDelete || onFinalize) && (
                   <th scope="col" className="px-6 py-3 text-right">
                     Acciones
                   </th>
@@ -257,6 +269,7 @@ export default function Table<T extends { id: string }>({ columns, data, onEdit,
                       columns={columns} 
                       onEdit={onEdit} 
                       onDelete={onDelete}
+                      onFinalize={onFinalize}
                       isDragEnabled={isDragEnabled}
                     />
                   ))}

@@ -14,8 +14,10 @@ import AdminActivities from './pages/admin/Activities';
 import AdminProcesses from './pages/admin/Processes';
 import AdminTasks from './pages/admin/Tasks';
 import AdminCriteria from './pages/admin/Criteria';
+import AdminActionCategories from './pages/admin/ActionCategories';
 import AdminMasterData from './pages/admin/MasterData';
 import MasterUsers from './pages/admin/MasterUsers';
+import ActionPlan from './pages/ActionPlan';
 import { AuthContext } from './AuthContext';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from './firebase';
@@ -323,6 +325,7 @@ export default function App() {
                 <Route path="matrix" element={<Matrix />} />
                 <Route path="process-map" element={<ProcessMap />} />
                 <Route path="training" element={<TrainingActions />} />
+                <Route path="action-plan" element={<ActionPlan />} />
                 <Route path="statistics" element={<Statistics />} />
                 <Route path="ohp" element={<OHP />} />
                 
@@ -333,6 +336,7 @@ export default function App() {
                 <Route path="admin/processes" element={<ProtectedRoute requireAdmin><AdminProcesses /></ProtectedRoute>} />
                 <Route path="admin/tasks" element={<ProtectedRoute requireAdmin><AdminTasks /></ProtectedRoute>} />
                 <Route path="admin/criteria" element={<ProtectedRoute requireAdmin><AdminCriteria /></ProtectedRoute>} />
+                <Route path="admin/action-categories" element={<ProtectedRoute requireAdmin><AdminActionCategories /></ProtectedRoute>} />
                 <Route path="admin/master-data" element={<ProtectedRoute requireAdmin><AdminMasterData /></ProtectedRoute>} />
               </Route>
             </Routes>

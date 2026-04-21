@@ -11,6 +11,8 @@ import {
   Settings, 
   CheckSquare, 
   ListChecks,
+  Tag,
+  ClipboardList,
   LogOut,
   ChevronDown,
   ChevronRight,
@@ -38,6 +40,7 @@ export default function Layout() {
 
   const topLevelItems = [
     { name: 'OHP', path: '/ohp', icon: Network, roles: ['admin', 'supervisor', 'user', 'lean_promotor'] },
+    { name: 'Plan de acciones', path: '/action-plan', icon: ClipboardList, roles: ['admin', 'supervisor', 'user', 'lean_promotor'] },
   ];
 
   const adminItems = [
@@ -47,6 +50,7 @@ export default function Layout() {
     { name: 'Procesos', path: '/admin/processes', icon: Settings },
     { name: 'Tareas', path: '/admin/tasks', icon: CheckSquare },
     { name: 'Criterios', path: '/admin/criteria', icon: ListChecks },
+    { name: 'Categorías de Acción', path: '/admin/action-categories', icon: Tag },
     { name: 'Datos Maestros', path: '/admin/master-data', icon: Database },
   ];
 
@@ -74,6 +78,27 @@ export default function Layout() {
             <LayoutDashboard className={clsx('mr-3 h-5 w-5', location.pathname === '/' ? 'text-blue-700' : 'text-gray-400')} />
             Menú Principal
           </Link>
+
+          {/* Top Level Items */}
+          {topLevelItems.filter(item => item.roles.includes(dbUser?.role || 'user')).map((item) => {
+            const Icon = item.icon;
+            const isActive = location.pathname === item.path;
+            return (
+              <Link
+                key={item.name}
+                to={item.path}
+                className={clsx(
+                  'flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-colors',
+                  isActive 
+                    ? 'bg-blue-50 text-blue-700' 
+                    : 'text-gray-700 hover:bg-gray-100'
+                )}
+              >
+                <Icon className={clsx('mr-3 h-5 w-5', isActive ? 'text-blue-700' : 'text-gray-400')} />
+                {item.name}
+              </Link>
+            );
+          })}
 
           {/* Polivalencia Section */}
           <div className="mb-2">
@@ -116,27 +141,6 @@ export default function Layout() {
               </div>
             )}
           </div>
-
-          {/* Top Level Items */}
-          {topLevelItems.filter(item => item.roles.includes(dbUser?.role || 'user')).map((item) => {
-            const Icon = item.icon;
-            const isActive = location.pathname === item.path;
-            return (
-              <Link
-                key={item.name}
-                to={item.path}
-                className={clsx(
-                  'flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-colors',
-                  isActive 
-                    ? 'bg-blue-50 text-blue-700' 
-                    : 'text-gray-700 hover:bg-gray-100'
-                )}
-              >
-                <Icon className={clsx('mr-3 h-5 w-5', isActive ? 'text-blue-700' : 'text-gray-400')} />
-                {item.name}
-              </Link>
-            );
-          })}
 
           {isAdmin && (
             <>

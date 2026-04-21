@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
-import { Building2, Users, ArrowRight, LogOut, Plus, Trash2 } from 'lucide-react';
+import { Building2, Users, ArrowRight, LogOut, Plus, Trash2, LayoutDashboard, ClipboardList } from 'lucide-react';
 import { collection, onSnapshot, query, orderBy, addDoc, deleteDoc, doc, where } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Company } from '../types';
@@ -269,13 +269,23 @@ export default function Home() {
                   Has accedido como miembro de <span className="font-bold text-gray-900">{company?.name || 'tu empresa'}</span>.
                 </p>
                 
-                <button
-                  onClick={() => navigate('/matrix')}
-                  className="w-full max-w-sm bg-blue-600 text-white px-8 py-4 rounded-2xl font-bold text-lg hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 flex items-center justify-center gap-3 mx-auto"
-                >
-                  Entrar a la Aplicación
-                  <ArrowRight size={24} />
-                </button>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
+                  <button
+                    onClick={() => navigate('/matrix')}
+                    className="w-full bg-blue-600 text-white px-8 py-6 rounded-2xl font-bold text-lg hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 flex flex-col items-center justify-center gap-3"
+                  >
+                    <LayoutDashboard size={32} />
+                    <span>Matriz de Polivalencia</span>
+                  </button>
+                  
+                  <button
+                    onClick={() => navigate('/action-plan')}
+                    className="w-full bg-white border-2 border-blue-100 text-blue-700 px-8 py-6 rounded-2xl font-bold text-lg hover:bg-blue-50 transition-all shadow-sm flex flex-col items-center justify-center gap-3"
+                  >
+                    <ClipboardList size={32} />
+                    <span>Plan de Acciones</span>
+                  </button>
+                </div>
               </div>
             )}
           </div>
