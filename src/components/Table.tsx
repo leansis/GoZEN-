@@ -31,6 +31,7 @@ interface TableProps<T> {
   onEdit?: (item: T) => void;
   onDelete?: (item: T) => void;
   onFinalize?: (item: T) => void;
+  actions?: (item: T) => React.ReactNode;
   searchable?: boolean;
   onReorder?: (items: T[]) => void;
 }
@@ -41,6 +42,7 @@ function SortableRow<T extends { id: string }>({
   onEdit, 
   onDelete,
   onFinalize,
+  actions,
   isDragEnabled
 }: { 
   item: T; 
@@ -48,6 +50,7 @@ function SortableRow<T extends { id: string }>({
   onEdit?: (item: T) => void; 
   onDelete?: (item: T) => void;
   onFinalize?: (item: T) => void;
+  actions?: (item: T) => React.ReactNode;
   isDragEnabled: boolean;
 }) {
   const {
@@ -86,8 +89,9 @@ function SortableRow<T extends { id: string }>({
             : (item[col.accessor] as React.ReactNode)}
         </td>
       ))}
-      {((onEdit || onDelete || onFinalize)) && (
+      {((onEdit || onDelete || onFinalize || actions)) && (
         <td className="px-6 py-4 text-right space-x-2">
+          {actions && actions(item)}
           {onFinalize && (item as any).status !== 'finalizada' && (
             <button
               onClick={(e) => { e.stopPropagation(); onFinalize(item); }}
@@ -121,7 +125,7 @@ function SortableRow<T extends { id: string }>({
   );
 }
 
-export default function Table<T extends { id: string }>({ columns, data, onEdit, onDelete, onFinalize, searchable = true, onReorder }: TableProps<T>) {
+export default function Table<T extends { id: string }>({ columns, data, onEdit, onDelete, onFinalize, actions, searchable = true, onReorder }: TableProps<T>) {
   const [sortConfig, setSortConfig] = useState<{ key: number; direction: 'asc' | 'desc' } | null>(null);
   const [filterText, setFilterText] = useState('');
 
@@ -243,7 +247,7 @@ export default function Table<T extends { id: string }>({ columns, data, onEdit,
                     </div>
                   </th>
                 ))}
-                {(onEdit || onDelete || onFinalize) && (
+                {((onEdit || onDelete || onFinalize || actions)) && (
                   <th scope="col" className="px-6 py-3 text-right">
                     Acciones
                   </th>
@@ -253,7 +257,7 @@ export default function Table<T extends { id: string }>({ columns, data, onEdit,
             <tbody>
               {sortedData.length === 0 ? (
                 <tr>
-                  <td colSpan={columns.length + ((onEdit || onDelete) ? 1 : 0) + (isDragEnabled ? 1 : 0)} className="px-6 py-4 text-center text-gray-500">
+                  <td colSpan={columns.length + ((onEdit || onDelete || onFinalize || actions) ? 1 : 0) + (isDragEnabled ? 1 : 0)} className="px-6 py-4 text-center text-gray-500">
                     No hay datos disponibles
                   </td>
                 </tr>
@@ -270,6 +274,7 @@ export default function Table<T extends { id: string }>({ columns, data, onEdit,
                       onEdit={onEdit} 
                       onDelete={onDelete}
                       onFinalize={onFinalize}
+                      actions={actions}
                       isDragEnabled={isDragEnabled}
                     />
                   ))}

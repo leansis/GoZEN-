@@ -175,3 +175,48 @@ export interface ActionCategory {
   companyId: string;
   createdAt: string;
 }
+
+export type ForumFrequency = 'diaria' | 'semanal' | 'mensual' | 'adhoc';
+export type ForumSessionStatus = 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
+
+export interface ForumAgendaItem {
+  id: string;
+  title: string;
+  duration?: number; // Estimated duration in minutes
+  order: number;
+}
+
+export interface Forum {
+  id: string;
+  name: string;
+  description?: string;
+  teamId: string;
+  teamName?: string;
+  companyId: string;
+  frequency: ForumFrequency;
+  estimatedDuration: number; // Total minutes
+  agenda: ForumAgendaItem[];
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface ForumAttendee {
+  uid: string;
+  name: string;
+  present: boolean;
+}
+
+export interface ForumSession {
+  id: string;
+  forumId: string;
+  forumName: string;
+  scheduledAt: string;
+  startedAt?: string;
+  completedAt?: string;
+  status: ForumSessionStatus;
+  attendees: ForumAttendee[];
+  currentAgendaStep: number; // Index of the agenda item
+  results: Record<string, string>; // item.id -> notes/results
+  companyId: string;
+  createdBy: string;
+}

@@ -311,6 +311,37 @@ service cloud.firestore {
              (!('id' in data) || (data.id is string));
     }
 
+    function isValidForum(data) {
+      return data.keys().hasAll(['name', 'teamId', 'companyId', 'frequency', 'agenda', 'createdBy', 'createdAt']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 200 &&
+             data.teamId is string &&
+             data.companyId is string &&
+             data.frequency in ['diaria', 'semanal', 'mensual', 'adhoc'] &&
+             data.estimatedDuration is number &&
+             data.agenda is list &&
+             data.createdBy is string &&
+             data.createdAt is string &&
+             (!('description' in data) || data.description is string) &&
+             (!('teamName' in data) || data.teamName is string) &&
+             (!('id' in data) || (data.id is string));
+    }
+
+    function isValidForumSession(data) {
+      return data.keys().hasAll(['forumId', 'forumName', 'scheduledAt', 'status', 'attendees', 'currentAgendaStep', 'results', 'companyId', 'createdBy']) &&
+             data.forumId is string &&
+             data.forumName is string &&
+             data.scheduledAt is string &&
+             data.status in ['scheduled', 'in_progress', 'completed', 'cancelled'] &&
+             data.attendees is list &&
+             data.currentAgendaStep is number &&
+             data.results is map &&
+             data.companyId is string &&
+             data.createdBy is string &&
+             (!('startedAt' in data) || data.startedAt is string) &&
+             (!('completedAt' in data) || data.completedAt is string) &&
+             (!('id' in data) || (data.id is string));
+    }
+
     // ===============================================================
     // Rules
     // ===============================================================
@@ -454,6 +485,18 @@ service cloud.firestore {
     match /actionCategories/{categoryId} {
       allow read: if isAuthenticated() && belongsToCompany(resource.data.companyId);
       allow create, update: if isAdmin() && isValidActionCategory(request.resource.data) && belongsToCompany(request.resource.data.companyId);
+      allow delete: if isAdmin() && belongsToCompany(resource.data.companyId);
+    }
+
+    match /forums/{forumId} {
+      allow read: if isAuthenticated() && belongsToCompany(resource.data.companyId);
+      allow create, update: if (isAdmin() || isSupervisor()) && isValidForum(request.resource.data) && belongsToCompany(request.resource.data.companyId);
+      allow delete: if isAdmin() && belongsToCompany(resource.data.companyId);
+    }
+
+    match /forumSessions/{sessionId} {
+      allow read: if isAuthenticated() && belongsToCompany(resource.data.companyId);
+      allow create, update: if isAuthenticated() && belongsToCompany(request.resource.data.companyId) && isValidForumSession(request.resource.data);
       allow delete: if isAdmin() && belongsToCompany(resource.data.companyId);
     }
   }

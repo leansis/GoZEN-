@@ -3,7 +3,7 @@ import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../AuthContext';
 import { handleFirestoreError, OperationType } from '../lib/firestore-utils';
-import { Team, Process, Task, Criterion, UserTaskLevel, TrainingAction, Activity } from '../types';
+import { Team, Process, Task, Criterion, UserTaskLevel, TrainingAction, Activity, Forum, ForumSession } from '../types';
 
 interface AppDataContextType {
   activities: Activity[];
@@ -15,6 +15,8 @@ interface AppDataContextType {
   trainingActions: TrainingAction[];
   teamTargets: any[];
   users: any[];
+  forums: Forum[];
+  forumSessions: ForumSession[];
   loading: boolean;
 }
 
@@ -32,6 +34,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [trainingActions, setTrainingActions] = useState<TrainingAction[]>([]);
   const [teamTargets, setTeamTargets] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
+  const [forums, setForums] = useState<Forum[]>([]);
+  const [forumSessions, setForumSessions] = useState<ForumSession[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -47,6 +51,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       setTrainingActions([]);
       setTeamTargets([]);
       setUsers([]);
+      setForums([]);
+      setForumSessions([]);
       setLoading(false);
       return;
     }
@@ -94,9 +100,17 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
 
     const unsubUsers = onSnapshot(getQuery('users'), (snapshot) => {
       setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'users'));
+
+    const unsubForums = onSnapshot(getQuery('forums'), (snapshot) => {
+      setForums(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Forum)));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'forums'));
+
+    const unsubForumSessions = onSnapshot(getQuery('forumSessions'), (snapshot) => {
+      setForumSessions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ForumSession)));
       setLoading(false);
     }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'users');
+      handleFirestoreError(error, OperationType.LIST, 'forumSessions');
       setLoading(false);
     });
 
@@ -110,12 +124,14 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       unsubTraining();
       unsubTeamTargets();
       unsubUsers();
+      unsubForums();
+      unsubForumSessions();
     };
   }, [activeCompanyId, dbUser?.companyId]);
 
   return (
     <AppDataContext.Provider value={{
-      activities, teams, processes, tasks, criteria, userTaskLevels, trainingActions, teamTargets, users, loading
+      activities, teams, processes, tasks, criteria, userTaskLevels, trainingActions, teamTargets, users, forums, forumSessions, loading
     }}>
       {children}
     </AppDataContext.Provider>

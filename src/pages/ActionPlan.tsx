@@ -865,7 +865,11 @@ export default function ActionPlanPage() {
                       type="date"
                       required
                       value={editingAction?.targetDate || ''}
-                      onChange={(e) => setEditingAction({ ...editingAction, targetDate: e.target.value })}
+                      onChange={(e) => {
+                        const newDate = e.target.value;
+                        const newStatus = calculateAutomaticStatus(newDate, editingAction?.status || 'pendiente');
+                        setEditingAction({ ...editingAction, targetDate: newDate, status: newStatus });
+                      }}
                       className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm text-sm"
                     />
                   </div>

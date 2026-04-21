@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
-import { Building2, Users, ArrowRight, LogOut, Plus, Trash2, LayoutDashboard, ClipboardList } from 'lucide-react';
+import { Building2, Users, ArrowRight, LogOut, Plus, Trash2, LayoutDashboard, ClipboardList, MessagesSquare } from 'lucide-react';
 import { collection, onSnapshot, query, orderBy, addDoc, deleteDoc, doc, where } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Company } from '../types';
@@ -269,21 +269,29 @@ export default function Home() {
                   Has accedido como miembro de <span className="font-bold text-gray-900">{company?.name || 'tu empresa'}</span>.
                 </p>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
                   <button
                     onClick={() => navigate('/matrix')}
-                    className="w-full bg-blue-600 text-white px-8 py-6 rounded-2xl font-bold text-lg hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 flex flex-col items-center justify-center gap-3"
+                    className="w-full bg-blue-600 text-white px-6 py-10 rounded-3xl font-bold text-xl hover:bg-blue-700 transition-all shadow-xl shadow-blue-200 flex flex-col items-center justify-center gap-4"
                   >
-                    <LayoutDashboard size={32} />
-                    <span>Matriz de Polivalencia</span>
+                    <LayoutDashboard size={40} />
+                    <span>Polivalencia</span>
                   </button>
                   
                   <button
                     onClick={() => navigate('/action-plan')}
-                    className="w-full bg-white border-2 border-blue-100 text-blue-700 px-8 py-6 rounded-2xl font-bold text-lg hover:bg-blue-50 transition-all shadow-sm flex flex-col items-center justify-center gap-3"
+                    className="w-full bg-white border-2 border-blue-50 text-blue-700 px-6 py-10 rounded-3xl font-bold text-xl hover:bg-blue-50 transition-all shadow-sm flex flex-col items-center justify-center gap-4"
                   >
-                    <ClipboardList size={32} />
-                    <span>Plan de Acciones</span>
+                    <ClipboardList size={40} />
+                    <span>Acciones</span>
+                  </button>
+
+                  <button
+                    onClick={() => navigate('/forums')}
+                    className="w-full bg-white border-2 border-green-50 text-green-700 px-6 py-10 rounded-3xl font-bold text-xl hover:bg-green-50 transition-all shadow-sm flex flex-col items-center justify-center gap-4"
+                  >
+                    <MessagesSquare size={40} />
+                    <span>Foros</span>
                   </button>
                 </div>
               </div>

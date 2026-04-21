@@ -220,6 +220,69 @@
         "updatedAt": { "type": "string" }
       },
       "required": ["name", "companyId", "createdAt"]
+    },
+    "Forum": {
+      "title": "Forum",
+      "description": "Definition of a forum meeting structure",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "teamId": { "type": "string" },
+        "teamName": { "type": "string" },
+        "companyId": { "type": "string" },
+        "frequency": { "type": "string", "enum": ["diaria", "semanal", "mensual", "adhoc"] },
+        "estimatedDuration": { "type": "number" },
+        "agenda": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "title": { "type": "string" },
+              "duration": { "type": "number" },
+              "order": { "type": "number" }
+            },
+            "required": ["id", "title", "order"]
+          }
+        },
+        "createdBy": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["name", "teamId", "companyId", "frequency", "agenda", "createdBy", "createdAt"]
+    },
+    "ForumSession": {
+      "title": "ForumSession",
+      "description": "A specific meeting instance of a forum",
+      "type": "object",
+      "properties": {
+        "forumId": { "type": "string" },
+        "forumName": { "type": "string" },
+        "scheduledAt": { "type": "string" },
+        "startedAt": { "type": "string" },
+        "completedAt": { "type": "string" },
+        "status": { "type": "string", "enum": ["scheduled", "in_progress", "completed", "cancelled"] },
+        "attendees": {
+          "type": "array",
+          "items": {
+             "type": "object",
+             "properties": {
+               "uid": { "type": "string" },
+               "name": { "type": "string" },
+               "present": { "type": "boolean" }
+             },
+             "required": ["uid", "name", "present"]
+          }
+        },
+        "currentAgendaStep": { "type": "number" },
+        "results": {
+           "type": "object",
+           "additionalProperties": { "type": "string" }
+        },
+        "companyId": { "type": "string" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["forumId", "forumName", "scheduledAt", "status", "attendees", "currentAgendaStep", "results", "companyId", "createdBy"]
     }
   },
   "firestore": {
@@ -274,6 +337,14 @@
     "/actionCategories/{categoryId}": {
       "schema": { "$ref": "#/entities/ActionCategory" },
       "description": "Categories for action plans"
+    },
+    "/forums/{forumId}": {
+      "schema": { "$ref": "#/entities/Forum" },
+      "description": "Forum definitions"
+    },
+    "/forumSessions/{sessionId}": {
+      "schema": { "$ref": "#/entities/ForumSession" },
+      "description": "Forum session instances"
     }
   }
 }
