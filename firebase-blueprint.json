@@ -32,12 +32,46 @@
       "properties": {
         "name": { "type": "string" },
         "supervisorId": { "type": "string" },
-        "memberIds": { "type": "array", "items": { "type": "string" } },
+        "supervisorName": { "type": "string" },
+        "members": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "uid": { "type": "string" },
+              "name": { "type": "string" },
+              "photoURL": { "type": "string" }
+            }
+          }
+        },
         "processIds": { "type": "array", "items": { "type": "string" } },
         "parentTeamId": { "type": "string" },
-        "companyId": { "type": "string" }
+        "companyId": { "type": "string" },
+        "hasGroups": { "type": "boolean" },
+        "groups": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "name": { "type": "string" },
+              "leaderId": { "type": "string" },
+              "leaderName": { "type": "string" },
+              "members": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "uid": { "type": "string" },
+                    "name": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
       },
-      "required": ["name", "supervisorId", "memberIds", "processIds", "companyId"]
+      "required": ["name", "supervisorId", "companyId"]
     },
     "Activity": {
       "title": "Activity",
@@ -269,7 +303,10 @@
              "properties": {
                "uid": { "type": "string" },
                "name": { "type": "string" },
-               "present": { "type": "boolean" }
+               "present": { "type": "boolean" },
+               "groupId": { "type": "string" },
+               "groupName": { "type": "string" },
+               "isLeader": { "type": "boolean" }
              },
              "required": ["uid", "name", "present"]
           }

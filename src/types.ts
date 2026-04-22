@@ -23,6 +23,14 @@ export interface TeamMember {
   name: string;
 }
 
+export interface TeamGroup {
+  id: string;
+  name: string;
+  leaderId: string;
+  leaderName: string;
+  members: TeamMember[];
+}
+
 export interface Team {
   id: string;
   name: string;
@@ -32,6 +40,8 @@ export interface Team {
   processIds: string[];
   parentTeamId?: string;
   companyId: string;
+  groups?: TeamGroup[];
+  hasGroups?: boolean;
 }
 
 export interface Activity {
@@ -204,6 +214,9 @@ export interface ForumAttendee {
   uid: string;
   name: string;
   present: boolean;
+  groupId?: string;
+  groupName?: string;
+  isLeader?: boolean;
 }
 
 export interface ForumSession {

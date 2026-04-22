@@ -306,18 +306,36 @@ export default function ForumSession() {
          <div className="space-y-4">
             <h3 className="bg-teal-500/80 text-white py-2 px-4 rounded font-bold text-center uppercase tracking-widest text-xs">Asistentes</h3>
             <div className="bg-white rounded-lg border border-gray-100 shadow-sm overflow-hidden">
-               {session.attendees.map(a => (
-                 <button 
-                  key={a.uid}
-                  onClick={() => handleToggleAttendance(a.uid)}
-                  className={clsx(
-                    "w-full flex items-center justify-between p-4 border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors text-sm",
-                    a.present ? "text-gray-800 font-medium" : "text-gray-300 italic"
-                  )}
-                 >
-                   <span>{a.name}</span>
-                   {a.present && <Check size={16} className="text-teal-500" />}
-                 </button>
+               {Object.entries(
+                 session.attendees.reduce((acc, a) => {
+                   const group = a.groupName || 'Equipo';
+                   if (!acc[group]) acc[group] = [];
+                   acc[group].push(a);
+                   return acc;
+                 }, {} as Record<string, ForumAttendee[]>)
+               ).map(([groupName, groupAttendees]) => (
+                 <div key={groupName} className="border-b last:border-0 border-gray-100">
+                    <div className="bg-gray-50 px-4 py-1.5 text-[10px] font-black text-gray-400 uppercase tracking-tighter">
+                       {groupName}
+                    </div>
+                    {groupAttendees.map(a => (
+                      <button 
+                       key={a.uid}
+                       onClick={() => handleToggleAttendance(a.uid)}
+                       className={clsx(
+                         "w-full flex items-center justify-between p-4 border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors text-sm",
+                         a.present ? "text-gray-800 font-medium" : "text-gray-300 italic"
+                       )}
+                      >
+                        <div className="flex items-center gap-2">
+                           {a.isLeader && <span className="w-2 h-2 rounded-full bg-orange-500" title="Líder" />}
+                           <span>{a.name}</span>
+                           {a.isLeader && <span className="text-[8px] bg-orange-100 text-orange-600 px-1 rounded font-bold uppercase">Líder</span>}
+                        </div>
+                        {a.present && <Check size={16} className="text-teal-500" />}
+                      </button>
+                    ))}
+                 </div>
                ))}
             </div>
          </div>

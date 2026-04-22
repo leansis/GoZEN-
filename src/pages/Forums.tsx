@@ -88,11 +88,30 @@ export default function Forums() {
     try {
       // Find team members to invite as attendees
       const team = teams.find(t => t.id === selectedForumForSession.teamId);
-      const invitedAttendees: ForumAttendee[] = (team?.members || []).map(m => ({
-        uid: m.uid,
-        name: m.name,
-        present: false
-      }));
+      let invitedAttendees: ForumAttendee[] = [];
+
+      if (team?.hasGroups && team.groups && team.groups.length > 0) {
+        // Collect all members from all groups
+        team.groups.forEach(group => {
+          group.members.forEach(m => {
+            invitedAttendees.push({
+              uid: m.uid,
+              name: m.name,
+              present: false,
+              groupId: group.id,
+              groupName: group.name,
+              isLeader: group.leaderId === m.uid
+            });
+          });
+        });
+      } else {
+        invitedAttendees = (team?.members || []).map(m => ({
+          uid: m.uid,
+          name: m.name,
+          present: false,
+          isLeader: team?.supervisorId === m.uid
+        }));
+      }
 
       const sessionData: Omit<ForumSession, 'id'> = {
         forumId: selectedForumForSession.id,

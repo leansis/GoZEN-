@@ -189,6 +189,8 @@ service cloud.firestore {
              data.companyId is string &&
              (!('parentTeamId' in data) || (data.parentTeamId is string && data.parentTeamId.size() <= 100)) &&
              (!('supervisorName' in data) || (data.supervisorName is string && data.supervisorName.size() <= 100)) &&
+             (!('hasGroups' in data) || (data.hasGroups is bool)) &&
+             (!('groups' in data) || (data.groups is list && data.groups.size() <= 20)) &&
              (!('id' in data) || (data.id is string));
     }
 
