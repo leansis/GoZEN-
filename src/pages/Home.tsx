@@ -293,14 +293,6 @@ export default function Home() {
                     <MessagesSquare size={40} />
                     <span>Foros</span>
                   </button>
-
-                  <button
-                    onClick={() => navigate('/escalated-actions')}
-                    className="w-full bg-orange-600 text-white px-6 py-10 rounded-3xl font-bold text-xl hover:bg-orange-700 transition-all shadow-xl shadow-orange-200 flex flex-col items-center justify-center gap-4"
-                  >
-                    <AlertCircle size={40} />
-                    <span>Escalados</span>
-                  </button>
                 </div>
               </div>
             )}

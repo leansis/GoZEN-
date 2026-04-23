@@ -18,7 +18,8 @@ import {
   Search,
   XCircle,
   X,
-  ChevronDown
+  ChevronDown,
+  ArrowUp
 } from 'lucide-react';
 import { 
   collection, 
@@ -73,8 +74,9 @@ export default function ActionPlanPage() {
   const { dbUser, isAdmin, isSupervisor, activeCompanyId } = useAuth();
   const { forums } = useAppData();
   const navigate = useNavigate();
-  const [view, setView] = useState<'list' | 'kanban'>('kanban');
+  const [view, setView] = useState<'list' | 'kanban' | 'escalated'>('kanban');
   const [actions, setActions] = useState<ActionPlan[]>([]);
+  const [onlyMineEscalated, setOnlyMineEscalated] = useState(false);
   const [subActions, setSubActions] = useState<SubAction[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [teams, setTeams] = useState<any[]>([]);
@@ -744,14 +746,14 @@ export default function ActionPlanPage() {
                 >
                   <List size={20} />
                 </button>
+                <button 
+                  onClick={() => setView('escalated')}
+                  className={clsx("p-1.5 rounded-md transition-all", view === 'escalated' ? "bg-orange-50 text-orange-600 shadow-sm" : "text-gray-400 hover:text-gray-600")}
+                  title="Vista Escalados"
+                >
+                  <AlertCircle size={20} />
+                </button>
               </div>
-              <button 
-                onClick={() => navigate('/escalated-actions')}
-                className="flex items-center gap-2 px-4 py-2 bg-orange-50 text-orange-600 rounded-xl hover:bg-orange-100 transition-all font-bold text-sm border border-orange-100"
-              >
-                <AlertCircle size={18} />
-                Ver Escalados
-              </button>
               <button 
                 onClick={() => { setEditingAction({ assignedTo: [], assignedToNames: [] }); setTempSubActions([]); }}
                 className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl hover:bg-blue-700 transition shadow-lg shadow-blue-200 active:scale-95 duration-200"
@@ -769,7 +771,7 @@ export default function ActionPlanPage() {
         </div>
       )}
 
-      {/* Kanban View */}
+      {/* Main Content View */}
       {isLoading ? (
         <div className="flex flex-col items-center justify-center py-20 gap-4">
           <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
@@ -777,7 +779,7 @@ export default function ActionPlanPage() {
         </div>
       ) : (
         <>
-          {view === 'kanban' ? (
+          {view === 'kanban' && (
             <div className="flex flex-row gap-4 overflow-x-auto pb-6 custom-scrollbar -mx-4 px-4 lg:mx-0 lg:px-0 snap-x snap-mandatory lg:snap-none">
               {DATE_COLUMNS.map(col => {
                 const actionsInColumn = filteredActions.filter(a => getActionDateCategory(a.targetDate) === col.value);
@@ -805,7 +807,9 @@ export default function ActionPlanPage() {
                 );
               })}
             </div>
-          ) : (
+          )}
+
+          {view === 'list' && (
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden overflow-x-auto">
               <Table
                 columns={actionColumns}
@@ -819,6 +823,115 @@ export default function ActionPlanPage() {
                   No hay acciones disponibles para mostrar.
                 </div>
               )}
+            </div>
+          )}
+
+          {view === 'escalated' && (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+               <div className="flex items-center gap-4 py-2">
+                 <span className="text-gray-700 font-bold text-sm">Filtrar escalados por mi</span>
+                 <label className="relative inline-flex items-center cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      checked={onlyMineEscalated}
+                      onChange={(e) => setOnlyMineEscalated(e.target.checked)}
+                      className="sr-only peer" 
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-600 transition-all"></div>
+                 </label>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12">
+                <div className="space-y-4">
+                  <h2 className="bg-blue-50/50 py-2.5 text-center text-blue-700 font-bold tracking-[0.2em] uppercase text-xs rounded-xl border border-blue-100/50 shadow-sm">
+                    ACCIONES
+                  </h2>
+                  <div className="max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar space-y-4">
+                    {(() => {
+                      const escalatedActions = filteredActions.filter(a => a.isEscalated && (a.type === 'accion' || !a.type));
+                      const finalFilter = onlyMineEscalated ? escalatedActions.filter(a => a.escalatedBy === dbUser?.uid) : escalatedActions;
+                      
+                      if (finalFilter.length === 0) return <p className="text-center py-12 text-gray-400 italic text-sm">No hay acciones escaladas</p>;
+                      
+                      return finalFilter.map(action => {
+                        const subCount = subActions.filter(s => s.actionId === action.id).length;
+                        return (
+                          <div 
+                            key={action.id}
+                            onClick={() => openEditModal(action)}
+                            className="bg-[#C1B7CE] p-5 rounded-2xl shadow-sm relative hover:brightness-95 transition-all cursor-pointer group"
+                          >
+                            <div className="flex justify-between items-start mb-1">
+                              <h4 className="font-bold text-[#4F4F4F] text-lg leading-tight pr-8">{action.title}</h4>
+                              <ArrowUp size={20} className="text-white absolute right-5 top-5 group-hover:scale-125 transition-transform" />
+                            </div>
+                            <p className="text-sm text-[#5F5F5F] font-semibold mt-1">
+                              {action.createdByName || 'Usuario'}
+                            </p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-[10px] text-[#707070] font-bold bg-white/30 px-2 py-0.5 rounded uppercase tracking-wider">
+                                {action.escalatedAt ? format(new Date(action.escalatedAt), 'dd MMM yyyy', { locale: es }) : (action.createdAt ? format(new Date(action.createdAt), 'dd MMM yyyy', { locale: es }) : 'N/A')}
+                              </span>
+                            </div>
+                            
+                            <div className="mt-4 flex items-center justify-between">
+                              <div className="w-9 h-9 rounded-full bg-[#A89CB8] border-2 border-white flex items-center justify-center text-white text-sm font-black shadow-inner">
+                                {subCount}
+                              </div>
+                              <span className="text-[10px] font-black text-white/80 uppercase tracking-tighter">Detalles</span>
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h2 className="bg-red-50/50 py-2.5 text-center text-red-700 font-bold tracking-[0.2em] uppercase text-xs rounded-xl border border-red-100/50 shadow-sm">
+                    INCIDENCIAS
+                  </h2>
+                  <div className="max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar space-y-4">
+                    {(() => {
+                      const escalatedIncidents = filteredActions.filter(a => a.isEscalated && a.type === 'incidencia');
+                      const finalFilter = onlyMineEscalated ? escalatedIncidents.filter(a => a.escalatedBy === dbUser?.uid) : escalatedIncidents;
+                      
+                      if (finalFilter.length === 0) return <p className="text-center py-12 text-gray-400 italic text-sm">No hay incidencias escaladas</p>;
+
+                      return finalFilter.map(action => {
+                        const subCount = subActions.filter(s => s.actionId === action.id).length;
+                        return (
+                          <div 
+                            key={action.id}
+                            onClick={() => openEditModal(action)}
+                            className="bg-[#C1B7CE] p-5 rounded-2xl shadow-sm relative hover:brightness-95 transition-all cursor-pointer group"
+                          >
+                            <div className="flex justify-between items-start mb-1">
+                              <h4 className="font-bold text-[#4F4F4F] text-lg leading-tight pr-8">{action.title}</h4>
+                              <ArrowUp size={20} className="text-white absolute right-5 top-5 group-hover:scale-125 transition-transform" />
+                            </div>
+                            <p className="text-sm text-[#5F5F5F] font-semibold mt-1">
+                              {action.createdByName || 'Usuario'}
+                            </p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-[10px] text-[#707070] font-bold bg-white/30 px-2 py-0.5 rounded uppercase tracking-wider">
+                                {action.escalatedAt ? format(new Date(action.escalatedAt), 'dd MMM yyyy', { locale: es }) : (action.createdAt ? format(new Date(action.createdAt), 'dd MMM yyyy', { locale: es }) : 'N/A')}
+                              </span>
+                            </div>
+                            
+                            <div className="mt-4 flex items-center justify-between">
+                              <div className="w-9 h-9 rounded-full bg-[#A89CB8] border-2 border-white flex items-center justify-center text-white text-sm font-black shadow-inner">
+                                {subCount}
+                              </div>
+                              <span className="text-[10px] font-black text-white/80 uppercase tracking-tighter">Detalles</span>
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </>

@@ -20,7 +20,6 @@ import MasterUsers from './pages/admin/MasterUsers';
 import ActionPlan from './pages/ActionPlan';
 import Forums from './pages/Forums';
 import ForumSession from './pages/ForumSession';
-import EscalatedPdcas from './pages/EscalatedPdcas';
 import { AuthContext } from './AuthContext';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from './firebase';
@@ -344,9 +343,6 @@ export default function App() {
                 <Route path="admin/action-categories" element={<ProtectedRoute requireAdmin><AdminActionCategories /></ProtectedRoute>} />
                 <Route path="admin/master-data" element={<ProtectedRoute requireAdmin><AdminMasterData /></ProtectedRoute>} />
               </Route>
-
-              {/* Standalone Views */}
-              <Route path="escalated-actions" element={<ProtectedRoute><EscalatedPdcas /></ProtectedRoute>} />
             </Routes>
           </Router>
         </AppDataProvider>
