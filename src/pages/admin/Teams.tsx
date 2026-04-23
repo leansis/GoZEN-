@@ -51,15 +51,13 @@ export default function Teams() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaveError(null);
-    if (!editingTeam?.name || !editingTeam?.supervisorId || !dbUser) return;
+    if (!editingTeam?.name || !dbUser) return;
 
     const companyId = activeCompanyId || dbUser.companyId;
 
     try {
       const teamData: any = {
         name: editingTeam.name,
-        supervisorId: editingTeam.supervisorId,
-        supervisorName: users.find(u => u.uid === editingTeam.supervisorId)?.name || '',
         members: (editingTeam.members || []).map(m => {
           const user = users.find(u => u.uid === m.uid);
           return {
@@ -76,6 +74,10 @@ export default function Teams() {
           leaderName: users.find(u => u.uid === g.leaderId)?.name || g.leaderName || ''
         }))
       };
+
+      // Reset team supervisor info if requested to be removed
+      teamData.supervisorId = '';
+      teamData.supervisorName = '';
 
       if (editingTeam.parentTeamId) {
         teamData.parentTeamId = editingTeam.parentTeamId;
@@ -193,12 +195,6 @@ export default function Teams() {
         columns={[
           { header: 'Equipo', accessor: 'name', sortable: true },
           { 
-            header: 'Supervisor', 
-            accessor: (t) => t.supervisorName || users.find(u => u.uid === t.supervisorId)?.name || 'Desconocido',
-            sortable: true,
-            sortAccessor: (t) => t.supervisorName || users.find(u => u.uid === t.supervisorId)?.name || ''
-          },
-          { 
             header: 'Grupos', 
             accessor: (t) => t.hasGroups ? (t.groups?.length || 0) : 'N/A', 
             sortable: true 
@@ -265,8 +261,8 @@ export default function Teams() {
               
               {activeTab === 'basic' && (
                 <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <div className="lg:col-span-1">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="md:col-span-1">
                       <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Nombre del Equipo</label>
                       <input
                         type="text"
@@ -278,25 +274,7 @@ export default function Teams() {
                       />
                     </div>
                     
-                    <div className="lg:col-span-1">
-                      <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Supervisor</label>
-                      <select
-                        required
-                        value={editingTeam.supervisorId || ''}
-                        onChange={(e) => setEditingTeam({ ...editingTeam, supervisorId: e.target.value })}
-                        className="w-full rounded-xl border-gray-200 shadow-sm p-3 border focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm bg-white"
-                      >
-                        <option value="">Seleccionar...</option>
-                        {users
-                          .filter(u => u.role === 'supervisor' || u.role === 'admin' || u.role === 'lean_promotor')
-                          .sort((a, b) => a.name.localeCompare(b.name))
-                          .map(u => (
-                            <option key={u.uid} value={u.uid}>{u.name}</option>
-                          ))}
-                      </select>
-                    </div>
-
-                    <div className="lg:col-span-1">
+                    <div className="md:col-span-1">
                       <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Equipo Padre (Opcional)</label>
                       <select
                         value={editingTeam.parentTeamId || ''}
@@ -448,13 +426,13 @@ export default function Teams() {
 
                           <div className="space-y-4">
                             <div>
-                              <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 px-1">Líder del Grupo</label>
+                              <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 px-1">Supervisor del Grupo</label>
                               <select
                                 value={group.leaderId}
                                 onChange={(e) => updateGroup(group.id, { leaderId: e.target.value })}
                                 className="block w-full rounded-xl border-gray-200 shadow-sm p-2.5 border text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 transition-all outline-none"
                               >
-                                <option value="">Seleccionar líder...</option>
+                                <option value="">Seleccionar supervisor...</option>
                                 {editingTeam.members?.map(m => (
                                   <option key={m.uid} value={m.uid}>{m.name}</option>
                                 ))}

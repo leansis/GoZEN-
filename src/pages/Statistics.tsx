@@ -22,7 +22,8 @@ export default function Statistics() {
       setTeams(data.filter(t => 
         t.supervisorId === dbUser?.uid || 
         (t.supervisorId && dbUser?.email && t.supervisorId.toLowerCase() === dbUser.email.toLowerCase()) ||
-        t.members.some(m => m.uid === dbUser?.uid)
+        t.members.some(m => m.uid === dbUser?.uid) ||
+        (t.groups || []).some(g => g.leaderId === dbUser?.uid)
       ));
     } else {
       setTeams(data.filter(t => t.members.some(m => m.uid === dbUser?.uid)));

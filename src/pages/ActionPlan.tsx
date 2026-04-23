@@ -124,7 +124,11 @@ export default function ActionPlanPage() {
 
   // Filter actions based on permissions
   const filteredActions = React.useMemo(() => {
-    const supervisorTeams = teams.filter(t => t.supervisorId === dbUser?.uid || t.supervisorId === dbUser?.email);
+    const supervisorTeams = teams.filter(t => 
+      t.supervisorId === dbUser?.uid || 
+      t.supervisorId === dbUser?.email ||
+      (t.groups || []).some((g: any) => g.leaderId === dbUser?.uid)
+    );
     const managedUserIds = new Set<string>();
     supervisorTeams.forEach(t => t.members?.forEach((m: any) => managedUserIds.add(m.uid)));
 
@@ -152,7 +156,11 @@ export default function ActionPlanPage() {
     if (isAdmin) {
       reachable = [...users];
     } else {
-      const supervisorTeams = teams.filter(t => t.supervisorId === dbUser?.uid || t.supervisorId === dbUser?.email);
+      const supervisorTeams = teams.filter(t => 
+        t.supervisorId === dbUser?.uid || 
+        t.supervisorId === dbUser?.email ||
+        (t.groups || []).some((g: any) => g.leaderId === dbUser?.uid)
+      );
       const managedUserIds = new Set<string>();
       supervisorTeams.forEach(t => {
         t.members?.forEach((m: any) => managedUserIds.add(m.uid));

@@ -196,7 +196,7 @@ export interface ActionCategory {
   createdAt: string;
 }
 
-export type ForumFrequency = 'diaria' | 'semanal' | 'mensual' | 'adhoc';
+export type ForumFrequency = 'diaria' | 'semanal' | 'mensual' | 'adhoc' | 'periodic';
 export type ForumSessionStatus = 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
 
 export interface ForumAgendaItem {
@@ -204,6 +204,16 @@ export interface ForumAgendaItem {
   title: string;
   duration?: number; // Estimated duration in minutes
   order: number;
+}
+
+export interface ForumRecurrence {
+  repeatEvery: number;
+  repeatUnit: 'day' | 'week' | 'month';
+  daysOfWeek: number[]; // 1-7 (Mon-Sun)
+  startDate: string;
+  endDate?: string;
+  startTime: string;
+  endTime: string;
 }
 
 export interface Forum {
@@ -214,6 +224,7 @@ export interface Forum {
   teamName?: string;
   companyId: string;
   frequency: ForumFrequency;
+  recurrence?: ForumRecurrence;
   estimatedDuration: number; // Total minutes
   agenda: ForumAgendaItem[];
   createdBy: string;

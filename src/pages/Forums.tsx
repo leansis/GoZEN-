@@ -11,7 +11,10 @@ import {
   Edit2,
   Search,
   ChevronRight,
-  MoreHorizontal
+  MoreHorizontal,
+  Clock,
+  RefreshCcw,
+  X
 } from 'lucide-react';
 import { useAuth } from '../AuthContext';
 import { useAppData } from '../contexts/AppDataContext';
@@ -25,13 +28,23 @@ import {
   query, 
   where 
 } from 'firebase/firestore';
-import { Forum, ForumFrequency, ForumAgendaItem, ForumSession, ForumAttendee } from '../types';
+import { Forum, ForumFrequency, ForumAgendaItem, ForumSession, ForumAttendee, ForumRecurrence } from '../types';
 import Modal from '../components/Modal';
 import Table from '../components/Table';
 import clsx from 'clsx';
 import { useNavigate } from 'react-router-dom';
-import { format } from 'date-fns';
+import { format, addWeeks, addMonths, addDays } from 'date-fns';
 import { es } from 'date-fns/locale';
+
+const DAYS_OF_WEEK = [
+  { id: 1, label: 'L' },
+  { id: 2, label: 'M' },
+  { id: 3, label: 'X' },
+  { id: 4, label: 'J' },
+  { id: 5, label: 'V' },
+  { id: 6, label: 'S' },
+  { id: 7, label: 'D' },
+];
 
 export default function Forums() {
   const { dbUser, isAdmin, isSupervisor, activeCompanyId } = useAuth();
@@ -40,6 +53,7 @@ export default function Forums() {
   
   const [isForumModalOpen, setIsForumModalOpen] = useState(false);
   const [editingForum, setEditingForum] = useState<Partial<Forum> | null>(null);
+  const [showRecurrence, setShowRecurrence] = useState(false);
   const [isSessionModalOpen, setIsSessionModalOpen] = useState(false);
   const [selectedForumForSession, setSelectedForumForSession] = useState<Forum | null>(null);
   const [sessionDate, setSessionDate] = useState(format(new Date(), 'yyyy-MM-dd'));
@@ -61,21 +75,28 @@ export default function Forums() {
     if (!activeCompanyId || !dbUser) return;
 
     try {
-      const forumData = {
+      const forumData: any = {
         ...editingForum,
         companyId: activeCompanyId,
         createdBy: dbUser.uid,
-        createdAt: new Date().toISOString(),
+        createdAt: editingForum?.createdAt || new Date().toISOString(),
         agenda: editingForum?.agenda || []
-      } as Omit<Forum, 'id'>;
+      };
+
+      if (!showRecurrence) {
+        delete forumData.recurrence;
+      } else {
+        forumData.frequency = 'periodic';
+      }
 
       if (editingForum?.id) {
-        await updateDoc(doc(db, 'forums', editingForum.id), forumData as any);
+        await updateDoc(doc(db, 'forums', editingForum.id), forumData);
       } else {
         await addDoc(collection(db, 'forums'), forumData);
       }
       setIsForumModalOpen(false);
       setEditingForum(null);
+      setShowRecurrence(false);
     } catch (err) {
       console.error("Error saving forum:", err);
     }
@@ -133,10 +154,31 @@ export default function Forums() {
     }
   };
 
+  const getFrequencyLabel = (forum: Forum) => {
+    if (forum.frequency === 'periodic' && forum.recurrence) {
+      const { repeatEvery, repeatUnit, daysOfWeek } = forum.recurrence;
+      const unit = repeatUnit === 'day' ? 'días' : repeatUnit === 'week' ? 'semanas' : 'meses';
+      let label = `Cada ${repeatEvery} ${unit}`;
+      if (repeatUnit === 'week' && daysOfWeek && daysOfWeek.length > 0) {
+        const days = daysOfWeek.map(d => DAYS_OF_WEEK.find(dw => dw.id === d)?.label).join(', ');
+        label += ` (${days})`;
+      }
+      return label;
+    }
+    const standard: Record<string, string> = {
+      diaria: 'Diaria',
+      semanal: 'Semanal',
+      mensual: 'Mensual',
+      adhoc: 'Puntual',
+      periodic: 'Periódico'
+    };
+    return standard[forum.frequency] || forum.frequency;
+  };
+
   const forumColumns = [
     { header: 'Nombre', accessor: 'name' as keyof Forum },
     { header: 'Equipo', accessor: 'teamName' as keyof Forum },
-    { header: 'Frecuencia', accessor: 'frequency' as keyof Forum },
+    { header: 'Frecuencia', accessor: (f: Forum) => getFrequencyLabel(f) },
     { 
       header: 'Duración', 
       accessor: (f: Forum) => `${f.estimatedDuration} min`
@@ -172,6 +214,7 @@ export default function Forums() {
                   agenda: [],
                   teamId: ''
                 });
+                setShowRecurrence(false);
                 setIsForumModalOpen(true);
               }}
               className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all font-bold text-sm shadow-lg shadow-blue-200"
@@ -201,6 +244,7 @@ export default function Forums() {
             data={filteredForums}
             onEdit={(f) => {
               setEditingForum(f);
+              setShowRecurrence(f.frequency === 'periodic');
               setIsForumModalOpen(true);
             }}
             onDelete={async (f) => {
@@ -304,7 +348,7 @@ export default function Forums() {
       {/* Forum Definition Modal */}
       <Modal
         isOpen={isForumModalOpen}
-        onClose={() => { setIsForumModalOpen(false); setEditingForum(null); }}
+        onClose={() => { setIsForumModalOpen(false); setEditingForum(null); setShowRecurrence(false); }}
         title={editingForum?.id ? "Editar Foro" : "Nuevo Foro"}
         maxWidth="max-w-3xl"
       >
@@ -337,20 +381,6 @@ export default function Forums() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Frecuencia</label>
-              <select
-                required
-                value={editingForum?.frequency || 'diaria'}
-                onChange={(e) => setEditingForum({ ...editingForum, frequency: e.target.value as ForumFrequency })}
-                className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm"
-              >
-                <option value="diaria">Diaria</option>
-                <option value="semanal">Semanal</option>
-                <option value="mensual">Mensual</option>
-                <option value="adhoc">Ad-hoc (Puntual)</option>
-              </select>
-            </div>
-            <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">Duración Estimada (min)</label>
               <input
                 type="number"
@@ -359,6 +389,184 @@ export default function Forums() {
                 onChange={(e) => setEditingForum({ ...editingForum, estimatedDuration: parseInt(e.target.value) })}
                 className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm"
               />
+            </div>
+            
+            <div className="md:col-span-2 space-y-4">
+              <div className="flex items-center gap-4">
+                <button
+                  type="button"
+                  onClick={() => setShowRecurrence(!showRecurrence)}
+                  className={clsx(
+                    "flex items-center gap-2 px-4 py-2 rounded-xl border transition-all text-sm font-medium",
+                    showRecurrence 
+                      ? "bg-blue-50 border-blue-200 text-blue-600 shadow-sm" 
+                      : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
+                  )}
+                >
+                  <RefreshCcw size={18} className={clsx(showRecurrence && "animate-spin-slow")} />
+                  {showRecurrence ? 'Recurrencia Activa' : 'Configurar Recurrencia'}
+                </button>
+                
+                {!showRecurrence && (
+                  <div className="flex-1">
+                    <select
+                      required
+                      value={editingForum?.frequency || 'diaria'}
+                      onChange={(e) => setEditingForum({ ...editingForum, frequency: e.target.value as ForumFrequency })}
+                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm"
+                    >
+                      <option value="diaria">Diaria</option>
+                      <option value="semanal">Semanal</option>
+                      <option value="mensual">Mensual</option>
+                      <option value="adhoc">Ad-hoc (Puntual)</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              {showRecurrence && (
+                <div className="bg-gray-50 p-6 rounded-2xl border border-gray-200 space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="space-y-1.5">
+                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider px-1">Fecha de inicio</label>
+                      <input
+                        type="date"
+                        value={editingForum?.recurrence?.startDate || format(new Date(), 'yyyy-MM-dd')}
+                        onChange={(e) => {
+                          const recurrence = editingForum?.recurrence || { repeatEvery: 1, repeatUnit: 'week', daysOfWeek: [], startDate: '', startTime: '09:00', endTime: '09:30' };
+                          setEditingForum({ ...editingForum, frequency: 'periodic', recurrence: { ...recurrence, startDate: e.target.value } });
+                        }}
+                        className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider px-1">Hora de inicio</label>
+                      <input
+                        type="time"
+                        value={editingForum?.recurrence?.startTime || '09:00'}
+                        onChange={(e) => {
+                          const recurrence = editingForum?.recurrence || { repeatEvery: 1, repeatUnit: 'week', daysOfWeek: [], startDate: format(new Date(), 'yyyy-MM-dd'), startTime: '', endTime: '09:30' };
+                          setEditingForum({ ...editingForum, frequency: 'periodic', recurrence: { ...recurrence, startTime: e.target.value } });
+                        }}
+                        className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between items-center px-1">
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">Hora de finalización</label>
+                      </div>
+                      <input
+                        type="time"
+                        value={editingForum?.recurrence?.endTime || '09:30'}
+                        onChange={(e) => {
+                          const recurrence = editingForum?.recurrence || { repeatEvery: 1, repeatUnit: 'week', daysOfWeek: [], startDate: format(new Date(), 'yyyy-MM-dd'), startTime: '09:00', endTime: '' };
+                          setEditingForum({ ...editingForum, frequency: 'periodic', recurrence: { ...recurrence, endTime: e.target.value } });
+                        }}
+                        className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
+                    <span className="font-medium">Repetir cada</span>
+                    <input
+                      type="number"
+                      min="1"
+                      value={editingForum?.recurrence?.repeatEvery || 1}
+                      onChange={(e) => {
+                        const recurrence = editingForum?.recurrence || { repeatEvery: 1, repeatUnit: 'week', daysOfWeek: [], startDate: format(new Date(), 'yyyy-MM-dd'), startTime: '09:00', endTime: '09:30' };
+                        setEditingForum({ ...editingForum, frequency: 'periodic', recurrence: { ...recurrence, repeatEvery: parseInt(e.target.value) || 1 } });
+                      }}
+                      className="w-16 px-2 py-1 bg-white border border-gray-200 rounded-lg text-center focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                    <select
+                      value={editingForum?.recurrence?.repeatUnit || 'week'}
+                      onChange={(e) => {
+                        const recurrence = editingForum?.recurrence || { repeatEvery: 1, repeatUnit: 'week', daysOfWeek: [], startDate: format(new Date(), 'yyyy-MM-dd'), startTime: '09:00', endTime: '09:30' };
+                        setEditingForum({ ...editingForum, frequency: 'periodic', recurrence: { ...recurrence, repeatUnit: e.target.value as any } });
+                      }}
+                      className="px-2 py-1 bg-white border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="day">días</option>
+                      <option value="week">semanas</option>
+                      <option value="month">meses</option>
+                    </select>
+                  </div>
+
+                  {editingForum?.recurrence?.repeatUnit === 'week' && (
+                    <div className="flex gap-2 justify-between">
+                      {DAYS_OF_WEEK.map((day) => (
+                        <button
+                          key={day.id}
+                          type="button"
+                          onClick={() => {
+                            const recurrence = editingForum?.recurrence || { repeatEvery: 1, repeatUnit: 'week', daysOfWeek: [], startDate: format(new Date(), 'yyyy-MM-dd'), startTime: '09:00', endTime: '09:30' };
+                            const currentDays = recurrence.daysOfWeek || [];
+                            const newDays = currentDays.includes(day.id)
+                              ? currentDays.filter(d => d !== day.id)
+                              : [...currentDays, day.id];
+                            setEditingForum({ ...editingForum, frequency: 'periodic', recurrence: { ...recurrence, daysOfWeek: newDays } });
+                          }}
+                          className={clsx(
+                            "w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all",
+                            editingForum?.recurrence?.daysOfWeek?.includes(day.id)
+                              ? "bg-blue-600 text-white shadow-lg shadow-blue-200 scale-110"
+                              : "bg-gray-200 text-gray-500 hover:bg-gray-300"
+                          )}
+                        >
+                          {day.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-4 text-sm text-gray-600">
+                    <span className="font-medium whitespace-nowrap">Hasta el</span>
+                    <div className="flex items-center gap-2 flex-1">
+                      <input
+                        type="date"
+                        value={editingForum?.recurrence?.endDate || ''}
+                        disabled={!editingForum?.recurrence?.endDate}
+                        onChange={(e) => {
+                          const recurrence = editingForum?.recurrence || { repeatEvery: 1, repeatUnit: 'week', daysOfWeek: [], startDate: format(new Date(), 'yyyy-MM-dd'), startTime: '09:00', endTime: '09:30' };
+                          setEditingForum({ ...editingForum, frequency: 'periodic', recurrence: { ...recurrence, endDate: e.target.value } });
+                        }}
+                        className={clsx(
+                          "flex-1 px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all",
+                          !editingForum?.recurrence?.endDate && "opacity-50 cursor-not-allowed"
+                        )}
+                        placeholder="Sin fecha de fin"
+                      />
+                      {!editingForum?.recurrence?.endDate ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const recurrence = editingForum?.recurrence || { repeatEvery: 1, repeatUnit: 'week', daysOfWeek: [], startDate: format(new Date(), 'yyyy-MM-dd'), startTime: '09:00', endTime: '09:30' };
+                            setEditingForum({ ...editingForum, frequency: 'periodic', recurrence: { ...recurrence, endDate: format(addMonths(new Date(), 6), 'yyyy-MM-dd') } });
+                          }}
+                          className="text-xs text-blue-600 hover:underline font-bold"
+                        >
+                          Definir fin
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const recurrence = editingForum?.recurrence || { repeatEvery: 1, repeatUnit: 'week', daysOfWeek: [], startDate: format(new Date(), 'yyyy-MM-dd'), startTime: '09:00', endTime: '09:30' };
+                            const newRec = { ...recurrence };
+                            delete newRec.endDate;
+                            setEditingForum({ ...editingForum, frequency: 'periodic', recurrence: newRec });
+                          }}
+                          className="p-1.5 text-gray-400 hover:text-red-500 transition-colors"
+                          title="Eliminar fecha de fin"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

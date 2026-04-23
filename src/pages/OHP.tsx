@@ -188,11 +188,12 @@ export default function OHP() {
     const gap = calculateTeamGap(team);
     const coverage = calculateCoverage(team);
     const isExpanded = expandedTeams[team.id];
-    const leaderName = team.supervisorName || users.find(u => u.uid === team.supervisorId)?.name;
 
     return (
       <div key={team.id} className="flex flex-col items-center">
-        <div className={`p-4 rounded-xl border-2 ${gap > 0 ? 'border-red-400 bg-red-50' : 'border-green-400 bg-green-50'} shadow-sm min-w-[240px] relative z-10 transition-all duration-300`}>
+        <div 
+          className={`p-4 rounded-xl border-2 ${gap > 0 ? 'border-red-400 bg-red-50' : 'border-green-400 bg-green-50'} shadow-sm min-w-[240px] relative z-10 transition-all duration-300`}
+        >
           <div className="flex justify-between items-start mb-2">
             <h3 className="font-bold text-gray-800">{team.name}</h3>
             <button 
@@ -227,26 +228,6 @@ export default function OHP() {
 
           {isExpanded && (
             <div className="mt-4 pt-4 border-t border-gray-200/50 text-sm">
-              <div 
-                className={`mb-3 p-2 rounded ${editMode ? 'border-2 border-dashed border-blue-300 bg-blue-50/50 min-h-[60px]' : ''}`}
-                onDragOver={editMode ? (e) => e.preventDefault() : undefined}
-                onDrop={editMode ? (e) => handleDropLeader(e, team) : undefined}
-              >
-                <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Líder</p>
-                {leaderName ? (
-                  <div className="flex items-center justify-between bg-white px-2 py-1.5 rounded border border-gray-200 shadow-sm">
-                    <span className="truncate font-medium text-gray-700">{leaderName}</span>
-                    {editMode && (
-                      <button onClick={() => handleRemoveLeader(team)} className="text-red-400 hover:text-red-600 ml-2 font-bold px-1">×</button>
-                    )}
-                  </div>
-                ) : (
-                  <span className="text-gray-400 italic text-xs block text-center py-1">
-                    {editMode ? 'Arrastra un líder aquí' : 'Sin líder asignado'}
-                  </span>
-                )}
-              </div>
-
               <div 
                 className={`p-2 rounded ${editMode ? 'border-2 border-dashed border-green-300 bg-green-50/50 min-h-[80px]' : ''}`}
                 onDragOver={editMode ? (e) => e.preventDefault() : undefined}
@@ -288,13 +269,13 @@ export default function OHP() {
                           <p className="text-xs font-bold text-gray-700 uppercase tracking-tight">{group.name}</p>
                         </div>
                         
-                        {/* Group Leader */}
+                        {/* Group Supervisor */}
                         <div 
                           className={`mb-3 p-2 rounded-lg transition-all ${editMode ? 'border-2 border-dashed border-blue-200 bg-blue-50/50 mb-4' : ''}`}
                           onDragOver={editMode ? (e) => e.preventDefault() : undefined}
                           onDrop={editMode ? (e) => handleDropGroupLeader(e, team, group.id) : undefined}
                         >
-                          <p className="text-[9px] font-bold text-gray-400 uppercase mb-1.5 tracking-wider px-1">Líder G.</p>
+                          <p className="text-[9px] font-bold text-gray-400 uppercase mb-1.5 tracking-wider px-1">Supervisor G.</p>
                           {group.leaderName ? (
                             <div className="flex items-center justify-between bg-white px-2.5 py-2 rounded-lg border border-gray-200 text-xs shadow-sm group/leader">
                               <div className="flex items-center gap-2 truncate">
@@ -309,7 +290,7 @@ export default function OHP() {
                             </div>
                           ) : (
                             <div className="text-gray-400 italic text-[10px] border border-dashed border-gray-200 rounded-lg py-2 flex items-center justify-center bg-white/30">
-                              {editMode ? 'Suelta un líder aquí' : 'Sin líder'}
+                              {editMode ? 'Suelta un supervisor aquí' : 'Sin supervisor'}
                             </div>
                           )}
                         </div>
