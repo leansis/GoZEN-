@@ -40,8 +40,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [dbUser, setDbUser] = useState<User | null>(null);
   const [company, setCompany] = useState<Company | null>(null);
-  const [activeCompanyId, setActiveCompanyId] = useState<string | null>(null);
+  const [activeCompanyId, setActiveCompanyIdState] = useState<string | null>(localStorage.getItem('activeCompanyId'));
   const [loading, setLoading] = useState(true);
+
+  const setActiveCompanyId = (id: string | null) => {
+    setActiveCompanyIdState(id);
+    if (id) {
+      localStorage.setItem('activeCompanyId', id);
+    } else {
+      localStorage.removeItem('activeCompanyId');
+    }
+  };
 
   useEffect(() => {
     const fetchActiveCompany = async () => {
@@ -144,7 +153,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
             setDbUser(existingUser);
             
-            if (existingUser.companyId) {
+            if (existingUser.companyId && !activeCompanyId) {
               try {
                 const companyDoc = await getDoc(doc(db, 'companies', existingUser.companyId));
                 if (companyDoc.exists()) {

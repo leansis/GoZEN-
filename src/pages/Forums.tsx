@@ -58,6 +58,7 @@ export default function Forums() {
   const [selectedForumForSession, setSelectedForumForSession] = useState<Forum | null>(null);
   const [sessionDate, setSessionDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [sessionTime, setSessionTime] = useState(format(new Date(), 'HH:mm'));
+  const [isSaving, setIsSaving] = useState(false);
   
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'list' | 'sessions'>('sessions');
@@ -72,8 +73,9 @@ export default function Forums() {
 
   const handleSaveForum = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activeCompanyId || !dbUser) return;
+    if (!activeCompanyId || !dbUser || isSaving) return;
 
+    setIsSaving(true);
     try {
       const { id, ...dataToSave } = editingForum as any;
       
@@ -111,13 +113,16 @@ export default function Forums() {
       setShowRecurrence(false);
     } catch (err) {
       console.error("Error saving forum:", err);
+    } finally {
+      setIsSaving(false);
     }
   };
 
   const handleCreateSession = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedForumForSession || !dbUser || !activeCompanyId) return;
+    if (!selectedForumForSession || !dbUser || !activeCompanyId || isSaving) return;
 
+    setIsSaving(true);
     try {
       // Find team members to invite as attendees
       const team = teams.find(t => t.id === selectedForumForSession.teamId);
@@ -163,6 +168,8 @@ export default function Forums() {
       setSelectedForumForSession(null);
     } catch (err) {
       console.error("Error creating session:", err);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -657,16 +664,19 @@ export default function Forums() {
           <div className="flex justify-end gap-3 pt-6 border-t border-gray-100">
             <button
               type="button"
-              onClick={() => { setIsForumModalOpen(false); setEditingForum(null); }}
-              className="px-6 py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded-xl transition-all"
+              disabled={isSaving}
+              onClick={() => { setIsForumModalOpen(false); setEditingForum(null); setShowRecurrence(false); }}
+              className="px-6 py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded-xl transition-all disabled:opacity-50"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              className="px-8 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all font-bold text-sm shadow-lg shadow-blue-200"
+              disabled={isSaving}
+              className="flex items-center gap-2 px-8 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all font-bold text-sm shadow-lg shadow-blue-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Guardar Foro
+              {isSaving ? <RefreshCcw size={16} className="animate-spin" /> : null}
+              {editingForum?.id ? 'Guardar Cambios' : 'Crear Foro'}
             </button>
           </div>
         </form>
@@ -709,15 +719,18 @@ export default function Forums() {
           <div className="flex justify-end gap-3 pt-6 border-t border-gray-100">
             <button
               type="button"
+              disabled={isSaving}
               onClick={() => { setIsSessionModalOpen(false); setSelectedForumForSession(null); }}
-              className="px-6 py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded-xl transition-all"
+              className="px-6 py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded-xl transition-all disabled:opacity-50"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              className="px-8 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all font-bold text-sm shadow-lg shadow-blue-200"
+              disabled={isSaving}
+              className="flex items-center gap-2 px-8 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all font-bold text-sm shadow-lg shadow-blue-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
+              {isSaving ? <RefreshCcw size={16} className="animate-spin" /> : null}
               Programar Sesión
             </button>
           </div>
