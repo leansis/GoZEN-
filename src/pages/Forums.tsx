@@ -75,22 +75,34 @@ export default function Forums() {
     if (!activeCompanyId || !dbUser) return;
 
     try {
+      const { id, ...dataToSave } = editingForum as any;
+      
       const forumData: any = {
-        ...editingForum,
+        ...dataToSave,
         companyId: activeCompanyId,
         createdBy: dbUser.uid,
-        createdAt: editingForum?.createdAt || new Date().toISOString(),
-        agenda: editingForum?.agenda || []
+        createdAt: dataToSave.createdAt || new Date().toISOString(),
+        agenda: dataToSave.agenda || []
       };
 
       if (!showRecurrence) {
         delete forumData.recurrence;
       } else {
         forumData.frequency = 'periodic';
+        // Ensure recurrence has at least the basic defaults if it was partially defined
+        forumData.recurrence = {
+          repeatEvery: forumData.recurrence?.repeatEvery || 1,
+          repeatUnit: forumData.recurrence?.repeatUnit || 'week',
+          daysOfWeek: forumData.recurrence?.daysOfWeek || [],
+          startDate: forumData.recurrence?.startDate || format(new Date(), 'yyyy-MM-dd'),
+          startTime: forumData.recurrence?.startTime || '09:00',
+          endTime: forumData.recurrence?.endTime || '09:30',
+          ...(forumData.recurrence?.endDate ? { endDate: forumData.recurrence.endDate } : {})
+        };
       }
 
-      if (editingForum?.id) {
-        await updateDoc(doc(db, 'forums', editingForum.id), forumData);
+      if (id) {
+        await updateDoc(doc(db, 'forums', id), forumData);
       } else {
         await addDoc(collection(db, 'forums'), forumData);
       }
@@ -395,7 +407,24 @@ export default function Forums() {
               <div className="flex items-center gap-4">
                 <button
                   type="button"
-                  onClick={() => setShowRecurrence(!showRecurrence)}
+                  onClick={() => {
+                    const nextShow = !showRecurrence;
+                    setShowRecurrence(nextShow);
+                    if (nextShow && !editingForum?.recurrence) {
+                      setEditingForum({
+                        ...editingForum,
+                        frequency: 'periodic',
+                        recurrence: {
+                          repeatEvery: 1,
+                          repeatUnit: 'week',
+                          daysOfWeek: [],
+                          startDate: format(new Date(), 'yyyy-MM-dd'),
+                          startTime: '09:00',
+                          endTime: '09:30'
+                        }
+                      });
+                    }
+                  }}
                   className={clsx(
                     "flex items-center gap-2 px-4 py-2 rounded-xl border transition-all text-sm font-medium",
                     showRecurrence 
