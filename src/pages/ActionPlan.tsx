@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Plus, 
   List, 
@@ -16,7 +17,8 @@ import {
   Tag,
   Search,
   XCircle,
-  X
+  X,
+  ChevronDown
 } from 'lucide-react';
 import { 
   collection, 
@@ -33,10 +35,12 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../AuthContext';
+import { useAppData } from '../contexts/AppDataContext';
 import { 
   ActionPlan, 
   ActionStatus, 
   ActionPriority, 
+  ActionType,
   SubAction, 
   SubActionAudit,
   User,
@@ -67,6 +71,8 @@ const PRIORITY_OPTIONS: { value: ActionPriority; label: string; color: string }[
 
 export default function ActionPlanPage() {
   const { dbUser, isAdmin, isSupervisor, activeCompanyId } = useAuth();
+  const { forums } = useAppData();
+  const navigate = useNavigate();
   const [view, setView] = useState<'list' | 'kanban'>('kanban');
   const [actions, setActions] = useState<ActionPlan[]>([]);
   const [subActions, setSubActions] = useState<SubAction[]>([]);
@@ -74,6 +80,20 @@ export default function ActionPlanPage() {
   const [teams, setTeams] = useState<any[]>([]);
   const [categories, setCategories] = useState<ActionCategory[]>([]);
   const [editingAction, setEditingAction] = useState<Partial<ActionPlan> | null>(null);
+  
+  // New State for Escalation & Type
+  const [type, setType] = useState<ActionType>('accion');
+  const [isEscalated, setIsEscalated] = useState(false);
+  const [escalatedToForumId, setEscalatedToForumId] = useState('');
+
+  useEffect(() => {
+    if (editingAction) {
+      setType(editingAction.type || 'accion');
+      setIsEscalated(editingAction.isEscalated || false);
+      setEscalatedToForumId(editingAction.escalatedToForumId || '');
+    }
+  }, [editingAction]);
+
   const [actionToDelete, setActionToDelete] = useState<ActionPlan | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showUserSelector, setShowUserSelector] = useState(false);
@@ -247,6 +267,7 @@ export default function ActionPlanPage() {
       const actionPayload: any = {
         title: editingAction.title,
         description: editingAction.description || '',
+        type: type,
         status: autoStatus,
         priority: editingAction.priority || 'media',
         categoryId: editingAction.categoryId || '',
@@ -259,8 +280,16 @@ export default function ActionPlanPage() {
         assignedTo: editingAction.assignedTo || [],
         assignedToNames: (editingAction.assignedTo || []).map(uid => 
           users.find(u => u.uid === uid)?.name || 'Desconocido'
-        )
+        ),
+        isEscalated: isEscalated,
+        escalatedToForumId: escalatedToForumId || ''
       };
+
+      if (isEscalated && !editingAction.isEscalated) {
+        actionPayload.escalatedBy = dbUser.uid;
+        actionPayload.escalatedByName = dbUser.name;
+        actionPayload.escalatedAt = now;
+      }
 
       let actionId = editingAction.id;
 
@@ -502,6 +531,18 @@ export default function ActionPlanPage() {
             )}>
               {PRIORITY_OPTIONS.find(p => p.value === action.priority)?.label}
             </span>
+            {action.isEscalated && (
+              <span className="bg-orange-50 text-orange-600 text-[10px] font-bold px-2 py-0.5 rounded-md border border-orange-100 flex items-center gap-1 uppercase" title="Escalado">
+                <AlertCircle size={10} />
+                Escalado
+              </span>
+            )}
+            {action.type === 'incidencia' && (
+              <span className="bg-red-50 text-red-600 text-[10px] font-bold px-2 py-0.5 rounded-md border border-red-100 flex items-center gap-1 uppercase">
+                <AlertCircle size={10} />
+                Incidencia
+              </span>
+            )}
             {action.categoryName && (
               <span className="bg-blue-50 text-blue-600 text-[10px] font-bold px-2 py-0.5 rounded-md border border-blue-100 flex items-center gap-1 uppercase">
                 <Tag size={10} />
@@ -587,7 +628,11 @@ export default function ActionPlanPage() {
       header: 'Título', 
       accessor: (a) => (
         <div className="flex flex-col">
-          <span className="font-bold text-gray-800">{a.title}</span>
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-gray-800">{a.title}</span>
+            {a.isEscalated && <span className="bg-orange-50 text-orange-600 text-[10px] px-1.5 py-0.5 rounded font-bold uppercase border border-orange-100 flex items-center gap-1"><AlertCircle size={10} /> Escalado</span>}
+            {a.type === 'incidencia' && <span className="bg-red-50 text-red-600 text-[10px] px-1.5 py-0.5 rounded font-bold uppercase border border-red-100 flex items-center gap-1"><AlertCircle size={10} /> Incidencia</span>}
+          </div>
           <span className="text-xs text-gray-500 truncate max-w-[200px]">{a.description}</span>
         </div>
       ),
@@ -683,31 +728,38 @@ export default function ActionPlanPage() {
           <h1 className="text-2xl font-bold text-gray-800">Plan de Acciones</h1>
           <p className="text-gray-500 text-sm">Gestiona y realiza seguimiento de las acciones operativas. </p>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="bg-white border border-gray-200 rounded-lg p-1 flex shadow-sm">
-            <button 
-              onClick={() => setView('kanban')}
-              className={clsx("p-1.5 rounded-md transition-all", view === 'kanban' ? "bg-blue-50 text-blue-600 shadow-sm" : "text-gray-400 hover:text-gray-600")}
-              title="Vista Kanban"
-            >
-              <LayoutDashboard size={20} />
-            </button>
-            <button 
-              onClick={() => setView('list')}
-              className={clsx("p-1.5 rounded-md transition-all", view === 'list' ? "bg-blue-50 text-blue-600 shadow-sm" : "text-gray-400 hover:text-gray-600")}
-              title="Vista Lista"
-            >
-              <List size={20} />
-            </button>
-          </div>
-          <button 
-            onClick={() => { setEditingAction({ assignedTo: [], assignedToNames: [] }); setTempSubActions([]); }}
-            className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl hover:bg-blue-700 transition shadow-lg shadow-blue-200 active:scale-95 duration-200"
-          >
-            <Plus size={20} />
-            <span className="font-semibold">Nueva Acción</span>
-          </button>
-        </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="bg-white border border-gray-200 rounded-lg p-1 flex shadow-sm">
+                <button 
+                  onClick={() => setView('kanban')}
+                  className={clsx("p-1.5 rounded-md transition-all", view === 'kanban' ? "bg-blue-50 text-blue-600 shadow-sm" : "text-gray-400 hover:text-gray-600")}
+                  title="Vista Kanban"
+                >
+                  <LayoutDashboard size={20} />
+                </button>
+                <button 
+                  onClick={() => setView('list')}
+                  className={clsx("p-1.5 rounded-md transition-all", view === 'list' ? "bg-blue-50 text-blue-600 shadow-sm" : "text-gray-400 hover:text-gray-600")}
+                  title="Vista Lista"
+                >
+                  <List size={20} />
+                </button>
+              </div>
+              <button 
+                onClick={() => navigate('/escalated-actions')}
+                className="flex items-center gap-2 px-4 py-2 bg-orange-50 text-orange-600 rounded-xl hover:bg-orange-100 transition-all font-bold text-sm border border-orange-100"
+              >
+                <AlertCircle size={18} />
+                Ver Escalados
+              </button>
+              <button 
+                onClick={() => { setEditingAction({ assignedTo: [], assignedToNames: [] }); setTempSubActions([]); }}
+                className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl hover:bg-blue-700 transition shadow-lg shadow-blue-200 active:scale-95 duration-200"
+              >
+                <Plus size={20} />
+                <span className="font-semibold">Nueva Acción</span>
+              </button>
+            </div>
       </div>
 
       {error && (
@@ -811,9 +863,34 @@ export default function ActionPlanPage() {
                   />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div className="sm:col-span-1">
-                    <label className="block text-sm font-semibold text-gray-700 mb-1">Tipo de Acción</label>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Tipo</label>
+                    <div className="flex p-1 bg-gray-50 rounded-xl border border-gray-100 h-[42px]">
+                      <button
+                        type="button"
+                        onClick={() => setType('accion')}
+                        className={clsx(
+                          "flex-1 rounded-lg text-xs font-bold transition-all",
+                          type === 'accion' ? "bg-white text-blue-600 shadow-sm" : "text-gray-400 hover:text-gray-600"
+                        )}
+                      >
+                        Acción
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setType('incidencia')}
+                        className={clsx(
+                          "flex-1 rounded-lg text-xs font-bold transition-all",
+                          type === 'incidencia' ? "bg-white text-orange-600 shadow-sm" : "text-gray-400 hover:text-gray-600"
+                        )}
+                      >
+                        Incidencia
+                      </button>
+                    </div>
+                  </div>
+                  <div className="sm:col-span-1">
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Categoría</label>
                     <select 
                       value={editingAction?.categoryId || ''}
                       onChange={(e) => setEditingAction({ ...editingAction, categoryId: e.target.value })}
@@ -981,6 +1058,40 @@ export default function ActionPlanPage() {
                     className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm text-sm"
                     placeholder="Observaciones de progreso..."
                   />
+                </div>
+
+                <div className="p-4 bg-orange-50/50 rounded-2xl border border-orange-100/50 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                       <AlertCircle size={20} className="text-orange-600" />
+                       <span className="font-bold text-gray-800 text-sm">Escalación de PDCAs</span>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={isEscalated}
+                        onChange={(e) => setIsEscalated(e.target.checked)}
+                        className="sr-only peer" 
+                      />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-600"></div>
+                    </label>
+                  </div>
+                  
+                  {isEscalated && (
+                    <div className="animate-in slide-in-from-top-2 duration-200 pb-2">
+                       <label className="block text-xs font-bold text-orange-700 mb-2 uppercase tracking-wider">Escalar a otro Foro</label>
+                       <select 
+                        value={escalatedToForumId}
+                        onChange={(e) => setEscalatedToForumId(e.target.value)}
+                        className="w-full px-4 py-2.5 border border-orange-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none shadow-sm bg-white text-sm"
+                       >
+                          <option value="">Seleccionar foro destino...</option>
+                          {forums.map(f => (
+                            <option key={f.id} value={f.id}>{f.name} ({f.teamName})</option>
+                          ))}
+                       </select>
+                    </div>
+                  )}
                 </div>
               </div>
 

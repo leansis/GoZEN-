@@ -14,6 +14,7 @@ import {
   Tag,
   ClipboardList,
   MessagesSquare,
+  AlertCircle,
   LogOut,
   ChevronDown,
   ChevronRight,
@@ -42,6 +43,7 @@ export default function Layout() {
   const topLevelItems = [
     { name: 'OHP', path: '/ohp', icon: Network, roles: ['admin', 'supervisor', 'user', 'lean_promotor'] },
     { name: 'Plan de acciones', path: '/action-plan', icon: ClipboardList, roles: ['admin', 'supervisor', 'user', 'lean_promotor'] },
+    { name: 'Escalados', path: '/escalated-actions', icon: AlertCircle, roles: ['admin', 'supervisor', 'user', 'lean_promotor'] },
     { name: 'Foros', path: '/forums', icon: MessagesSquare, roles: ['admin', 'supervisor', 'user', 'lean_promotor'] },
   ];
 

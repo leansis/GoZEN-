@@ -142,11 +142,13 @@ export interface TrainingAction {
 
 export type ActionStatus = 'pendiente' | 'en_progreso' | 'finalizada' | 'bloqueada' | 'cancelada' | 'retrasada';
 export type ActionPriority = 'baja' | 'media' | 'alta' | 'critica';
+export type ActionType = 'accion' | 'incidencia';
 
 export interface ActionPlan {
   id: string;
   title: string;
   description: string;
+  type: ActionType;
   categoryId?: string;
   categoryName?: string;
   createdBy: string;
@@ -161,6 +163,14 @@ export interface ActionPlan {
   companyId: string;
   createdAt: string;
   updatedAt: string;
+  
+  // Escalation fields
+  isEscalated?: boolean;
+  escalatedToForumId?: string; // Optional target forum
+  escalatedBy?: string;
+  escalatedByName?: string;
+  escalatedAt?: string;
+  originForumId?: string; // Forum where it was created
 }
 
 export interface SubActionAudit {

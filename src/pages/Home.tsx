@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
-import { Building2, Users, ArrowRight, LogOut, Plus, Trash2, LayoutDashboard, ClipboardList, MessagesSquare } from 'lucide-react';
+import { Building2, Users, ArrowRight, LogOut, Plus, Trash2, LayoutDashboard, ClipboardList, MessagesSquare, AlertCircle } from 'lucide-react';
 import { collection, onSnapshot, query, orderBy, addDoc, deleteDoc, doc, where } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Company } from '../types';
@@ -292,6 +292,14 @@ export default function Home() {
                   >
                     <MessagesSquare size={40} />
                     <span>Foros</span>
+                  </button>
+
+                  <button
+                    onClick={() => navigate('/escalated-actions')}
+                    className="w-full bg-orange-600 text-white px-6 py-10 rounded-3xl font-bold text-xl hover:bg-orange-700 transition-all shadow-xl shadow-orange-200 flex flex-col items-center justify-center gap-4"
+                  >
+                    <AlertCircle size={40} />
+                    <span>Escalados</span>
                   </button>
                 </div>
               </div>
