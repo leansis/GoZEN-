@@ -108,6 +108,81 @@ export default function OHP() {
     });
   };
 
+  const handleDropGroupLeader = async (e: React.DragEvent, team: Team, groupId: string) => {
+    e.preventDefault();
+    const userData = e.dataTransfer.getData('application/json');
+    if (!userData) return;
+    const user: User = JSON.parse(userData);
+    
+    if (team.groups) {
+      const newGroups = team.groups.map(g => 
+        g.id === groupId ? { ...g, leaderId: user.uid, leaderName: user.name } : g
+      );
+      
+      const updateData: any = { groups: newGroups };
+      
+      // Ensure user is also a member of the team
+      if (!team.members.some(m => m.uid === user.uid)) {
+        updateData.members = [...team.members, { uid: user.uid, name: user.name }];
+      }
+
+      await updateDoc(doc(db, 'teams', team.id), updateData);
+    }
+  };
+
+  const handleDropGroupMember = async (e: React.DragEvent, team: Team, groupId: string) => {
+    e.preventDefault();
+    const userData = e.dataTransfer.getData('application/json');
+    if (!userData) return;
+    const user: User = JSON.parse(userData);
+    
+    if (team.groups) {
+      let memberAddedToTeam = false;
+      const newGroups = team.groups.map(g => {
+        if (g.id === groupId) {
+          if (!g.members.some(m => m.uid === user.uid)) {
+            memberAddedToTeam = true;
+            return { ...g, members: [...g.members, { uid: user.uid, name: user.name }] };
+          }
+        }
+        return g;
+      });
+      
+      if (memberAddedToTeam) {
+        const updateData: any = { groups: newGroups };
+        
+        // Ensure user is also a member of the team
+        if (!team.members.some(m => m.uid === user.uid)) {
+          updateData.members = [...team.members, { uid: user.uid, name: user.name }];
+        }
+
+        await updateDoc(doc(db, 'teams', team.id), updateData);
+      }
+    }
+  };
+
+  const handleRemoveGroupMember = async (team: Team, groupId: string, memberUid: string) => {
+    if (team.groups) {
+      const newGroups = team.groups.map(g => 
+        g.id === groupId ? { ...g, members: g.members.filter(m => m.uid !== memberUid) } : g
+      );
+      await updateDoc(doc(db, 'teams', team.id), {
+        groups: newGroups
+      });
+    }
+  };
+
+  const handleRemoveGroupLeader = async (team: Team, groupId: string) => {
+    if (team.groups) {
+      const newGroups = team.groups.map(g => 
+        g.id === groupId ? { ...g, leaderId: '', leaderName: '' } : g
+      );
+      await updateDoc(doc(db, 'teams', team.id), {
+        groups: newGroups
+      });
+    }
+  };
+
   const renderTeamNode = (team: Team, depth: number = 0) => {
     const childTeams = teams.filter(t => t.parentTeamId === team.id);
     const gap = calculateTeamGap(team);
@@ -177,9 +252,11 @@ export default function OHP() {
                 onDragOver={editMode ? (e) => e.preventDefault() : undefined}
                 onDrop={editMode ? (e) => handleDropMember(e, team) : undefined}
               >
-                <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Miembros</p>
+                <p className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                  {team.hasGroups ? 'Todos los Miembros' : 'Miembros'}
+                </p>
                 {team.members.length > 0 ? (
-                  <div className="space-y-1.5">
+                  <div className="space-y-1.5 font-sans">
                     {team.members.map(member => (
                       <div key={member.uid} className="flex items-center justify-between bg-white px-2 py-1.5 rounded border border-gray-200 shadow-sm">
                         <span className="truncate text-gray-700">{member.name}</span>
@@ -195,6 +272,77 @@ export default function OHP() {
                   </span>
                 )}
               </div>
+
+              {/* Render Groups if available */}
+              {team.hasGroups && team.groups && team.groups.length > 0 && (
+                <div className="mt-4 space-y-3 pt-4 border-t border-gray-200/50">
+                  <div className="flex items-center gap-2 justify-center">
+                    <div className="h-px bg-gray-300 flex-1"></div>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Grupos del Equipo</p>
+                    <div className="h-px bg-gray-300 flex-1"></div>
+                  </div>
+                  <div className="grid grid-cols-1 gap-4">
+                    {team.groups.map(group => (
+                      <div key={group.id} className="p-3 bg-gray-100/50 rounded-xl border border-gray-200/80 shadow-sm overflow-hidden">
+                        <div className="flex items-center justify-between mb-3 px-1 border-b border-gray-200/50 pb-2">
+                          <p className="text-xs font-bold text-gray-700 uppercase tracking-tight">{group.name}</p>
+                        </div>
+                        
+                        {/* Group Leader */}
+                        <div 
+                          className={`mb-3 p-2 rounded-lg transition-all ${editMode ? 'border-2 border-dashed border-blue-200 bg-blue-50/50 mb-4' : ''}`}
+                          onDragOver={editMode ? (e) => e.preventDefault() : undefined}
+                          onDrop={editMode ? (e) => handleDropGroupLeader(e, team, group.id) : undefined}
+                        >
+                          <p className="text-[9px] font-bold text-gray-400 uppercase mb-1.5 tracking-wider px-1">Líder G.</p>
+                          {group.leaderName ? (
+                            <div className="flex items-center justify-between bg-white px-2.5 py-2 rounded-lg border border-gray-200 text-xs shadow-sm group/leader">
+                              <div className="flex items-center gap-2 truncate">
+                                <div className="w-5 h-5 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-[10px] font-bold shrink-0">
+                                  {group.leaderName.charAt(0)}
+                                </div>
+                                <span className="truncate font-semibold text-gray-700">{group.leaderName}</span>
+                              </div>
+                              {editMode && (
+                                <button onClick={() => handleRemoveGroupLeader(team, group.id)} className="text-red-400 hover:text-red-600 ml-1 font-bold px-1.5 transition-colors">×</button>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="text-gray-400 italic text-[10px] border border-dashed border-gray-200 rounded-lg py-2 flex items-center justify-center bg-white/30">
+                              {editMode ? 'Suelta un líder aquí' : 'Sin líder'}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Group Members */}
+                        <div 
+                          className={`p-2 rounded-lg transition-all ${editMode ? 'border-2 border-dashed border-green-200 bg-green-50/50 min-h-[60px]' : ''}`}
+                          onDragOver={editMode ? (e) => e.preventDefault() : undefined}
+                          onDrop={editMode ? (e) => handleDropGroupMember(e, team, group.id) : undefined}
+                        >
+                          <p className="text-[9px] font-bold text-gray-400 uppercase mb-1.5 tracking-wider px-1">Miembros G.</p>
+                          {group.members.length > 0 ? (
+                            <div className="space-y-1.5">
+                              {group.members.map(m => (
+                                <div key={m.uid} className="flex items-center justify-between bg-white px-2.5 py-1.5 rounded-lg border border-gray-200 text-[11px] shadow-sm hover:border-green-200 transition-colors">
+                                  <span className="truncate text-gray-600 font-medium">{m.name}</span>
+                                  {editMode && (
+                                    <button onClick={() => handleRemoveGroupMember(team, group.id, m.uid)} className="text-red-400 hover:text-red-600 ml-1 font-bold px-1.5 transition-colors">×</button>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="text-gray-300 italic text-[10px] border border-dashed border-gray-200 rounded-lg py-3 flex items-center justify-center bg-white/30">
+                              {editMode ? 'Añade miembros aquí' : 'Sin miembros'}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
