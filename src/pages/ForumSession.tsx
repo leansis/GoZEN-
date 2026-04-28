@@ -1165,48 +1165,51 @@ export default function ForumSession() {
                               Indicadores
                             </h4>
                           </div>
-                          <div className="flex bg-gray-50 p-0.5 rounded-lg border border-gray-100 gap-0.5 scale-90 origin-right">
+                          <div className="flex bg-gray-50 p-1 rounded-xl border border-gray-100 gap-1.5 origin-right">
                             <button
                               onClick={() => setSelectedTypology(null)}
                               className={clsx(
-                                "px-2 py-0.5 rounded-md text-[8px] font-black uppercase transition-all tracking-wider flex items-center gap-1",
+                                "px-3 py-1 rounded-lg text-[10px] font-black uppercase transition-all tracking-wider flex items-center gap-1.5 shadow-sm",
                                 selectedTypology === null
-                                  ? "bg-white text-blue-600 border border-gray-100 shadow-sm"
-                                  : "text-gray-400",
+                                  ? "bg-white text-blue-600 border-gray-200"
+                                  : "bg-transparent text-gray-400 hover:text-gray-600 border-transparent",
                               )}
                             >
                               TODOS
-                              <span className="opacity-50 text-[7px]">({forumIndicators.length})</span>
+                              <span className="opacity-50 text-[8px]">({forumIndicators.length})</span>
                             </button>
                             {(
                               ["calidad", "personas", "coste", "plazo"] as const
                             ).map((type) => {
                               const count = forumIndicators.filter(i => i.typology === type).length;
+                              const isSelected = selectedTypology === type;
                               return (
                                 <button
                                   key={type}
                                   onClick={() => setSelectedTypology(type)}
                                   className={clsx(
-                                    "px-2 py-0.5 rounded-md text-[8px] font-black uppercase transition-all tracking-wider flex items-center gap-1",
-                                    selectedTypology === type
-                                      ? clsx(
-                                          "bg-white border border-gray-100 shadow-sm",
-                                          type === "calidad" && "text-amber-500",
-                                          type === "personas" && "text-purple-500",
-                                          type === "coste" && "text-emerald-500",
-                                          type === "plazo" && "text-blue-500",
-                                        )
-                                      : "text-gray-400",
+                                    "px-3 py-1 rounded-lg text-[10px] font-black uppercase transition-all tracking-wider flex items-center gap-1.5 border",
+                                    isSelected
+                                      ? "bg-white shadow-sm border-gray-200"
+                                      : "bg-transparent text-gray-400 border-transparent hover:text-gray-600",
+                                    isSelected && type === "calidad" && "text-amber-500",
+                                    isSelected && type === "personas" && "text-purple-500",
+                                    isSelected && type === "coste" && "text-emerald-500",
+                                    isSelected && type === "plazo" && "text-blue-500",
                                   )}
                                 >
+                                  {type === "calidad" && <Award size={12} className={isSelected ? "text-amber-500" : "text-gray-300"} />}
+                                  {type === "personas" && <Users size={12} className={isSelected ? "text-purple-500" : "text-gray-300"} />}
+                                  {type === "coste" && <Coins size={12} className={isSelected ? "text-emerald-500" : "text-gray-300"} />}
+                                  {type === "plazo" && <Clock size={12} className={isSelected ? "text-blue-500" : "text-gray-300"} />}
                                   {type}
-                                  <span className="opacity-50 text-[7px]">({count})</span>
+                                  <span className="opacity-50 text-[8px]">({count})</span>
                                 </button>
                               );
                             })}
                           </div>
                         </div>
-                        <div className="flex gap-2 overflow-x-auto pb-1 custom-scrollbar no-scrollbar-on-mobile">
+                        <div className="flex gap-2.5 overflow-x-auto pb-1.5 custom-scrollbar no-scrollbar-on-mobile">
                           {filteredIndicators.map((indicator) => {
                             const isViewed = viewedIndicatorIds.has(indicator.id);
                             const isActive = selectedIndicatorId === indicator.id;
@@ -1219,24 +1222,27 @@ export default function ForumSession() {
                                   setViewedIndicatorIds(prev => new Set(prev).add(indicator.id));
                                 }}
                                 className={clsx(
-                                  "flex-none w-28 px-2 py-1.5 rounded-xl border transition-all text-left relative overflow-hidden",
+                                  "flex-none w-36 px-3 py-2 rounded-xl border transition-all text-left relative overflow-hidden",
                                   isActive
-                                    ? "bg-blue-600 border-blue-600 text-white shadow-sm"
+                                    ? "bg-blue-600 border-blue-600 text-white shadow-md scale-[1.02] z-10"
                                     : isViewed
-                                      ? "bg-gray-50 border-gray-50 text-gray-400"
-                                      : "bg-white border-gray-100 text-gray-600 hover:border-blue-200",
+                                      ? "bg-gray-50 border-gray-50 text-gray-400 shadow-inner"
+                                      : "bg-white border-gray-100 text-gray-600 hover:border-blue-200 shadow-sm",
                                 )}
                               >
-                                <div className="flex items-center gap-1 mb-0.5">
-                                  {indicator.typology === 'calidad' && <Award size={6} className={isActive ? "text-white" : "text-amber-500"} />}
-                                  {indicator.typology === 'coste' && <Coins size={6} className={isActive ? "text-white" : "text-emerald-500"} />}
-                                  {indicator.typology === 'plazo' && <Clock size={6} className={isActive ? "text-white" : "text-blue-500"} />}
-                                  {indicator.typology === 'personas' && <Users size={6} className={isActive ? "text-white" : "text-purple-500"} />}
-                                  <div className="text-[6px] font-black uppercase tracking-widest opacity-60">
+                                <div className="flex items-center gap-1.5 mb-1">
+                                  {indicator.typology === 'calidad' && <Award size={10} className={isActive ? "text-white" : "text-amber-500"} />}
+                                  {indicator.typology === 'coste' && <Coins size={10} className={isActive ? "text-white" : "text-emerald-500"} />}
+                                  {indicator.typology === 'plazo' && <Clock size={10} className={isActive ? "text-white" : "text-blue-500"} />}
+                                  {indicator.typology === 'personas' && <Users size={10} className={isActive ? "text-white" : "text-purple-500"} />}
+                                  <div className={clsx(
+                                    "text-[8px] font-black uppercase tracking-widest",
+                                    isActive ? "text-white/60" : "opacity-60"
+                                  )}>
                                     {indicator.typology || 'Ind'}
                                   </div>
                                 </div>
-                                <div className="font-bold text-[9px] truncate leading-tight">
+                                <div className="font-bold text-[10px] truncate leading-tight">
                                   {indicator.name}
                                 </div>
                               </button>
@@ -1317,11 +1323,11 @@ export default function ForumSession() {
                             <>
                               <div className="px-3 py-2 border-b border-gray-50 flex justify-between items-center bg-white shrink-0 shadow-sm z-10">
                                 <div>
-                                  <h3 className="font-black text-gray-800 uppercase tracking-tighter text-[11px]">
+                                  <h3 className="font-black text-gray-800 uppercase tracking-tighter text-sm">
                                     {selectedIndicator.name}
                                   </h3>
                                   {selectedIndicator.formula && (
-                                    <p className="text-[9px] text-gray-400 font-medium">
+                                    <p className="text-[11px] text-gray-400 font-medium tracking-tight">
                                       {selectedIndicator.formula}
                                     </p>
                                   )}
@@ -1331,10 +1337,10 @@ export default function ForumSession() {
                                     href={selectedIndicator.link}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="px-2 py-1 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-600 hover:text-white transition-all text-[9px] font-black border border-blue-100 flex items-center gap-1 shadow-sm"
+                                    className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-all text-[10px] font-black border border-blue-100 flex items-center gap-1.5 shadow-sm"
                                   >
                                     CUADRO MANDO
-                                    <LayoutDashboard size={10} />
+                                    <LayoutDashboard size={12} />
                                   </a>
                                 )}
                               </div>
