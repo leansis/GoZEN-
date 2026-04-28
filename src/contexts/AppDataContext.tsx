@@ -3,7 +3,7 @@ import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../AuthContext';
 import { handleFirestoreError, OperationType } from '../lib/firestore-utils';
-import { Team, Process, Task, Criterion, UserTaskLevel, TrainingAction, Activity, Forum, ForumSession } from '../types';
+import { Team, Process, Task, Criterion, UserTaskLevel, TrainingAction, Activity, Forum, ForumSession, MasterGroup, Indicator } from '../types';
 
 interface AppDataContextType {
   activities: Activity[];
@@ -17,6 +17,8 @@ interface AppDataContextType {
   users: any[];
   forums: Forum[];
   forumSessions: ForumSession[];
+  masterGroups: MasterGroup[];
+  indicators: Indicator[];
   loading: boolean;
 }
 
@@ -36,6 +38,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [users, setUsers] = useState<any[]>([]);
   const [forums, setForums] = useState<Forum[]>([]);
   const [forumSessions, setForumSessions] = useState<ForumSession[]>([]);
+  const [masterGroups, setMasterGroups] = useState<MasterGroup[]>([]);
+  const [indicators, setIndicators] = useState<Indicator[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -53,6 +57,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       setUsers([]);
       setForums([]);
       setForumSessions([]);
+      setMasterGroups([]);
+      setIndicators([]);
       setLoading(false);
       return;
     }
@@ -106,6 +112,14 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       setForums(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Forum)));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'forums'));
 
+    const unsubMasterGroups = onSnapshot(getQuery('masterGroups'), (snapshot) => {
+      setMasterGroups(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MasterGroup)));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'masterGroups'));
+
+    const unsubIndicators = onSnapshot(getQuery('indicators'), (snapshot) => {
+      setIndicators(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Indicator)));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'indicators'));
+
     const unsubForumSessions = onSnapshot(getQuery('forumSessions'), (snapshot) => {
       setForumSessions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ForumSession)));
       setLoading(false);
@@ -125,13 +139,15 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       unsubTeamTargets();
       unsubUsers();
       unsubForums();
+      unsubMasterGroups();
+      unsubIndicators();
       unsubForumSessions();
     };
   }, [activeCompanyId, dbUser?.companyId]);
 
   return (
     <AppDataContext.Provider value={{
-      activities, teams, processes, tasks, criteria, userTaskLevels, trainingActions, teamTargets, users, forums, forumSessions, loading
+      activities, teams, processes, tasks, criteria, userTaskLevels, trainingActions, teamTargets, users, forums, forumSessions, masterGroups, indicators, loading
     }}>
       {children}
     </AppDataContext.Provider>

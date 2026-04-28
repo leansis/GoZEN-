@@ -504,7 +504,7 @@ export default function MasterData() {
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
           <Database className="w-6 h-6 text-blue-600" />
-          Datos Maestros
+          Importación de maestros
         </h1>
         <p className="text-gray-500 mt-1">
           Importación y exportación masiva de la configuración del sistema.

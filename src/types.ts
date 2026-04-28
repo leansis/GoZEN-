@@ -1,10 +1,15 @@
 export type Role = 'admin' | 'supervisor' | 'user' | 'lean_promotor';
 export type Status = 'active' | 'inactive';
 
+export interface CompanySettings {
+  forumVirtualHorizonMonths: number;
+}
+
 export interface Company {
   id: string;
   name: string;
   createdAt: string;
+  settings?: CompanySettings;
 }
 
 export interface User {
@@ -23,8 +28,16 @@ export interface TeamMember {
   name: string;
 }
 
+export interface MasterGroup {
+  id: string;
+  name: string;
+  companyId: string;
+  createdAt: string;
+}
+
 export interface TeamGroup {
   id: string;
+  masterGroupId?: string;
   name: string;
   leaderId: string;
   leaderName: string;
@@ -171,6 +184,7 @@ export interface ActionPlan {
   escalatedByName?: string;
   escalatedAt?: string;
   originForumId?: string; // Forum where it was created
+  originForumName?: string; // Name of the forum where it was created
 }
 
 export interface SubActionAudit {
@@ -199,7 +213,7 @@ export interface ActionCategory {
 export type ForumFrequency = 'diaria' | 'semanal' | 'mensual' | 'adhoc' | 'periodic';
 export type ForumSessionStatus = 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
 
-export interface ForumAgendaItem {
+export interface ForumSection {
   id: string;
   title: string;
   duration?: number; // Estimated duration in minutes
@@ -225,8 +239,9 @@ export interface Forum {
   companyId: string;
   frequency: ForumFrequency;
   recurrence?: ForumRecurrence;
+  skippedDates?: string[];
   estimatedDuration: number; // Total minutes
-  agenda: ForumAgendaItem[];
+  sections: ForumSection[];
   createdBy: string;
   createdAt: string;
 }
@@ -249,8 +264,23 @@ export interface ForumSession {
   completedAt?: string;
   status: ForumSessionStatus;
   attendees: ForumAttendee[];
-  currentAgendaStep: number; // Index of the agenda item
+  currentSectionIndex: number; // Index of the section item
   results: Record<string, string>; // item.id -> notes/results
+  durationSeconds?: number;
   companyId: string;
   createdBy: string;
+}
+
+export interface Indicator {
+  id: string;
+  name: string;
+  description?: string;
+  formula?: string;
+  scopeIds: string[];
+  scopeNames: string[];
+  link?: string;
+  typology?: 'calidad' | 'coste' | 'plazo' | 'personas';
+  companyId: string;
+  createdAt: string;
+  updatedAt: string;
 }

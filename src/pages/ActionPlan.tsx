@@ -53,6 +53,8 @@ import ConfirmModal from '../components/ConfirmModal';
 import clsx from 'clsx';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { calculateAutomaticStatus } from '../lib/action-utils';
+import { handleFirestoreError, OperationType } from '../lib/firestore-utils';
 
 const STATUS_OPTIONS: { value: ActionStatus; label: string; color: string; bg: string }[] = [
   { value: 'pendiente', label: 'Pendiente', color: 'text-gray-600', bg: 'bg-gray-100' },
@@ -82,6 +84,11 @@ export default function ActionPlanPage() {
   const [teams, setTeams] = useState<any[]>([]);
   const [categories, setCategories] = useState<ActionCategory[]>([]);
   const [editingAction, setEditingAction] = useState<Partial<ActionPlan> | null>(null);
+
+  // New State for Filters
+  const [filterTeamId, setFilterTeamId] = useState<string>('');
+  const [filterForumId, setFilterForumId] = useState<string>('');
+  const [onlyResponsible, setOnlyResponsible] = useState<boolean>(false);
   
   // New State for Escalation & Type
   const [type, setType] = useState<ActionType>('accion');
@@ -104,50 +111,93 @@ export default function ActionPlanPage() {
 
   const companyId = dbUser?.companyId || activeCompanyId;
 
-  const calculateAutomaticStatus = (targetDate: string, currentStatus: ActionStatus): ActionStatus => {
-    if (currentStatus === 'finalizada' || currentStatus === 'cancelada' || currentStatus === 'bloqueada') {
-      return currentStatus;
-    }
-    
-    if (!targetDate) return 'pendiente';
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const deadline = new Date(targetDate);
-    deadline.setHours(0, 0, 0, 0);
-
-    if (deadline < today) {
-      return 'retrasada';
-    }
-    return 'en_progreso';
-  };
-
-  // Filter actions based on permissions
+  // Filter actions based on permissions and user request
   const filteredActions = React.useMemo(() => {
-    const supervisorTeams = teams.filter(t => 
-      t.supervisorId === dbUser?.uid || 
-      t.supervisorId === dbUser?.email ||
-      (t.groups || []).some((g: any) => g.leaderId === dbUser?.uid)
-    );
-    const managedUserIds = new Set<string>();
-    supervisorTeams.forEach(t => t.members?.forEach((m: any) => managedUserIds.add(m.uid)));
+    if (!dbUser) return [];
 
-    const list = isAdmin ? actions : actions.filter(action => {
-      const isCreator = action.createdBy === dbUser?.uid;
-      const isAssignee = action.assignedTo.includes(dbUser?.uid || '');
-      const isInManagedTeam = action.assignedTo.some(uid => managedUserIds.has(uid));
-      
-      if (isSupervisor) {
-        return isCreator || isAssignee || isInManagedTeam;
-      }
-      return isCreator || isAssignee;
+    const userUid = dbUser.uid;
+    const userEmail = dbUser.email.toLowerCase().trim();
+    const userName = dbUser.name?.toLowerCase().trim();
+
+    // 1. Identify teams I lead or supervise (to find hierarchy)
+    const teamsILeadOrSupervise = teams.filter(t => 
+      t.supervisorId === userUid || 
+      t.supervisorId?.toLowerCase().trim() === userEmail ||
+      (userName && t.supervisorId?.toLowerCase().trim() === userName) ||
+      (userName && t.supervisorName?.toLowerCase().trim() === userName) ||
+      (t.groups || []).some((g: any) => 
+        g.leaderId === userUid || 
+        (userName && g.leaderId?.toLowerCase().trim() === userName) ||
+        (userName && g.leaderName?.toLowerCase().trim() === userName)
+      )
+    );
+
+    // 2. Build the set of all "Governed" team IDs (including descendants)
+    const governedTeamIds = new Set<string>();
+    const getDescendants = (teamId: string) => {
+      const children = teams.filter(t => t.parentTeamId === teamId);
+      children.forEach(c => {
+        if (!governedTeamIds.has(c.id)) {
+          governedTeamIds.add(c.id);
+          getDescendants(c.id);
+        }
+      });
+    };
+
+    teamsILeadOrSupervise.forEach(t => {
+      governedTeamIds.add(t.id);
+      getDescendants(t.id);
     });
+
+    // 3. Identify teams I participate in
+    const participantTeamIds = new Set<string>(
+      teams.filter(t => 
+        t.members?.some((m: any) => (m.uid || m) === userUid) ||
+        (t.groups || []).some((g: any) => g.members?.some((m: any) => (m.uid || m) === userUid))
+      ).map(t => t.id)
+    );
+
+    // 4. Identify forums associated with governed and participant teams
+    const visibleForumIds = new Set<string>(
+      forums.filter(f => governedTeamIds.has(f.teamId) || participantTeamIds.has(f.teamId)).map(f => f.id)
+    );
+
+    // 5. BASE FILTER (Permissions/Default View)
+    // - I am responsible
+    // - I created it
+    // - It belongs to a forum I participate in or lead (including hierarchy)
+    let list = isAdmin ? actions : actions.filter(action => {
+      const isCreator = action.createdBy === userUid;
+      const isResponsible = action.assignedTo.includes(userUid);
+      const isForumVisible = action.originForumId && visibleForumIds.has(action.originForumId);
+      const isEscalatedTarget = action.escalatedToForumId && visibleForumIds.has(action.escalatedToForumId);
+      
+      return isCreator || isResponsible || isForumVisible || isEscalatedTarget;
+    });
+
+    // 6. AD-HOC FILTERS (User Input)
+    if (onlyResponsible) {
+      list = list.filter(a => a.assignedTo.includes(userUid));
+    }
+
+    if (filterTeamId) {
+      // Find forums for this team
+      const forumIdsInTeam = forums.filter(f => f.teamId === filterTeamId).map(f => f.id);
+      list = list.filter(a => 
+        (a.originForumId && forumIdsInTeam.includes(a.originForumId)) ||
+        (a.escalatedToForumId && forumIdsInTeam.includes(a.escalatedToForumId))
+      );
+    }
+
+    if (filterForumId) {
+      list = list.filter(a => a.originForumId === filterForumId || a.escalatedToForumId === filterForumId);
+    }
 
     return list.map(a => ({
       ...a,
       status: calculateAutomaticStatus(a.targetDate, a.status)
     }));
-  }, [actions, isAdmin, isSupervisor, dbUser, teams]);
+  }, [actions, isAdmin, dbUser, teams, forums, onlyResponsible, filterTeamId, filterForumId]);
 
   // Filter assignable users based on hierarchy
   const assignableUsers = React.useMemo(() => {
@@ -292,7 +342,9 @@ export default function ActionPlanPage() {
           users.find(u => u.uid === uid)?.name || 'Desconocido'
         ),
         isEscalated: isEscalated,
-        escalatedToForumId: escalatedToForumId || ''
+        escalatedToForumId: escalatedToForumId || '',
+        originForumId: editingAction.originForumId || '',
+        originForumName: forums.find(f => f.id === editingAction.originForumId)?.name || ''
       };
 
       if (isEscalated && !editingAction.isEscalated) {
@@ -530,7 +582,7 @@ export default function ActionPlanPage() {
     return (
       <div 
         key={action.id}
-        className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow cursor-pointer group mb-3"
+        className="bg-white p-4 rounded-xl border border-gray-200 transition-all cursor-pointer group mb-3"
         onClick={() => openEditModal(action)}
       >
         <div className="flex justify-between items-start mb-2">
@@ -738,42 +790,94 @@ export default function ActionPlanPage() {
           <h1 className="text-2xl font-bold text-gray-800">Plan de Acciones</h1>
           <p className="text-gray-500 text-sm">Gestiona y realiza seguimiento de las acciones operativas. </p>
         </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="bg-white border border-gray-200 rounded-lg p-1 flex shadow-sm">
-                <button 
-                  onClick={() => setView('kanban')}
-                  className={clsx("p-1.5 rounded-md transition-all", view === 'kanban' ? "bg-blue-50 text-blue-600 shadow-sm" : "text-gray-400 hover:text-gray-600")}
-                  title="Vista Kanban"
-                >
-                  <LayoutDashboard size={20} />
-                </button>
-                <button 
-                  onClick={() => setView('list')}
-                  className={clsx("p-1.5 rounded-md transition-all", view === 'list' ? "bg-blue-50 text-blue-600 shadow-sm" : "text-gray-400 hover:text-gray-600")}
-                  title="Vista Lista"
-                >
-                  <List size={20} />
-                </button>
-                <button 
-                  onClick={() => setView('escalated')}
-                  className={clsx("p-1.5 rounded-md transition-all", view === 'escalated' ? "bg-orange-50 text-orange-600 shadow-sm" : "text-gray-400 hover:text-gray-600")}
-                  title="Vista Escalados"
-                >
-                  <AlertCircle size={20} />
-                </button>
-              </div>
-              <button 
-                onClick={() => { setEditingAction({ assignedTo: [], assignedToNames: [] }); setTempSubActions([]); }}
-                className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl hover:bg-blue-700 transition shadow-lg shadow-blue-200 active:scale-95 duration-200"
-              >
-                <Plus size={20} />
-                <span className="font-semibold">Nueva Acción</span>
-              </button>
-            </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="bg-white border border-gray-200 rounded-lg p-1 flex">
+            <button 
+              onClick={() => setView('kanban')}
+              className={clsx("p-1.5 rounded-md transition-all", view === 'kanban' ? "bg-blue-50 text-blue-600" : "text-gray-400")}
+              title="Vista Kanban"
+            >
+              <LayoutDashboard size={20} />
+            </button>
+            <button 
+              onClick={() => setView('list')}
+              className={clsx("p-1.5 rounded-md transition-all", view === 'list' ? "bg-blue-50 text-blue-600" : "text-gray-400")}
+              title="Vista Lista"
+            >
+              <List size={20} />
+            </button>
+            <button 
+              onClick={() => setView('escalated')}
+              className={clsx("p-1.5 rounded-md transition-all", view === 'escalated' ? "bg-orange-50 text-orange-600" : "text-gray-400")}
+              title="Vista Escalados"
+            >
+              <AlertCircle size={20} />
+            </button>
+          </div>
+          <button 
+            onClick={() => { setEditingAction({ assignedTo: [], assignedToNames: [] }); setTempSubActions([]); }}
+            className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl hover:bg-blue-700 transition duration-200"
+          >
+            <Plus size={20} />
+            <span className="font-semibold">Nueva Acción</span>
+          </button>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-4 bg-white p-4 rounded-2xl border border-gray-100">
+        <div className="flex items-center gap-2">
+          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Equipo:</label>
+          <select 
+            value={filterTeamId}
+            onChange={(e) => {
+              setFilterTeamId(e.target.value);
+              setFilterForumId(''); // Reset forum filter when team changes
+            }}
+            className="bg-gray-50 border-none rounded-lg px-3 py-1.5 text-xs font-bold text-gray-700 focus:ring-2 focus:ring-blue-500 outline-none min-w-[150px] appearance-none cursor-pointer"
+          >
+            <option value="">Todos los equipos</option>
+            {teams.sort((a, b) => a.name.localeCompare(b.name)).map(t => (
+              <option key={t.id} value={t.id}>{t.name}</option>
+            ))}
+          </select>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Foro:</label>
+          <select 
+            value={filterForumId}
+            onChange={(e) => setFilterForumId(e.target.value)}
+            className="bg-gray-50 border-none rounded-lg px-3 py-1.5 text-xs font-bold text-gray-700 focus:ring-2 focus:ring-blue-500 outline-none min-w-[150px] appearance-none cursor-pointer"
+          >
+            <option value="">Todos los foros</option>
+            {forums
+              .filter(f => !filterTeamId || f.teamId === filterTeamId)
+              .sort((a, b) => a.name.localeCompare(b.name))
+              .map(f => (
+                <option key={f.id} value={f.id}>{f.name}</option>
+              ))}
+          </select>
+        </div>
+
+        <div className="flex items-center gap-3 ml-auto px-4 border-l border-gray-100">
+          <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Solo mis acciones</span>
+          <button
+            onClick={() => setOnlyResponsible(!onlyResponsible)}
+            className={clsx(
+              "w-10 h-5 rounded-full relative transition-all duration-300",
+              onlyResponsible ? "bg-blue-600" : "bg-gray-200"
+            )}
+          >
+            <div className={clsx(
+              "absolute top-1 w-3 h-3 bg-white rounded-full transition-all duration-300",
+              onlyResponsible ? "left-6" : "left-1"
+            )} />
+          </button>
+        </div>
       </div>
 
       {error && (
-        <div className="p-4 bg-red-50 border border-red-100 text-red-600 rounded-xl flex items-center gap-3 shadow-sm animate-in fade-in slide-in-from-top-2">
+        <div className="p-4 bg-red-50 border border-red-100 text-red-600 rounded-xl flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
           <AlertCircle size={20} className="shrink-0" />
           <span className="text-sm font-medium">{error}</span>
         </div>
@@ -798,7 +902,7 @@ export default function ActionPlanPage() {
                          <span className={clsx("w-3 h-3 rounded-full", col.color.replace('text-', 'bg-'))}></span>
                          <h3 className="font-bold text-gray-800">{col.label}</h3>
                       </div>
-                      <span className="bg-white border border-gray-200 text-gray-500 text-[10px] font-bold px-2 py-0.5 rounded-lg shadow-sm">
+                      <span className="bg-white border border-gray-200 text-gray-500 text-[10px] font-bold px-2 py-0.5 rounded-lg">
                         {actionsInColumn.length}
                       </span>
                     </div>
@@ -818,7 +922,7 @@ export default function ActionPlanPage() {
           )}
 
           {view === 'list' && (
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden overflow-x-auto">
+            <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden overflow-x-auto">
               <Table
                 columns={actionColumns}
                 data={filteredActions}
@@ -851,7 +955,7 @@ export default function ActionPlanPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12">
                 <div className="space-y-4">
-                  <h2 className="bg-blue-50/50 py-2.5 text-center text-blue-700 font-bold tracking-[0.2em] uppercase text-xs rounded-xl border border-blue-100/50 shadow-sm">
+                  <h2 className="bg-blue-50/50 py-2.5 text-center text-blue-700 font-bold tracking-[0.2em] uppercase text-xs rounded-xl border border-blue-100/50">
                     ACCIONES
                   </h2>
                   <div className="max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar space-y-4">
@@ -867,7 +971,7 @@ export default function ActionPlanPage() {
                           <div 
                             key={action.id}
                             onClick={() => openEditModal(action)}
-                            className="bg-[#C1B7CE] p-5 rounded-2xl shadow-sm relative hover:brightness-95 transition-all cursor-pointer group"
+                            className="bg-[#C1B7CE] p-5 rounded-2xl relative hover:brightness-95 transition-all cursor-pointer group"
                           >
                             <div className="flex justify-between items-start mb-1">
                               <h4 className="font-bold text-[#4F4F4F] text-lg leading-tight pr-8">{action.title}</h4>
@@ -883,7 +987,7 @@ export default function ActionPlanPage() {
                             </div>
                             
                             <div className="mt-4 flex items-center justify-between">
-                              <div className="w-9 h-9 rounded-full bg-[#A89CB8] border-2 border-white flex items-center justify-center text-white text-sm font-black shadow-inner">
+                              <div className="w-9 h-9 rounded-full bg-[#A89CB8] border-2 border-white flex items-center justify-center text-white text-sm font-black">
                                 {subCount}
                               </div>
                               <span className="text-[10px] font-black text-white/80 uppercase tracking-tighter">Detalles</span>
@@ -896,7 +1000,7 @@ export default function ActionPlanPage() {
                 </div>
 
                 <div className="space-y-4">
-                  <h2 className="bg-red-50/50 py-2.5 text-center text-red-700 font-bold tracking-[0.2em] uppercase text-xs rounded-xl border border-red-100/50 shadow-sm">
+                  <h2 className="bg-red-50/50 py-2.5 text-center text-red-700 font-bold tracking-[0.2em] uppercase text-xs rounded-xl border border-red-100/50">
                     INCIDENCIAS
                   </h2>
                   <div className="max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar space-y-4">
@@ -912,7 +1016,7 @@ export default function ActionPlanPage() {
                           <div 
                             key={action.id}
                             onClick={() => openEditModal(action)}
-                            className="bg-[#C1B7CE] p-5 rounded-2xl shadow-sm relative hover:brightness-95 transition-all cursor-pointer group"
+                            className="bg-[#C1B7CE] p-5 rounded-2xl relative hover:brightness-95 transition-all cursor-pointer group"
                           >
                             <div className="flex justify-between items-start mb-1">
                               <h4 className="font-bold text-[#4F4F4F] text-lg leading-tight pr-8">{action.title}</h4>
@@ -928,7 +1032,7 @@ export default function ActionPlanPage() {
                             </div>
                             
                             <div className="mt-4 flex items-center justify-between">
-                              <div className="w-9 h-9 rounded-full bg-[#A89CB8] border-2 border-white flex items-center justify-center text-white text-sm font-black shadow-inner">
+                              <div className="w-9 h-9 rounded-full bg-[#A89CB8] border-2 border-white flex items-center justify-center text-white text-sm font-black">
                                 {subCount}
                               </div>
                               <span className="text-[10px] font-black text-white/80 uppercase tracking-tighter">Detalles</span>
@@ -968,7 +1072,7 @@ export default function ActionPlanPage() {
                     required
                     value={editingAction?.title || ''}
                     onChange={(e) => setEditingAction({ ...editingAction, title: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm text-sm"
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm"
                     placeholder="Ej: Revisar manual de mantenimiento"
                   />
                 </div>
@@ -979,7 +1083,7 @@ export default function ActionPlanPage() {
                     rows={4}
                     value={editingAction?.description || ''}
                     onChange={(e) => setEditingAction({ ...editingAction, description: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm text-sm resize-none"
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm resize-none"
                     placeholder="Detalles de la acción..."
                   />
                 </div>
@@ -993,7 +1097,7 @@ export default function ActionPlanPage() {
                         onClick={() => setType('accion')}
                         className={clsx(
                           "flex-1 rounded-lg text-xs font-bold transition-all",
-                          type === 'accion' ? "bg-white text-blue-600 shadow-sm" : "text-gray-400 hover:text-gray-600"
+                          type === 'accion' ? "bg-white text-blue-600" : "text-gray-400 hover:text-gray-600"
                         )}
                       >
                         Acción
@@ -1003,7 +1107,7 @@ export default function ActionPlanPage() {
                         onClick={() => setType('incidencia')}
                         className={clsx(
                           "flex-1 rounded-lg text-xs font-bold transition-all",
-                          type === 'incidencia' ? "bg-white text-orange-600 shadow-sm" : "text-gray-400 hover:text-gray-600"
+                          type === 'incidencia' ? "bg-white text-orange-600" : "text-gray-400 hover:text-gray-600"
                         )}
                       >
                         Incidencia
@@ -1011,11 +1115,24 @@ export default function ActionPlanPage() {
                     </div>
                   </div>
                   <div className="sm:col-span-1">
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Foro (Origen)</label>
+                    <select 
+                      value={editingAction?.originForumId || ''}
+                      onChange={(e) => setEditingAction({ ...editingAction, originForumId: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all bg-white text-sm"
+                    >
+                      <option value="">Seleccionar...</option>
+                      {forums.sort((a, b) => a.name.localeCompare(b.name)).map(f => (
+                        <option key={f.id} value={f.id}>{f.name} ({f.teamName})</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="sm:col-span-1">
                     <label className="block text-sm font-semibold text-gray-700 mb-1">Categoría</label>
                     <select 
                       value={editingAction?.categoryId || ''}
                       onChange={(e) => setEditingAction({ ...editingAction, categoryId: e.target.value })}
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm bg-white text-sm"
+                      className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all bg-white text-sm"
                     >
                       <option value="">Seleccionar...</option>
                       {categories.map(c => (
@@ -1028,7 +1145,7 @@ export default function ActionPlanPage() {
                     <select 
                       value={editingAction?.priority || 'media'}
                       onChange={(e) => setEditingAction({ ...editingAction, priority: e.target.value as ActionPriority })}
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm bg-white text-sm"
+                      className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all bg-white text-sm"
                     >
                       {PRIORITY_OPTIONS.map(p => (
                         <option key={p.value} value={p.value}>{p.label}</option>
@@ -1037,24 +1154,32 @@ export default function ActionPlanPage() {
                   </div>
                   <div className="sm:col-span-1">
                     <label className="block text-sm font-semibold text-gray-700 mb-1">
-                      Estado {editingAction?.status === 'pendiente' || editingAction?.status === 'en_progreso' || editingAction?.status === 'retrasada' ? '(Auto)' : ''}
+                      Estado
                     </label>
-                    <select 
-                      value={editingAction?.status || 'pendiente'}
-                      onChange={(e) => setEditingAction({ ...editingAction, status: e.target.value as ActionStatus })}
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm bg-white text-sm"
-                    >
-                      {STATUS_OPTIONS.map(s => {
-                        const isAuto = s.value === 'retrasada' || s.value === 'en_progreso' || s.value === 'pendiente';
-                        return (
+                    <div className="relative">
+                      <select 
+                        value={editingAction?.status || 'pendiente'}
+                        onChange={(e) => setEditingAction({ ...editingAction, status: e.target.value as ActionStatus })}
+                        disabled={editingAction?.status === 'pendiente' || editingAction?.status === 'en_progreso' || editingAction?.status === 'retrasada'}
+                        className={clsx(
+                          "w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all bg-white text-sm appearance-none",
+                          (editingAction?.status === 'pendiente' || editingAction?.status === 'en_progreso' || editingAction?.status === 'retrasada') && "bg-gray-50 text-gray-500 cursor-not-allowed"
+                        )}
+                      >
+                        {STATUS_OPTIONS.map(s => (
                           <option key={s.value} value={s.value}>
-                            {s.label} {isAuto ? ' (Automático)' : ''}
+                            {s.label}
                           </option>
-                        );
-                      })}
-                    </select>
+                        ))}
+                      </select>
+                      {(editingAction?.status === 'pendiente' || editingAction?.status === 'en_progreso' || editingAction?.status === 'retrasada') && (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                          <span className="text-[9px] font-black bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded uppercase tracking-tighter">Auto</span>
+                        </div>
+                      )}
+                    </div>
                     {(editingAction?.status === 'pendiente' || editingAction?.status === 'en_progreso' || editingAction?.status === 'retrasada') && (
-                      <p className="text-[10px] text-gray-400 mt-1 italic">Este estado se calcula según la fecha.</p>
+                      <p className="text-[10px] text-gray-400 mt-1 italic">Calculado según la fecha.</p>
                     )}
                   </div>
                   <div className="sm:col-span-1">
@@ -1068,7 +1193,7 @@ export default function ActionPlanPage() {
                         const newStatus = calculateAutomaticStatus(newDate, editingAction?.status || 'pendiente');
                         setEditingAction({ ...editingAction, targetDate: newDate, status: newStatus });
                       }}
-                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm text-sm"
+                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm"
                     />
                   </div>
                 </div>
@@ -1077,7 +1202,7 @@ export default function ActionPlanPage() {
                   <label className="block text-sm font-semibold text-gray-700 mb-1">Asignar a</label>
                   {assignableUsers.length > 0 ? (
                     <div className="space-y-2">
-                      <div className="flex flex-wrap gap-1.5 min-h-[38px] p-1.5 border border-gray-200 rounded-xl bg-white shadow-sm focus-within:ring-2 focus-within:ring-blue-500">
+                      <div className="flex flex-wrap gap-1.5 min-h-[38px] p-1.5 border border-gray-200 rounded-xl bg-white focus-within:ring-2 focus-within:ring-blue-500">
                         {editingAction?.assignedTo?.map(uid => {
                           const user = users.find(u => u.uid === uid);
                           if (!user) return null;
@@ -1112,7 +1237,7 @@ export default function ActionPlanPage() {
                             className="fixed inset-0 z-20" 
                             onClick={() => setShowUserSelector(false)}
                           />
-                          <div className="absolute left-0 right-0 top-full mt-2 bg-white border border-gray-100 rounded-xl shadow-xl z-30 flex flex-col max-h-80">
+                          <div className="absolute left-0 right-0 top-full mt-2 bg-white border border-gray-100 rounded-xl z-30 flex flex-col max-h-80">
                             <div className="p-2 border-b border-gray-100">
                               <div className="relative">
                                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -1176,7 +1301,7 @@ export default function ActionPlanPage() {
                     rows={2}
                     value={editingAction?.notes || ''}
                     onChange={(e) => setEditingAction({ ...editingAction, notes: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm text-sm"
+                    className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm"
                     placeholder="Observaciones de progreso..."
                   />
                 </div>
@@ -1204,7 +1329,7 @@ export default function ActionPlanPage() {
                        <select 
                         value={escalatedToForumId}
                         onChange={(e) => setEscalatedToForumId(e.target.value)}
-                        className="w-full px-4 py-2.5 border border-orange-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none shadow-sm bg-white text-sm"
+                        className="w-full px-4 py-2.5 border border-orange-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none bg-white text-sm"
                        >
                           <option value="">Seleccionar foro destino...</option>
                           {forums.map(f => (
@@ -1225,7 +1350,7 @@ export default function ActionPlanPage() {
                   <button 
                     type="button"
                     onClick={addTempSubAction}
-                    className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-xl flex items-center gap-1.5 transition-all active:scale-95"
+                    className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-xl flex items-center gap-1.5 transition-all"
                   >
                     <Plus size={16} />
                     <span className="text-xs font-bold">Añadir</span>
@@ -1234,7 +1359,7 @@ export default function ActionPlanPage() {
 
                 <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
                   {tempSubActions.map((sub, idx) => (
-                    <div key={idx} className="bg-white p-4 rounded-xl border border-gray-100 space-y-4 shadow-sm relative group hover:border-blue-200 transition-colors">
+                    <div key={idx} className="bg-white p-4 rounded-xl border border-gray-100 space-y-4 relative group hover:border-blue-200 transition-colors">
                       <div className="flex items-start gap-3">
                         <input 
                           type="checkbox"
@@ -1322,7 +1447,7 @@ export default function ActionPlanPage() {
             </button>
             <button
               type="submit"
-              className="w-full sm:w-auto px-10 py-3 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-lg shadow-blue-200 transition-all transform hover:-translate-y-0.5 active:translate-y-0"
+              className="w-full sm:w-auto px-10 py-3 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-all transform hover:-translate-y-0.5 active:translate-y-0"
             >
               Guardar Cambios
             </button>
@@ -1346,7 +1471,7 @@ export default function ActionPlanPage() {
                         <div className="absolute left-0 w-6 h-6 bg-blue-100 border-2 border-white rounded-full flex items-center justify-center -translate-x-1.5 ring-4 ring-white">
                            <Clock size={12} className="text-blue-600" />
                         </div>
-                        <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 shadow-sm transition-all hover:bg-white hover:shadow-md">
+                        <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 transition-all hover:bg-white">
                            <div className="flex justify-between items-center mb-1">
                               <p className="text-xs font-bold text-blue-700">Cambio de planificación</p>
                               <span className="text-[10px] text-gray-400">

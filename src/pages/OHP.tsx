@@ -14,6 +14,7 @@ export default function OHP() {
   const tasks = appData.tasks;
   const userTaskLevels = appData.userTaskLevels;
   const users = appData.users as User[];
+  const forums = appData.forums;
   const loading = appData.loading;
   
   const [editMode, setEditMode] = useState(false);
@@ -188,6 +189,7 @@ export default function OHP() {
     const gap = calculateTeamGap(team);
     const coverage = calculateCoverage(team);
     const isExpanded = expandedTeams[team.id];
+    const teamForums = forums.filter(f => f.teamId === team.id);
 
     return (
       <div key={team.id} className="flex flex-col items-center">
@@ -206,14 +208,28 @@ export default function OHP() {
           </div>
           
           <div className="flex items-center justify-between mt-3">
-            <div>
+            <div className="flex-1 min-w-0">
               <p className="text-sm text-gray-600">
                 Gap: <span className={`font-bold ${gap > 0 ? 'text-red-600' : 'text-green-600'}`}>{gap} niveles</span>
               </p>
-              <p className="text-xs text-gray-500">{team.members.length} miembros</p>
+              <p className="text-xs text-gray-500 mb-1">{team.members.length} miembros</p>
+              
+              {teamForums.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {teamForums.map(f => (
+                    <div 
+                      key={f.id} 
+                      className="text-[9px] bg-blue-100/50 text-blue-700 px-2 py-0.5 rounded-full border border-blue-200/50 font-bold uppercase tracking-wider truncate max-w-full"
+                      title={f.name}
+                    >
+                      {f.name}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
             
-            <div className="flex flex-col items-center ml-4">
+            <div className="flex flex-col items-center ml-4 shrink-0">
               <div 
                 className="w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold relative"
                 style={{ background: `conic-gradient(#3b82f6 0% ${coverage}%, #e5e7eb ${coverage}% 100%)` }}
@@ -228,31 +244,59 @@ export default function OHP() {
 
           {isExpanded && (
             <div className="mt-4 pt-4 border-t border-gray-200/50 text-sm">
-              <div 
-                className={`p-2 rounded ${editMode ? 'border-2 border-dashed border-green-300 bg-green-50/50 min-h-[80px]' : ''}`}
-                onDragOver={editMode ? (e) => e.preventDefault() : undefined}
-                onDrop={editMode ? (e) => handleDropMember(e, team) : undefined}
-              >
-                <p className="text-xs font-semibold text-gray-500 uppercase mb-2">
-                  {team.hasGroups ? 'Todos los Miembros' : 'Miembros'}
-                </p>
-                {team.members.length > 0 ? (
-                  <div className="space-y-1.5 font-sans">
-                    {team.members.map(member => (
-                      <div key={member.uid} className="flex items-center justify-between bg-white px-2 py-1.5 rounded border border-gray-200 shadow-sm">
-                        <span className="truncate text-gray-700">{member.name}</span>
-                        {editMode && (
-                          <button onClick={() => handleRemoveMember(team, member.uid)} className="text-red-400 hover:text-red-600 ml-2 font-bold px-1">×</button>
-                        )}
+              {/* Leader (Supervisor) - Only for teams without groups */}
+              {!team.hasGroups && (
+                <div 
+                  className={`mb-4 p-2 rounded-lg transition-all ${editMode ? 'border-2 border-dashed border-blue-200 bg-blue-50/50' : ''}`}
+                  onDragOver={editMode ? (e) => e.preventDefault() : undefined}
+                  onDrop={editMode ? (e) => handleDropLeader(e, team) : undefined}
+                >
+                  <p className="text-[10px] font-bold text-gray-400 uppercase mb-2 tracking-widest px-1">Líder del Equipo</p>
+                  {team.supervisorName ? (
+                    <div className="flex items-center justify-between bg-white px-3 py-2.5 rounded-xl border border-gray-200 text-xs shadow-sm group/leader">
+                      <div className="flex items-center gap-2 truncate">
+                        <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-[10px] font-bold shrink-0">
+                          {team.supervisorName.charAt(0)}
+                        </div>
+                        <span className="truncate font-semibold text-gray-700">{team.supervisorName}</span>
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <span className="text-gray-400 italic text-xs block text-center py-1">
-                    {editMode ? 'Arrastra miembros aquí' : 'Sin miembros'}
-                  </span>
-                )}
-              </div>
+                      {editMode && (
+                        <button onClick={() => handleRemoveLeader(team)} className="text-red-400 hover:text-red-600 ml-1 font-bold px-2 transition-colors text-lg">×</button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-gray-400 italic text-[10px] border border-dashed border-gray-200 rounded-xl py-3 flex items-center justify-center bg-white/30">
+                      {editMode ? 'Arrastra un líder aquí' : 'Sin líder'}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {!team.hasGroups && (
+                <div 
+                  className={`p-2 rounded ${editMode ? 'border-2 border-dashed border-green-300 bg-green-50/50 min-h-[80px]' : ''}`}
+                  onDragOver={editMode ? (e) => e.preventDefault() : undefined}
+                  onDrop={editMode ? (e) => handleDropMember(e, team) : undefined}
+                >
+                  <p className="text-[10px] font-bold text-gray-400 uppercase mb-2 tracking-widest px-1">Miembros</p>
+                  {team.members.length > 0 ? (
+                    <div className="space-y-1.5 font-sans">
+                      {team.members.map(member => (
+                        <div key={member.uid} className="flex items-center justify-between bg-white px-3 py-2 rounded-xl border border-gray-200 shadow-sm text-xs">
+                          <span className="truncate text-gray-700 font-medium">{member.name}</span>
+                          {editMode && (
+                            <button onClick={() => handleRemoveMember(team, member.uid)} className="text-red-400 hover:text-red-600 ml-2 font-bold px-2 text-lg">×</button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-gray-400 italic text-xs block text-center py-1">
+                      {editMode ? 'Arrastra miembros aquí' : 'Sin miembros'}
+                    </span>
+                  )}
+                </div>
+              )}
 
               {/* Render Groups if available */}
               {team.hasGroups && team.groups && team.groups.length > 0 && (
@@ -262,9 +306,9 @@ export default function OHP() {
                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Grupos del Equipo</p>
                     <div className="h-px bg-gray-300 flex-1"></div>
                   </div>
-                  <div className="grid grid-cols-1 gap-4">
+                  <div className="flex flex-row flex-wrap justify-center gap-4">
                     {team.groups.map(group => (
-                      <div key={group.id} className="p-3 bg-gray-100/50 rounded-xl border border-gray-200/80 shadow-sm overflow-hidden">
+                      <div key={group.id} className="p-3 bg-gray-100/50 rounded-xl border border-gray-200/80 shadow-sm overflow-hidden min-w-[180px] flex-1">
                         <div className="flex items-center justify-between mb-3 px-1 border-b border-gray-200/50 pb-2">
                           <p className="text-xs font-bold text-gray-700 uppercase tracking-tight">{group.name}</p>
                         </div>

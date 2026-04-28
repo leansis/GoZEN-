@@ -2,14 +2,16 @@ import React, { useEffect, useState } from 'react';
 import { collection, onSnapshot, doc, updateDoc, addDoc, deleteField, deleteDoc, query, where } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useAuth } from '../../AuthContext';
-import { Team, User, Process, TeamGroup, TeamMember } from '../../types';
+import { useAppData } from '../../contexts/AppDataContext';
+import { Team, User, Process, TeamGroup, TeamMember, MasterGroup } from '../../types';
 import Table from '../../components/Table';
 import Modal from '../../components/Modal';
 import ConfirmModal from '../../components/ConfirmModal';
-import { Plus, Trash2, Users as UsersIcon } from 'lucide-react';
+import { Plus, Trash2, Users as UsersIcon, ListChecks } from 'lucide-react';
 
 export default function Teams() {
   const { dbUser, activeCompanyId } = useAuth();
+  const { masterGroups } = useAppData();
   const [teams, setTeams] = useState<Team[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [processes, setProcesses] = useState<Process[]>([]);
@@ -70,14 +72,19 @@ export default function Teams() {
         companyId: companyId || '',
         hasGroups: editingTeam.hasGroups || false,
         groups: (editingTeam.groups || []).map(g => ({
-          ...g,
-          leaderName: users.find(u => u.uid === g.leaderId)?.name || g.leaderName || ''
-        }))
+          id: g.id,
+          name: g.name,
+          leaderId: g.leaderId || '',
+          leaderName: users.find(u => u.uid === g.leaderId)?.name || g.leaderName || '',
+          masterGroupId: g.masterGroupId || null,
+          members: (g.members || []).map(m => ({
+            uid: m.uid,
+            name: users.find(u => u.uid === m.uid)?.name || m.name
+          }))
+        })),
+        supervisorId: editingTeam.supervisorId || '',
+        supervisorName: editingTeam.supervisorName || ''
       };
-
-      // Reset team supervisor info if requested to be removed
-      teamData.supervisorId = '';
-      teamData.supervisorName = '';
 
       if (editingTeam.parentTeamId) {
         teamData.parentTeamId = editingTeam.parentTeamId;
@@ -129,12 +136,13 @@ export default function Teams() {
     }
   };
 
-  const addGroup = () => {
+  const addGroup = (masterGroup?: MasterGroup) => {
     if (!editingTeam) return;
     const groups = editingTeam.groups || [];
     const newGroup: TeamGroup = {
       id: Math.random().toString(36).substr(2, 9),
-      name: `Grupo ${groups.length + 1}`,
+      masterGroupId: masterGroup?.id,
+      name: masterGroup?.name || `Grupo ${groups.length + 1}`,
       leaderId: '',
       leaderName: '',
       members: []
@@ -194,6 +202,11 @@ export default function Teams() {
         data={teams}
         columns={[
           { header: 'Equipo', accessor: 'name', sortable: true },
+          { 
+            header: 'Líder/Supervisor', 
+            accessor: (t) => t.hasGroups ? 'Múltiples' : (t.supervisorName || 'No asignado'), 
+            sortable: true 
+          },
           { 
             header: 'Grupos', 
             accessor: (t) => t.hasGroups ? (t.groups?.length || 0) : 'N/A', 
@@ -287,6 +300,48 @@ export default function Teams() {
                         ))}
                       </select>
                     </div>
+
+                    <div className="md:col-span-2">
+                       <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className={`p-2 rounded-lg ${editingTeam.hasGroups ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'bg-white text-gray-400 border border-gray-200'}`}>
+                              <UsersIcon size={20} />
+                            </div>
+                            <div>
+                              <p className="text-sm font-bold text-gray-800">Estructura por Grupos</p>
+                              <p className="text-[10px] text-gray-500">Activa si este equipo se divide en varios turnos o células.</p>
+                            </div>
+                          </div>
+                          <label className="relative inline-flex items-center cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={editingTeam.hasGroups || false}
+                              onChange={(e) => setEditingTeam({ ...editingTeam, hasGroups: e.target.checked, groups: e.target.checked ? (editingTeam.groups || []) : [] })}
+                              className="sr-only peer"
+                            />
+                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                          </label>
+                       </div>
+                    </div>
+
+                    {!editingTeam.hasGroups && (
+                      <div className="md:col-span-1">
+                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Líder del Equipo</label>
+                        <select
+                          value={editingTeam.supervisorId || ''}
+                          onChange={(e) => {
+                            const u = users.find(u => u.uid === e.target.value);
+                            setEditingTeam({ ...editingTeam, supervisorId: e.target.value, supervisorName: u?.name || '' });
+                          }}
+                          className="w-full rounded-xl border-gray-200 shadow-sm p-3 border focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm bg-white"
+                        >
+                          <option value="">Seleccionar líder...</option>
+                          {users.map(u => (
+                            <option key={u.uid} value={u.uid}>{u.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -378,25 +433,28 @@ export default function Teams() {
                         </div>
                       </div>
                       <div className="flex items-center gap-4">
-                        <label className="relative inline-flex items-center cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={editingTeam.hasGroups || false}
-                            onChange={(e) => setEditingTeam({ ...editingTeam, hasGroups: e.target.checked, groups: e.target.checked ? (editingTeam.groups || []) : [] })}
-                            className="sr-only peer"
-                          />
-                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                        </label>
-                        
                         {editingTeam.hasGroups && (
-                          <button
-                            type="button"
-                            onClick={addGroup}
-                            className="flex items-center text-xs px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all font-bold shadow-lg shadow-blue-100"
-                          >
-                            <Plus className="w-4 h-4 mr-1.5" />
-                            Nuevo Grupo
-                          </button>
+                          <div className="flex flex-wrap gap-2">
+                             {masterGroups.map(mg => (
+                               <button
+                                 key={mg.id}
+                                 type="button"
+                                 onClick={() => addGroup(mg)}
+                                 className="flex items-center text-[10px] px-3 py-1.5 bg-white border border-gray-200 text-gray-600 rounded-lg hover:border-blue-400 hover:text-blue-600 transition-all font-bold shadow-sm"
+                               >
+                                 <Plus className="w-3 h-3 mr-1" />
+                                 {mg.name}
+                               </button>
+                             ))}
+                             <button
+                               type="button"
+                               onClick={() => addGroup()}
+                               className="flex items-center text-[10px] px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all font-bold shadow-sm"
+                             >
+                               <Plus className="w-3 h-3 mr-1" />
+                               Grupo Manual
+                             </button>
+                          </div>
                         )}
                       </div>
                     </div>

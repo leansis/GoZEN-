@@ -87,40 +87,37 @@ service cloud.firestore {
       );
     }
     function isGlobalAdmin() {
-      let email = toSafeString(request.auth.token.get('email', '')).lower();
-      return isAuthenticated() && 
-        (email == "leansisproductivity@gmail.com" || 
-         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'admin'));
+      return isAuthenticated() && (
+        toSafeString(request.auth.token.get('email', '')).lower() == "leansisproductivity@gmail.com" ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'admin')
+      );
     }
     function isAdmin() {
-      let email = toSafeString(request.auth.token.get('email', '')).lower();
       return isAuthenticated() &&
         (isGlobalAdmin() ||
          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
           (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'admin' ||
            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'lean_promotor')) ||
-         (email != '' && exists(/databases/$(database)/documents/users/$(email)) && 
-          (get(/databases/$(database)/documents/users/$(email)).data.get('role', '') == 'admin' ||
-           get(/databases/$(database)/documents/users/$(email)).data.get('role', '') == 'lean_promotor')));
+         (toSafeString(request.auth.token.get('email', '')).lower() != '' && exists(/databases/$(database)/documents/users/$(toSafeString(request.auth.token.get('email', '')).lower())) && 
+          (get(/databases/$(database)/documents/users/$(toSafeString(request.auth.token.get('email', '')).lower())).data.get('role', '') == 'admin' ||
+           get(/databases/$(database)/documents/users/$(toSafeString(request.auth.token.get('email', '')).lower())).data.get('role', '') == 'lean_promotor')));
     }
     function isLeanPromotor() {
-      let email = toSafeString(request.auth.token.get('email', '')).lower();
       return isAuthenticated() &&
         (isGlobalAdmin() ||
          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'lean_promotor') ||
-         (email != '' && exists(/databases/$(database)/documents/users/$(email)) && 
-          get(/databases/$(database)/documents/users/$(email)).data.get('role', '') == 'lean_promotor'));
+         (toSafeString(request.auth.token.get('email', '')).lower() != '' && exists(/databases/$(database)/documents/users/$(toSafeString(request.auth.token.get('email', '')).lower())) && 
+          get(/databases/$(database)/documents/users/$(toSafeString(request.auth.token.get('email', '')).lower())).data.get('role', '') == 'lean_promotor'));
     }
     function isSupervisor() {
-      let email = toSafeString(request.auth.token.get('email', '')).lower();
       return isAuthenticated() &&
         (isAdmin() ||
          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'supervisor') ||
-         (email != '' && exists(/databases/$(database)/documents/users/$(email)) && 
-          get(/databases/$(database)/documents/users/$(email)).data.get('role', '') == 'supervisor'));
+         (toSafeString(request.auth.token.get('email', '')).lower() != '' && exists(/databases/$(database)/documents/users/$(toSafeString(request.auth.token.get('email', '')).lower())) && 
+          get(/databases/$(database)/documents/users/$(toSafeString(request.auth.token.get('email', '')).lower())).data.get('role', '') == 'supervisor'));
     }
     function isTeamSupervisor(teamId) {
       return isAuthenticated() && 
@@ -134,13 +131,19 @@ service cloud.firestore {
     }
     function getUserCompanyId() {
       let email = toSafeString(request.auth.token.get('email', '')).lower();
-      return (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && toSafeString(get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('companyId', '')) != '') ? 
-        toSafeString(get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('companyId', '')) :
-        (email != '' && exists(/databases/$(database)/documents/users/$(email)) ?
-         toSafeString(get(/databases/$(database)/documents/users/$(email)).data.get('companyId', '')) : '');
+      let uid = request.auth.uid;
+      let uidPath = /databases/$(database)/documents/users/$(uid);
+      let emailPath = /databases/$(database)/documents/users/$(email);
+      
+      return (exists(uidPath) && toSafeString(get(uidPath).data.get('companyId', '')) != '') ? 
+        toSafeString(get(uidPath).data.get('companyId', '')) :
+        (email != "" && exists(emailPath) ?
+         toSafeString(get(emailPath).data.get('companyId', '')) : '');
     }
+
     function belongsToCompany(companyId) {
-      return isAuthenticated() && (isGlobalAdmin() || (getUserCompanyId() == companyId));
+      let isExplicitAdmin = toSafeString(request.auth.token.get('email', '')).lower() == "leansisproductivity@gmail.com";
+      return isAuthenticated() && (isExplicitAdmin || isGlobalAdmin() || (companyId != null && companyId != "" && getUserCompanyId() == companyId));
     }
     function uidUnchanged() {
       return !('uid' in request.resource.data) || request.resource.data.uid == request.auth.uid;
@@ -164,9 +167,13 @@ service cloud.firestore {
     
     // Domain Validators
     function isValidCompany(data) {
-      return hasOnlyAllowedFields(['id', 'name', 'createdAt']) &&
+      return hasOnlyAllowedFields(['id', 'name', 'createdAt', 'settings']) &&
              (!('id' in data) || data.id is string) && 
-             data.name is string && data.createdAt is string;
+             data.name is string && data.createdAt is string &&
+             (!('settings' in data) || (
+               data.settings is map &&
+               (!('forumVirtualHorizonMonths' in data.settings) || data.settings.forumVirtualHorizonMonths is number)
+             ));
     }
 
     function isValidUser(data) {
@@ -320,34 +327,67 @@ service cloud.firestore {
              (!('id' in data) || (data.id is string));
     }
 
+    function isValidMasterGroup(data) {
+      return data.keys().hasAll(['name', 'companyId', 'createdAt']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.companyId is string &&
+             data.createdAt is string &&
+             (!('id' in data) || (data.id is string));
+    }
+
     function isValidForum(data) {
-      return data.keys().hasAll(['name', 'teamId', 'companyId', 'frequency', 'agenda', 'createdBy', 'createdAt']) &&
+      return data.keys().hasAll(['name', 'teamId', 'companyId', 'frequency', 'sections', 'createdBy', 'createdAt']) &&
              data.name is string && data.name.size() > 0 && data.name.size() < 200 &&
              data.teamId is string &&
              data.companyId is string &&
-             data.frequency in ['diaria', 'semanal', 'mensual', 'adhoc'] &&
-             data.estimatedDuration is number &&
-             data.agenda is list &&
+             data.frequency in ['diaria', 'semanal', 'mensual', 'adhoc', 'periodic'] &&
+             (!('estimatedDuration' in data) || data.estimatedDuration is number) &&
+             data.sections is list &&
              data.createdBy is string &&
              data.createdAt is string &&
              (!('description' in data) || data.description is string) &&
              (!('teamName' in data) || data.teamName is string) &&
+             (!('recurrence' in data) || (
+               data.recurrence is map &&
+               data.recurrence.repeatEvery is number &&
+               data.recurrence.repeatUnit in ['day', 'week', 'month'] &&
+               data.recurrence.daysOfWeek is list &&
+               data.recurrence.startDate is string &&
+               (!('endDate' in data.recurrence) || data.recurrence.endDate is string) &&
+               data.recurrence.startTime is string &&
+               data.recurrence.endTime is string
+             )) &&
+             (!('skippedDates' in data) || data.skippedDates is list) &&
              (!('id' in data) || (data.id is string));
     }
 
     function isValidForumSession(data) {
-      return data.keys().hasAll(['forumId', 'forumName', 'scheduledAt', 'status', 'attendees', 'currentAgendaStep', 'results', 'companyId', 'createdBy']) &&
+      return data.keys().hasAll(['forumId', 'forumName', 'scheduledAt', 'status', 'attendees', 'currentSectionIndex', 'results', 'companyId', 'createdBy']) &&
              data.forumId is string &&
              data.forumName is string &&
              data.scheduledAt is string &&
              data.status in ['scheduled', 'in_progress', 'completed', 'cancelled'] &&
              data.attendees is list &&
-             data.currentAgendaStep is number &&
+             data.currentSectionIndex is number &&
              data.results is map &&
              data.companyId is string &&
              data.createdBy is string &&
              (!('startedAt' in data) || data.startedAt is string) &&
              (!('completedAt' in data) || data.completedAt is string) &&
+             (!('id' in data) || (data.id is string));
+    }
+
+    function isValidIndicator(data) {
+      return data.keys().hasAll(['name', 'companyId', 'createdAt']) &&
+             data.name is string && data.name.size() > 0 &&
+             data.companyId is string &&
+             data.createdAt is string &&
+             (!('description' in data) || data.description is string) &&
+             (!('formula' in data) || data.formula is string) &&
+             (!('scopeIds' in data) || data.scopeIds is list) &&
+             (!('scopeNames' in data) || data.scopeNames is list) &&
+             (!('link' in data) || data.link is string) &&
+             (!('updatedAt' in data) || data.updatedAt is string) &&
              (!('id' in data) || (data.id is string));
     }
 
@@ -362,14 +402,12 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      // Users can read their own profile. Admins and supervisors can read all in their company.
-      allow read: if isOwner(userId) || 
-                    (isAuthenticated() && (
-                      (resource != null && resource.data.email == request.auth.token.email) || 
-                      (isAdmin() && (resource == null || belongsToCompany(resource.data.companyId))) ||
-                      (isSupervisor() && (resource == null || belongsToCompany(resource.data.companyId))) ||
-                      (isGlobalAdmin())
-                    ));
+      // Users can read their own profile. All users can read others in their company for UI display (names, uids).
+      allow read: if isAuthenticated() && (
+                    isOwner(userId) || 
+                    isGlobalAdmin() || 
+                    (resource != null && belongsToCompany(resource.data.companyId))
+                  );
       // Only global admin can create/update admins or lean promoters
       function isAssigningPrivilegedRole() {
         return request.resource.data.get('role', '') in ['admin', 'lean_promotor'];
@@ -497,6 +535,12 @@ service cloud.firestore {
       allow delete: if isAdmin() && belongsToCompany(resource.data.companyId);
     }
 
+    match /masterGroups/{groupId} {
+      allow read: if isAuthenticated() && belongsToCompany(resource.data.companyId);
+      allow create, update: if isAdmin() && isValidMasterGroup(request.resource.data) && belongsToCompany(request.resource.data.companyId);
+      allow delete: if isAdmin() && belongsToCompany(resource.data.companyId);
+    }
+
     match /forums/{forumId} {
       allow read: if isAuthenticated() && belongsToCompany(resource.data.companyId);
       allow create, update: if (isAdmin() || isSupervisor()) && isValidForum(request.resource.data) && belongsToCompany(request.resource.data.companyId);
@@ -506,6 +550,12 @@ service cloud.firestore {
     match /forumSessions/{sessionId} {
       allow read: if isAuthenticated() && belongsToCompany(resource.data.companyId);
       allow create, update: if isAuthenticated() && belongsToCompany(request.resource.data.companyId) && isValidForumSession(request.resource.data);
+      allow delete: if isAdmin() && belongsToCompany(resource.data.companyId);
+    }
+
+    match /indicators/{indicatorId} {
+      allow read: if isAuthenticated() && belongsToCompany(resource.data.companyId);
+      allow create, update: if isAdmin() && isValidIndicator(request.resource.data) && belongsToCompany(request.resource.data.companyId);
       allow delete: if isAdmin() && belongsToCompany(resource.data.companyId);
     }
   }

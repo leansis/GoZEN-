@@ -1,5 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './AuthContext';
 import { AppDataProvider } from './contexts/AppDataContext';
 import Layout from './components/Layout';
@@ -14,8 +15,11 @@ import AdminActivities from './pages/admin/Activities';
 import AdminProcesses from './pages/admin/Processes';
 import AdminTasks from './pages/admin/Tasks';
 import AdminCriteria from './pages/admin/Criteria';
+import AdminIndicators from './pages/admin/Indicators';
 import AdminActionCategories from './pages/admin/ActionCategories';
 import AdminMasterData from './pages/admin/MasterData';
+import AdminMasterGroups from './pages/admin/MasterGroups';
+import AdminParameters from './pages/admin/Parameters';
 import MasterUsers from './pages/admin/MasterUsers';
 import ActionPlan from './pages/ActionPlan';
 import Forums from './pages/Forums';
@@ -121,22 +125,33 @@ const Login = () => {
     setSuccess(null);
     setIsLoggingIn(true);
     
+    const cleanEmail = email.toLowerCase().trim();
+    
     try {
       if (mode === 'login') {
-        await loginWithEmail(email, password);
+        await loginWithEmail(cleanEmail, password);
       } else if (mode === 'register') {
         if (!name) throw new Error("El nombre es obligatorio");
-        await registerWithEmail(email, password, name);
+        await registerWithEmail(cleanEmail, password, name);
       } else if (mode === 'reset') {
-        await resetPassword(email);
+        await resetPassword(cleanEmail);
         setSuccess("Se ha enviado un correo para restablecer tu contraseña.");
         setMode('login');
       }
     } catch (err: any) {
       console.error("Auth error:", err);
-      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-        setError("Credenciales incorrectas. Por favor, inténtalo de nuevo.");
-      } else if (err.code === 'auth/email-already-in-use') {
+      const errorCode = err.code || "";
+      const errorMessage = err.message || "";
+      
+      if (
+        errorCode === 'auth/user-not-found' || 
+        errorCode === 'auth/wrong-password' || 
+        errorCode === 'auth/invalid-credential' ||
+        errorCode === 'auth/invalid-login-credentials' ||
+        errorMessage.includes('invalid-credential')
+      ) {
+        setError("Credenciales incorrectas. Por favor, asegúrate de que tu correo y contraseña son válidos. Si nunca has entrado, usa la pestaña 'Activar mi cuenta'.");
+      } else if (errorCode === 'auth/email-already-in-use') {
         setError("Este correo electrónico ya está registrado y activado. Por favor, usa la pestaña de 'Entrar' con tu contraseña.");
         setMode('login'); // Auto-switch to login mode to help the user
       } else if (err.code === 'auth/weak-password') {
@@ -310,6 +325,7 @@ const Login = () => {
 export default function App() {
   return (
     <ErrorBoundary>
+      <Toaster position="top-right" />
       <AuthProvider>
         <AppDataProvider>
           <Router>
@@ -340,8 +356,11 @@ export default function App() {
                 <Route path="admin/processes" element={<ProtectedRoute requireAdmin><AdminProcesses /></ProtectedRoute>} />
                 <Route path="admin/tasks" element={<ProtectedRoute requireAdmin><AdminTasks /></ProtectedRoute>} />
                 <Route path="admin/criteria" element={<ProtectedRoute requireAdmin><AdminCriteria /></ProtectedRoute>} />
+                <Route path="admin/indicators" element={<ProtectedRoute requireAdmin><AdminIndicators /></ProtectedRoute>} />
                 <Route path="admin/action-categories" element={<ProtectedRoute requireAdmin><AdminActionCategories /></ProtectedRoute>} />
                 <Route path="admin/master-data" element={<ProtectedRoute requireAdmin><AdminMasterData /></ProtectedRoute>} />
+                <Route path="admin/master-groups" element={<ProtectedRoute requireAdmin><AdminMasterGroups /></ProtectedRoute>} />
+                <Route path="admin/parameters" element={<ProtectedRoute requireAdmin><AdminParameters /></ProtectedRoute>} />
               </Route>
             </Routes>
           </Router>
