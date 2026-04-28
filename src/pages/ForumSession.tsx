@@ -143,14 +143,14 @@ function SortableAttendee({ id, attendee }: SortableAttendeeProps) {
       {...attributes}
       {...listeners}
       className={clsx(
-        "flex items-center justify-between p-3 bg-white border border-gray-100 rounded-xl mb-2 cursor-grab active:cursor-grabbing hover:border-blue-200 transition-all group",
+        "flex items-center justify-between p-4 bg-white border border-gray-100 rounded-2xl mb-2.5 cursor-grab active:cursor-grabbing hover:border-blue-200 transition-all group shadow-sm",
         attendee.present ? "bg-white" : "bg-gray-50/50",
       )}
     >
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3.5">
         <div
           className={clsx(
-            "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold",
+            "w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shadow-inner",
             attendee.present
               ? "bg-blue-100 text-blue-600"
               : "bg-gray-200 text-gray-500",
@@ -161,26 +161,26 @@ function SortableAttendee({ id, attendee }: SortableAttendeeProps) {
         <div>
           <p
             className={clsx(
-              "text-sm font-medium",
+              "text-base font-bold",
               attendee.present ? "text-gray-800" : "text-gray-400 italic",
             )}
           >
             {attendee.name}
             {attendee.isLeader && (
-              <span className="ml-2 text-[10px] bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
+              <span className="ml-2 text-[11px] bg-orange-100 text-orange-600 px-2 py-0.5 rounded-lg font-black uppercase tracking-wider">
                 Líder
               </span>
             )}
           </p>
           {attendee.groupName && (
-            <p className="text-[10px] text-gray-400">{attendee.groupName}</p>
+            <p className="text-xs text-gray-400 font-medium">{attendee.groupName}</p>
           )}
         </div>
       </div>
       {attendee.present ? (
-        <CheckCircle2 size={18} className="text-green-500" />
+        <CheckCircle2 size={24} className="text-green-500" />
       ) : (
-        <UserX size={18} className="text-gray-300" />
+        <UserX size={24} className="text-gray-300" />
       )}
     </div>
   );
@@ -200,7 +200,7 @@ const ChevronDiagram = ({
   isPreparationMode: boolean;
 }) => {
   return (
-    <div className="flex items-center w-full overflow-hidden rounded-xl border border-gray-100 bg-white mb-4 shadow-sm">
+    <div className="flex items-center w-full overflow-hidden rounded-2xl border border-gray-100 bg-white mb-6 shadow-md">
       {steps.map((step, idx) => {
         const isCurrent = idx === currentStep;
         const isCompleted = idx < currentStep;
@@ -213,7 +213,7 @@ const ChevronDiagram = ({
             onClick={() => canClick && onStepClick(idx)}
             disabled={!canClick}
             className={clsx(
-              "relative flex-1 py-3 px-4 text-[9px] md:text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 min-w-0 transition-all duration-300",
+              "relative flex-1 py-4 px-6 text-[10px] md:text-sm font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 min-w-0 transition-all duration-300",
               isCurrent
                 ? "bg-blue-600 text-white z-10"
                 : isCompleted
@@ -223,18 +223,18 @@ const ChevronDiagram = ({
             )}
             style={{
               clipPath: isLast
-                ? "polygon(15px 0%, 100% 0%, 100% 100%, 15px 100%, 0% 50%)"
+                ? "polygon(20px 0%, 100% 0%, 100% 100%, 20px 100%, 0% 50%)"
                 : idx === 0
-                  ? "polygon(0% 0%, calc(100% - 15px) 0%, 100% 50%, calc(100% - 15px) 100%, 0% 100%)"
-                  : "polygon(0% 0%, calc(100% - 15px) 0%, 100% 50%, calc(100% - 15px) 100%, 0% 100%, 15px 50%)",
-              marginLeft: idx === 0 ? "0" : "-15px",
-              paddingLeft: idx === 0 ? "16px" : "31px",
-              flexBasis: isCurrent ? "25%" : "auto",
+                  ? "polygon(0% 0%, calc(100% - 20px) 0%, 100% 50%, calc(100% - 20px) 100%, 0% 100%)"
+                  : "polygon(0% 0%, calc(100% - 20px) 0%, 100% 50%, calc(100% - 20px) 100%, 0% 100%, 20px 50%)",
+              marginLeft: idx === 0 ? "0" : "-20px",
+              paddingLeft: idx === 0 ? "24px" : "44px",
+              flexBasis: isCurrent ? "20%" : "auto",
             }}
           >
             <span className="truncate flex items-center">
               {isCompleted && (
-                <Check size={12} className="inline mr-1 shrink-0" />
+                <Check size={14} className="inline mr-1 shrink-0" />
               )}
               {step}
             </span>
@@ -867,32 +867,34 @@ export default function ForumSession() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto h-screen flex flex-col overflow-hidden bg-gray-50/20 px-2 sm:px-4">
+    <div className="max-w-7xl mx-auto h-screen flex flex-col overflow-hidden bg-gray-50/20 px-4">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-1 shrink-0 pt-3 pb-2">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0 pt-4 pb-3">
         <div>
           <button
             onClick={() => navigate("/forums")}
-            className="flex items-center gap-1 text-gray-400 hover:text-blue-600 transition-colors text-[10px] font-black uppercase tracking-widest"
+            className="flex items-center gap-2 text-blue-600 hover:text-blue-700 transition-all text-sm font-black uppercase tracking-widest mb-1.5 group"
           >
-            <ChevronLeft size={12} />
-            Volver
-          </button>
-          <div className="flex items-center gap-2 mt-0.5">
-            <div className="w-6 h-6 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center">
-              <MessageSquare size={14} />
+            <div className="w-6 h-6 rounded-full bg-blue-50 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-all">
+              <ChevronLeft size={16} />
             </div>
-            <h1 className="text-lg font-black text-gray-800 uppercase tracking-tight">
+            Volver a sesiones
+          </button>
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center shadow-sm">
+              <MessageSquare size={18} />
+            </div>
+            <h1 className="text-xl font-black text-gray-800 uppercase tracking-tight">
               {forum.name}
             </h1>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
           {session.status === "in_progress" && (
             <div
               className={clsx(
-                "flex items-center gap-3 px-4 py-1.5 rounded-xl border transition-all duration-300",
+                "flex items-center gap-3 px-5 py-2 rounded-2xl border shadow-sm transition-all duration-300",
                 isExceeded
                   ? "bg-red-50 border-red-200 text-red-600"
                   : isNearEnd
@@ -902,14 +904,14 @@ export default function ForumSession() {
             >
               <Timer
                 className={clsx(isExceeded ? "animate-spin-slow" : "")}
-                size={16}
+                size={20}
               />
-              <div className="flex items-center gap-2">
-                <span className="text-xl font-mono font-black tracking-tighter leading-none">
+              <div className="flex flex-col">
+                <span className="text-2xl font-mono font-black tracking-tighter leading-none">
                   {formatTimer(elapsedSeconds)}
                 </span>
                 <span className="text-[10px] font-bold uppercase tracking-widest opacity-60">
-                  Meta: {forum.estimatedDuration}m
+                  Meta: {forum.estimatedDuration} min
                 </span>
               </div>
             </div>
@@ -920,35 +922,35 @@ export default function ForumSession() {
               <button
                 onClick={handleStartSession}
                 className={clsx(
-                  "flex items-center gap-2 px-4 py-1.5 text-white rounded-lg font-black text-xs transition-all",
+                  "flex items-center gap-2 px-6 py-2.5 text-white rounded-xl font-black text-sm transition-all shadow-md",
                   isFuture
                     ? "bg-blue-600 hover:bg-blue-700"
                     : "bg-green-600 hover:bg-green-700",
                 )}
               >
-                <Play size={14} fill="currentColor" />
+                <Play size={18} fill="currentColor" />
                 {isFuture ? "PREPARAR" : "INICIAR"}
               </button>
             )}
 
             {(session.status === "in_progress" || isPreparationMode) && (
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-3">
                 {effectiveSectionIndex > 0 && (
                   <button
                     onClick={() => handleStepChange(effectiveSectionIndex - 1)}
-                    className="p-1 px-2 bg-gray-50 text-gray-400 rounded-lg hover:bg-gray-100 transition-colors"
+                    className="p-2.5 bg-gray-50 text-gray-400 rounded-xl hover:bg-gray-100 transition-colors shadow-sm"
                   >
-                    <ChevronLeft size={14} />
+                    <ChevronLeft size={20} />
                   </button>
                 )}
 
                 {effectiveSectionIndex < steps.length - 1 ? (
                   <button
                     onClick={() => handleStepChange(effectiveSectionIndex + 1)}
-                    className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-600 text-white rounded-lg font-black text-xs hover:bg-blue-700 transition-all shadow-sm"
+                    className="flex items-center gap-2 px-8 py-3 bg-blue-600 text-white rounded-xl font-black text-sm hover:bg-blue-700 transition-all shadow-lg"
                   >
                     SIGUIENTE
-                    <ChevronRight size={14} />
+                    <ChevronRight size={18} />
                   </button>
                 ) : (
                   !isPreparationMode && (
@@ -956,16 +958,16 @@ export default function ForumSession() {
                       onClick={handleFinishSession}
                       disabled={isSaving}
                       className={clsx(
-                        "flex items-center gap-1.5 px-4 py-1.5 bg-red-600 text-white rounded-lg font-black text-xs hover:bg-red-700 transition-all shadow-sm",
+                        "flex items-center gap-2 px-8 py-3 bg-red-600 text-white rounded-xl font-black text-sm hover:bg-red-700 transition-all shadow-lg",
                         isSaving && "opacity-50 cursor-not-allowed",
                       )}
                     >
                       {isSaving ? (
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                       ) : (
-                        <CheckCircle2 size={14} />
+                        <CheckCircle2 size={18} />
                       )}
-                      {isSaving ? "OK" : "FINALIZAR"}
+                      {isSaving ? "GUARDANDO" : "FINALIZAR"}
                     </button>
                   )
                 )}
@@ -998,21 +1000,21 @@ export default function ForumSession() {
               id="attendee-container"
               className="bg-white rounded-2xl border border-gray-100 overflow-hidden flex flex-col h-full shadow-sm"
             >
-              <div className="p-3.5 border-b border-gray-50 flex items-center justify-between bg-white sticky top-0 z-10">
-                <div className="flex items-center gap-2">
-                  <UserCheck className="text-green-500" size={16} />
-                  <h3 className="font-black text-gray-800 uppercase tracking-tight text-[13px]">
+              <div className="p-4 border-b border-gray-50 flex items-center justify-between bg-white sticky top-0 z-10">
+                <div className="flex items-center gap-2.5">
+                  <UserCheck className="text-green-500" size={18} />
+                  <h3 className="font-black text-gray-800 uppercase tracking-tight text-sm">
                     Asistentes
                   </h3>
-                  <span className="bg-green-100 text-green-600 px-2 py-0.5 rounded-full text-[10px] font-black">
+                  <span className="bg-green-100 text-green-600 px-2 py-0.5 rounded-full text-xs font-black">
                     {attendeesList.length}
                   </span>
                 </div>
                 <button
                   onClick={() => setShowAddMember(true)}
-                  className="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center hover:bg-blue-600 hover:text-white transition-all shadow-sm"
+                  className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center hover:bg-blue-600 hover:text-white transition-all shadow-sm"
                 >
-                  <Plus size={14} />
+                  <Plus size={16} />
                 </button>
               </div>
 
@@ -1043,17 +1045,17 @@ export default function ForumSession() {
               id="absent-container"
               className="bg-white rounded-2xl border border-gray-100 overflow-hidden flex flex-col h-full shadow-sm"
             >
-              <div className="p-3 border-b border-gray-50 bg-white sticky top-0 z-10">
-                <div className="flex items-center gap-1.5">
-                  <UserX className="text-red-400" size={16} />
-                  <h3 className="font-black text-gray-800 uppercase tracking-tight text-[13px]">
-                    Ausentes
-                  </h3>
-                  <span className="bg-red-50 text-red-500 px-2 py-0.5 rounded-full text-[10px] font-black">
-                    {absenteesList.length}
-                  </span>
-                </div>
+            <div className="p-4 border-b border-gray-50 bg-white sticky top-0 z-10">
+              <div className="flex items-center gap-2">
+                <UserX className="text-red-400" size={18} />
+                <h3 className="font-black text-gray-800 uppercase tracking-tight text-sm">
+                  Ausentes
+                </h3>
+                <span className="bg-red-50 text-red-500 px-2 py-0.5 rounded-full text-xs font-black">
+                  {absenteesList.length}
+                </span>
               </div>
+            </div>
 
               <Droppable id="absent-container">
                 <SortableContext
@@ -1080,15 +1082,15 @@ export default function ForumSession() {
 
           {/* Column 3: Secciones */}
           <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden flex flex-col h-full shadow-sm">
-            <div className="p-3 border-b border-gray-50 bg-white sticky top-0 z-10">
-              <div className="flex items-center gap-1.5">
-                <Clock className="text-blue-500" size={16} />
-                <h3 className="font-black text-gray-800 uppercase tracking-tight text-[13px]">
+            <div className="p-4 border-b border-gray-50 bg-white sticky top-0 z-10">
+              <div className="flex items-center gap-2">
+                <Clock className="text-blue-500" size={18} />
+                <h3 className="font-black text-gray-800 uppercase tracking-tight text-sm">
                   Secciones
                 </h3>
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
+            <div className="flex-1 overflow-y-auto p-3 space-y-2">
                   {steps.map((step, idx) => {
                     const isCurrent = idx === effectiveSectionIndex;
                     const isCompleted = idx < effectiveSectionIndex;
@@ -1098,30 +1100,30 @@ export default function ForumSession() {
                         key={idx}
                         onClick={() => (isAdmin || idx <= effectiveSectionIndex) && handleStepChange(idx)}
                         className={clsx(
-                          "flex items-center gap-2.5 p-2.5 rounded-lg border transition-all cursor-pointer group",
+                          "flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer group",
                           isCurrent
                             ? "bg-blue-50 border-blue-200 text-blue-700 shadow-sm"
                             : isCompleted
                               ? "bg-emerald-50 border-emerald-100 text-emerald-600"
-                              : "bg-white border-transparent text-gray-500",
+                              : "bg-white border-transparent text-gray-500 hover:bg-gray-50",
                         )}
                       >
                         <div
                           className={clsx(
-                            "w-6 h-6 rounded-lg flex items-center justify-center font-bold text-xs transition-colors",
+                            "w-7 h-7 rounded-lg flex items-center justify-center font-bold text-sm transition-colors",
                             isCurrent
-                              ? "bg-blue-600 text-white"
+                              ? "bg-blue-600 text-white shadow-md"
                               : isCompleted
                                 ? "bg-emerald-500 text-white"
                                 : "bg-gray-100 text-gray-400",
                           )}
                         >
-                          {isCompleted ? <Check size={12} /> : idx === 0 ? "•" : idx}
+                          {isCompleted ? <Check size={14} /> : idx === 0 ? "•" : idx}
                         </div>
-                        <span className="font-bold text-[11px] uppercase tracking-wider flex-1">
+                        <span className="font-bold text-sm uppercase tracking-wider flex-1">
                           {step}
                         </span>
-                        {isCompleted && <span className="text-[9px] font-black uppercase text-emerald-500/60 opacity-0 group-hover:opacity-100 transition-opacity">OK</span>}
+                        {isCompleted && <span className="text-[10px] font-black uppercase text-emerald-500/60 opacity-0 group-hover:opacity-100 transition-opacity">COMPLETADO</span>}
                       </div>
                     );
                   })}
@@ -1159,24 +1161,24 @@ export default function ForumSession() {
                       {/* Top Indicators Panel */}
                       <div className="bg-white rounded-xl border border-gray-100 p-2 shrink-0 shadow-sm">
                         <div className="flex items-center justify-between mb-1.5 border-b border-gray-50 pb-1 px-1">
-                          <div className="flex items-center gap-1.5">
-                            <BarChart3 className="text-blue-600" size={12} />
-                            <h4 className="font-black text-gray-800 uppercase tracking-widest text-[10px]">
+                          <div className="flex items-center gap-2">
+                            <BarChart3 className="text-blue-600" size={16} />
+                            <h4 className="font-black text-gray-800 uppercase tracking-widest text-xs">
                               Indicadores
                             </h4>
                           </div>
-                          <div className="flex bg-gray-50 p-1 rounded-xl border border-gray-100 gap-1.5 origin-right">
+                          <div className="flex bg-gray-50 p-1.5 rounded-xl border border-gray-100 gap-2 origin-right">
                             <button
                               onClick={() => setSelectedTypology(null)}
                               className={clsx(
-                                "px-3 py-1 rounded-lg text-[10px] font-black uppercase transition-all tracking-wider flex items-center gap-1.5 shadow-sm",
+                                "px-4 py-1.5 rounded-lg text-[11px] font-black uppercase transition-all tracking-wider flex items-center gap-2 shadow-sm",
                                 selectedTypology === null
                                   ? "bg-white text-blue-600 border-gray-200"
                                   : "bg-transparent text-gray-400 hover:text-gray-600 border-transparent",
                               )}
                             >
                               TODOS
-                              <span className="opacity-50 text-[8px]">({forumIndicators.length})</span>
+                              <span className="opacity-50 text-[10px]">({forumIndicators.length})</span>
                             </button>
                             {(
                               ["calidad", "personas", "coste", "plazo"] as const
@@ -1188,7 +1190,7 @@ export default function ForumSession() {
                                   key={type}
                                   onClick={() => setSelectedTypology(type)}
                                   className={clsx(
-                                    "px-3 py-1 rounded-lg text-[10px] font-black uppercase transition-all tracking-wider flex items-center gap-1.5 border",
+                                    "px-4 py-1.5 rounded-lg text-[11px] font-black uppercase transition-all tracking-wider flex items-center gap-2 border",
                                     isSelected
                                       ? "bg-white shadow-sm border-gray-200"
                                       : "bg-transparent text-gray-400 border-transparent hover:text-gray-600",
@@ -1198,12 +1200,12 @@ export default function ForumSession() {
                                     isSelected && type === "plazo" && "text-blue-500",
                                   )}
                                 >
-                                  {type === "calidad" && <Award size={12} className={isSelected ? "text-amber-500" : "text-gray-300"} />}
-                                  {type === "personas" && <Users size={12} className={isSelected ? "text-purple-500" : "text-gray-300"} />}
-                                  {type === "coste" && <Coins size={12} className={isSelected ? "text-emerald-500" : "text-gray-300"} />}
-                                  {type === "plazo" && <Clock size={12} className={isSelected ? "text-blue-500" : "text-gray-300"} />}
+                                  {isSelected && type === "calidad" && <Award size={14} className="text-amber-500" />}
+                                  {isSelected && type === "personas" && <Users size={14} className="text-purple-500" />}
+                                  {isSelected && type === "coste" && <Coins size={14} className="text-emerald-500" />}
+                                  {isSelected && type === "plazo" && <Clock size={14} className="text-blue-500" />}
                                   {type}
-                                  <span className="opacity-50 text-[8px]">({count})</span>
+                                  <span className="opacity-50 text-[10px]">({count})</span>
                                 </button>
                               );
                             })}
@@ -1222,27 +1224,27 @@ export default function ForumSession() {
                                   setViewedIndicatorIds(prev => new Set(prev).add(indicator.id));
                                 }}
                                 className={clsx(
-                                  "flex-none w-36 px-3 py-2 rounded-xl border transition-all text-left relative overflow-hidden",
+                                  "flex-none w-44 px-4 py-3 rounded-2xl border transition-all text-left relative overflow-hidden",
                                   isActive
-                                    ? "bg-blue-600 border-blue-600 text-white shadow-md scale-[1.02] z-10"
+                                    ? "bg-blue-600 border-blue-600 text-white shadow-lg scale-[1.03] z-10"
                                     : isViewed
                                       ? "bg-gray-50 border-gray-50 text-gray-400 shadow-inner"
                                       : "bg-white border-gray-100 text-gray-600 hover:border-blue-200 shadow-sm",
                                 )}
                               >
-                                <div className="flex items-center gap-1.5 mb-1">
-                                  {indicator.typology === 'calidad' && <Award size={10} className={isActive ? "text-white" : "text-amber-500"} />}
-                                  {indicator.typology === 'coste' && <Coins size={10} className={isActive ? "text-white" : "text-emerald-500"} />}
-                                  {indicator.typology === 'plazo' && <Clock size={10} className={isActive ? "text-white" : "text-blue-500"} />}
-                                  {indicator.typology === 'personas' && <Users size={10} className={isActive ? "text-white" : "text-purple-500"} />}
+                                <div className="flex items-center gap-2 mb-1.5">
+                                  {indicator.typology === 'calidad' && <Award size={14} className={isActive ? "text-white" : "text-amber-500"} />}
+                                  {indicator.typology === 'coste' && <Coins size={14} className={isActive ? "text-white" : "text-emerald-500"} />}
+                                  {indicator.typology === 'plazo' && <Clock size={14} className={isActive ? "text-white" : "text-blue-500"} />}
+                                  {indicator.typology === 'personas' && <Users size={14} className={isActive ? "text-white" : "text-purple-500"} />}
                                   <div className={clsx(
-                                    "text-[8px] font-black uppercase tracking-widest",
+                                    "text-[10px] font-black uppercase tracking-widest",
                                     isActive ? "text-white/60" : "opacity-60"
                                   )}>
                                     {indicator.typology || 'Ind'}
                                   </div>
                                 </div>
-                                <div className="font-bold text-[10px] truncate leading-tight">
+                                <div className="font-bold text-xs truncate leading-tight">
                                   {indicator.name}
                                 </div>
                               </button>
@@ -1253,11 +1255,11 @@ export default function ForumSession() {
 
                       <div className="flex flex-1 gap-3 min-h-0 overflow-hidden">
                         {/* Left Incidents Panel */}
-                        <div className="w-52 bg-white rounded-xl border border-gray-100 flex flex-col overflow-hidden shrink-0 shadow-sm">
-                          <div className="p-2.5 border-b border-gray-50 flex items-center justify-between bg-white sticky top-0 z-10 shrink-0">
-                            <div className="flex items-center gap-1.5 text-red-600">
-                              <AlertTriangle size={14} />
-                              <h4 className="font-black uppercase tracking-tighter text-[11px]">
+                        <div className="w-64 bg-white rounded-xl border border-gray-100 flex flex-col overflow-hidden shrink-0 shadow-sm">
+                          <div className="p-4 border-b border-gray-50 flex items-center justify-between bg-white sticky top-0 z-10 shrink-0">
+                            <div className="flex items-center gap-2 text-red-600">
+                              <AlertTriangle size={18} />
+                              <h4 className="font-black uppercase tracking-tighter text-[13px]">
                                 Incidencias
                               </h4>
                             </div>
@@ -1276,12 +1278,12 @@ export default function ForumSession() {
                                 setType("incidencia");
                                 setIsEscalated(false);
                               }}
-                              className="w-5 h-5 rounded-md bg-red-50 text-red-600 flex items-center justify-center hover:bg-red-600 hover:text-white transition-all shadow-sm"
+                              className="w-8 h-8 rounded-lg bg-red-50 text-red-600 flex items-center justify-center hover:bg-red-600 hover:text-white transition-all shadow-sm"
                             >
-                              <Plus size={12} />
+                              <Plus size={18} />
                             </button>
                           </div>
-                          <div className="flex-1 overflow-y-auto p-2.5 space-y-2 bg-gray-50/10 custom-scrollbar">
+                          <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-gray-50/10 custom-scrollbar">
                             {forumIncidents.map((incident) => (
                               <div
                                 key={incident.id}
@@ -1298,17 +1300,17 @@ export default function ForumSession() {
                                     incident.escalatedToForumId || "",
                                   );
                                 }}
-                                className="bg-white p-2.5 rounded-xl border border-gray-100 transition-all cursor-pointer group shadow-sm hover:border-red-200"
+                                className="bg-white p-4 rounded-xl border border-gray-100 transition-all cursor-pointer group shadow-sm hover:border-red-200"
                               >
-                                <div className="flex justify-between items-start gap-1.5 mb-1">
-                                  <h5 className="font-bold text-gray-800 text-[11px] leading-tight group-hover:text-red-600 transition-colors line-clamp-2">
+                                <div className="flex justify-between items-start gap-2 mb-1.5">
+                                  <h5 className="font-bold text-gray-800 text-[13px] leading-tight group-hover:text-red-600 transition-colors line-clamp-2">
                                     {incident.title}
                                   </h5>
-                                  <div className={clsx("w-1.5 h-1.5 rounded-full shrink-0", incident.priority === "critica" ? "bg-red-600 animate-pulse" : "bg-red-400")} />
+                                  <div className={clsx("w-2 h-2 rounded-full shrink-0", incident.priority === "critica" ? "bg-red-600 animate-pulse" : "bg-red-400")} />
                                 </div>
-                                <div className="flex items-center justify-between text-[8px] font-black uppercase tracking-widest text-gray-400">
-                                  <div className="flex items-center gap-1">
-                                    <Calendar size={8} />
+                                <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-gray-400">
+                                  <div className="flex items-center gap-1.5">
+                                    <Calendar size={12} />
                                     {format(new Date(incident.targetDate), "dd MMM", { locale: es })}
                                   </div>
                                 </div>
@@ -1463,11 +1465,11 @@ export default function ForumSession() {
                   };
 
                   return (
-                    <div className="w-full h-full overflow-hidden flex flex-col gap-1.5 min-h-0">
-                      <div className="flex items-center justify-between px-1 shrink-0">
-                        <div className="flex items-center gap-1.5">
-                          <LayoutDashboard size={12} className="text-blue-600" />
-                          <h3 className="text-[10px] font-black text-gray-800 uppercase tracking-tighter">
+                    <div className="w-full h-full overflow-hidden flex flex-col gap-2 min-h-0">
+                      <div className="flex items-center justify-between px-2 shrink-0 mb-1">
+                        <div className="flex items-center gap-2">
+                          <LayoutDashboard size={18} className="text-blue-600" />
+                          <h3 className="text-xs font-black text-gray-800 uppercase tracking-tighter">
                             Plan de Acción
                           </h3>
                         </div>
@@ -1486,13 +1488,13 @@ export default function ForumSession() {
                             setType("accion");
                             setIsEscalated(false);
                           }}
-                          className="flex items-center gap-1 bg-blue-600 text-white px-2 py-0.5 rounded-md hover:bg-blue-700 transition duration-200 text-[8px] font-black uppercase shadow-sm"
+                          className="flex items-center gap-1.5 bg-blue-600 text-white px-4 py-2 rounded-xl hover:bg-blue-700 transition duration-200 text-[10px] font-black uppercase shadow-md"
                         >
-                          <Plus size={8} />
+                          <Plus size={14} />
                           <span>Nueva Acción</span>
                         </button>
                       </div>
-                      <div className="flex gap-2 overflow-x-auto pb-1 custom-scrollbar snap-x snap-mandatory flex-1 min-h-0">
+                      <div className="flex gap-4 overflow-x-auto pb-2 custom-scrollbar snap-x snap-mandatory flex-1 min-h-0">
                         {columns.map((col) => {
                           const colActions = actions.filter(
                             (a) =>
@@ -1503,20 +1505,20 @@ export default function ForumSession() {
                           return (
                             <div
                               key={col.value}
-                              className="flex-none w-[170px] bg-white rounded-xl border border-gray-100 flex flex-col snap-start overflow-hidden shadow-sm"
+                              className="flex-none w-64 bg-white rounded-2xl border border-gray-100 flex flex-col snap-start overflow-hidden shadow-sm"
                             >
-                              <div className="px-2 py-1 border-b border-gray-50 flex items-center justify-between bg-white sticky top-0 z-10 shrink-0">
-                                <div className="flex items-center gap-1">
-                                  <div className={clsx("w-1.5 h-1.5 rounded-full", col.color)} />
-                                  <h4 className="font-black text-gray-800 uppercase tracking-tight text-[7px]">
+                              <div className="px-4 py-2.5 border-b border-gray-50 flex items-center justify-between bg-white sticky top-0 z-10 shrink-0">
+                                <div className="flex items-center gap-2">
+                                  <div className={clsx("w-2 h-2 rounded-full", col.color)} />
+                                  <h4 className="font-black text-gray-800 uppercase tracking-tight text-[11px]">
                                     {col.label}
                                   </h4>
                                 </div>
-                                <span className="bg-gray-50 text-gray-500 text-[6px] font-black px-1 py-0.5 rounded-full border border-gray-100">
+                                <span className="bg-gray-50 text-gray-500 text-[10px] font-black px-2 py-0.5 rounded-full border border-gray-100">
                                   {colActions.length}
                                 </span>
                               </div>
-                              <div className="flex-1 overflow-y-auto p-1 space-y-1 bg-gray-50/10 custom-scrollbar">
+                              <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-gray-50/10 custom-scrollbar">
                                 {colActions.map((action) => {
                                   const actionSubActions = subActions.filter((s) => s.actionId === action.id);
                                   const completedSubActions = actionSubActions.filter((s) => s.completed).length;
@@ -1531,19 +1533,19 @@ export default function ForumSession() {
                                         setIsEscalated(action.isEscalated || false);
                                         setEscalatedToForumId(action.escalatedToForumId || "");
                                       }}
-                                      className="bg-white p-2 rounded-lg border border-gray-50 hover:border-blue-200 transition-all cursor-pointer group shadow-sm"
+                                      className="bg-white p-4 rounded-xl border border-gray-50 hover:border-blue-200 transition-all cursor-pointer group shadow-sm bg-white"
                                     >
-                                      <div className="flex flex-col gap-1">
-                                        <div className="flex justify-between items-start gap-1">
-                                          <h5 className="font-bold text-gray-800 text-[9px] leading-tight group-hover:text-blue-600 transition-colors line-clamp-2">
+                                      <div className="flex flex-col gap-2">
+                                        <div className="flex justify-between items-start gap-2">
+                                          <h5 className="font-bold text-gray-800 text-[13px] leading-tight group-hover:text-blue-600 transition-colors line-clamp-2">
                                             {action.title}
                                           </h5>
-                                          {action.priority === "critica" && <div className="w-1 h-1 rounded-full bg-red-600 animate-pulse shrink-0" />}
+                                          {action.priority === "critica" && <div className="w-2 h-2 rounded-full bg-red-600 animate-pulse shrink-0" />}
                                         </div>
-                                        <div className="flex items-center justify-between mt-0.5 pt-1 border-t border-gray-50">
-                                          <div className="flex -space-x-1">
-                                            {action.assignedToNames?.slice(0, 2).map((name, i) => (
-                                              <div key={i} className="w-3.5 h-3.5 rounded-full bg-blue-50 border border-white flex items-center justify-center text-[5px] font-black text-blue-600 uppercase" title={name}>
+                                        <div className="flex items-center justify-between mt-1 pt-2 border-t border-gray-50">
+                                          <div className="flex -space-x-1.5">
+                                            {action.assignedToNames?.slice(0, 3).map((name, i) => (
+                                              <div key={i} className="w-6 h-6 rounded-full bg-blue-50 border border-white flex items-center justify-center text-[8px] font-black text-blue-600 uppercase shadow-inner" title={name}>
                                                 {name.charAt(0)}
                                               </div>
                                             ))}
