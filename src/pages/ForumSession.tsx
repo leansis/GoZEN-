@@ -143,14 +143,14 @@ function SortableAttendee({ id, attendee }: SortableAttendeeProps) {
       {...attributes}
       {...listeners}
       className={clsx(
-        "flex items-center justify-between p-4 bg-white border border-gray-100 rounded-2xl mb-2.5 cursor-grab active:cursor-grabbing hover:border-blue-200 transition-all group shadow-sm",
+        "flex items-center justify-between p-3 bg-white border border-gray-100 rounded-xl mb-2 cursor-grab active:cursor-grabbing hover:border-blue-200 transition-all group",
         attendee.present ? "bg-white" : "bg-gray-50/50",
       )}
     >
-      <div className="flex items-center gap-3.5">
+      <div className="flex items-center gap-3">
         <div
           className={clsx(
-            "w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shadow-inner",
+            "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold",
             attendee.present
               ? "bg-blue-100 text-blue-600"
               : "bg-gray-200 text-gray-500",
@@ -161,26 +161,26 @@ function SortableAttendee({ id, attendee }: SortableAttendeeProps) {
         <div>
           <p
             className={clsx(
-              "text-base font-bold",
+              "text-sm font-medium",
               attendee.present ? "text-gray-800" : "text-gray-400 italic",
             )}
           >
             {attendee.name}
             {attendee.isLeader && (
-              <span className="ml-2 text-[11px] bg-orange-100 text-orange-600 px-2 py-0.5 rounded-lg font-black uppercase tracking-wider">
+              <span className="ml-2 text-[10px] bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
                 Líder
               </span>
             )}
           </p>
           {attendee.groupName && (
-            <p className="text-xs text-gray-400 font-medium">{attendee.groupName}</p>
+            <p className="text-[10px] text-gray-400">{attendee.groupName}</p>
           )}
         </div>
       </div>
       {attendee.present ? (
-        <CheckCircle2 size={24} className="text-green-500" />
+        <CheckCircle2 size={18} className="text-green-500" />
       ) : (
-        <UserX size={24} className="text-gray-300" />
+        <UserX size={18} className="text-gray-300" />
       )}
     </div>
   );
@@ -200,7 +200,7 @@ const ChevronDiagram = ({
   isPreparationMode: boolean;
 }) => {
   return (
-    <div className="flex items-center w-full overflow-hidden rounded-2xl border border-gray-100 bg-white mb-6 shadow-md">
+    <div className="flex items-center w-full overflow-hidden rounded-xl border border-gray-100 bg-white mb-8">
       {steps.map((step, idx) => {
         const isCurrent = idx === currentStep;
         const isCompleted = idx < currentStep;
@@ -232,7 +232,7 @@ const ChevronDiagram = ({
               flexBasis: isCurrent ? "20%" : "auto",
             }}
           >
-            <span className="truncate flex items-center">
+            <span className="truncate">
               {isCompleted && (
                 <Check size={14} className="inline mr-1 shrink-0" />
               )}
@@ -867,24 +867,22 @@ export default function ForumSession() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto h-screen flex flex-col overflow-hidden bg-gray-50/20 px-4">
+    <div className="max-w-7xl mx-auto space-y-6 pb-20 animate-in fade-in duration-500">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0 pt-4 pb-3">
-        <div>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex-1">
           <button
             onClick={() => navigate("/forums")}
-            className="flex items-center gap-2 text-blue-600 hover:text-blue-700 transition-all text-sm font-black uppercase tracking-widest mb-1.5 group"
+            className="flex items-center gap-2 text-gray-400 hover:text-blue-600 transition-colors text-sm font-bold uppercase tracking-wider mb-2"
           >
-            <div className="w-6 h-6 rounded-full bg-blue-50 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-all">
-              <ChevronLeft size={16} />
-            </div>
+            <ChevronLeft size={16} />
             Volver a sesiones
           </button>
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center shadow-sm">
-              <MessageSquare size={18} />
+            <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center">
+              <MessageSquare size={24} />
             </div>
-            <h1 className="text-xl font-black text-gray-800 uppercase tracking-tight">
+            <h1 className="text-2xl font-black text-gray-800 uppercase tracking-tight">
               {forum.name}
             </h1>
           </div>
@@ -894,7 +892,7 @@ export default function ForumSession() {
           {session.status === "in_progress" && (
             <div
               className={clsx(
-                "flex items-center gap-3 px-5 py-2 rounded-2xl border shadow-sm transition-all duration-300",
+                "flex items-center gap-4 px-6 py-3 rounded-2xl border transition-all duration-300",
                 isExceeded
                   ? "bg-red-50 border-red-200 text-red-600"
                   : isNearEnd
@@ -904,31 +902,31 @@ export default function ForumSession() {
             >
               <Timer
                 className={clsx(isExceeded ? "animate-spin-slow" : "")}
-                size={20}
+                size={24}
               />
               <div className="flex flex-col">
-                <span className="text-2xl font-mono font-black tracking-tighter leading-none">
+                <span className="text-2xl font-mono font-black tracking-tighter">
                   {formatTimer(elapsedSeconds)}
                 </span>
                 <span className="text-[10px] font-bold uppercase tracking-widest opacity-60">
-                  Meta: {forum.estimatedDuration} min
+                  Objetivo: {forum.estimatedDuration} min
                 </span>
               </div>
             </div>
           )}
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-3 shrink-0">
             {session.status === "scheduled" && !isPreparationMode && (
               <button
                 onClick={handleStartSession}
                 className={clsx(
-                  "flex items-center gap-2 px-6 py-2.5 text-white rounded-xl font-black text-sm transition-all shadow-md",
+                  "flex items-center gap-3 px-8 py-4 text-white rounded-2xl font-black text-xl transition-all",
                   isFuture
                     ? "bg-blue-600 hover:bg-blue-700"
                     : "bg-green-600 hover:bg-green-700",
                 )}
               >
-                <Play size={18} fill="currentColor" />
+                <Play size={24} fill="currentColor" />
                 {isFuture ? "PREPARAR" : "INICIAR"}
               </button>
             )}
@@ -938,19 +936,19 @@ export default function ForumSession() {
                 {effectiveSectionIndex > 0 && (
                   <button
                     onClick={() => handleStepChange(effectiveSectionIndex - 1)}
-                    className="p-2.5 bg-gray-50 text-gray-400 rounded-xl hover:bg-gray-100 transition-colors shadow-sm"
+                    className="p-3 bg-gray-50 text-gray-400 rounded-xl hover:bg-gray-100 transition-colors"
                   >
-                    <ChevronLeft size={20} />
+                    <ChevronLeft size={24} />
                   </button>
                 )}
 
                 {effectiveSectionIndex < steps.length - 1 ? (
                   <button
                     onClick={() => handleStepChange(effectiveSectionIndex + 1)}
-                    className="flex items-center gap-2 px-8 py-3 bg-blue-600 text-white rounded-xl font-black text-sm hover:bg-blue-700 transition-all shadow-lg"
+                    className="flex items-center gap-2 px-8 py-4 bg-blue-600 text-white rounded-2xl font-black text-xl hover:bg-blue-700 transition-all"
                   >
                     SIGUIENTE
-                    <ChevronRight size={18} />
+                    <ChevronRight size={24} />
                   </button>
                 ) : (
                   !isPreparationMode && (
@@ -958,16 +956,16 @@ export default function ForumSession() {
                       onClick={handleFinishSession}
                       disabled={isSaving}
                       className={clsx(
-                        "flex items-center gap-2 px-8 py-3 bg-red-600 text-white rounded-xl font-black text-sm hover:bg-red-700 transition-all shadow-lg",
+                        "flex items-center gap-2 px-8 py-4 bg-red-600 text-white rounded-2xl font-black text-xl hover:bg-red-700 transition-all",
                         isSaving && "opacity-50 cursor-not-allowed",
                       )}
                     >
                       {isSaving ? (
-                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
                       ) : (
-                        <CheckCircle2 size={18} />
+                        <CheckCircle2 size={24} />
                       )}
-                      {isSaving ? "GUARDANDO" : "FINALIZAR"}
+                      {isSaving ? "GUARDANDO..." : "FINALIZAR"}
                     </button>
                   )
                 )}
@@ -978,18 +976,16 @@ export default function ForumSession() {
       </div>
 
       {/* Progress Diagram */}
-      <div className="px-2 shrink-0">
-        <ChevronDiagram
-          steps={steps}
-          currentStep={effectiveSectionIndex}
-          onStepClick={handleStepChange}
-          status={session.status}
-          isPreparationMode={isPreparationMode}
-        />
-      </div>
+      <ChevronDiagram
+        steps={steps}
+        currentStep={effectiveSectionIndex}
+        onStepClick={handleStepChange}
+        status={session.status}
+        isPreparationMode={isPreparationMode}
+      />
 
       {effectiveSectionIndex === 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 flex-1 min-h-0 px-2 pb-2">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {/* Column 1: Asistentes */}
           <DndContext
             sensors={sensors}
@@ -998,23 +994,23 @@ export default function ForumSession() {
           >
             <div
               id="attendee-container"
-              className="bg-white rounded-2xl border border-gray-100 overflow-hidden flex flex-col h-full shadow-sm"
+              className="bg-white rounded-3xl border border-gray-100 overflow-hidden flex flex-col h-[600px]"
             >
-              <div className="p-4 border-b border-gray-50 flex items-center justify-between bg-white sticky top-0 z-10">
-                <div className="flex items-center gap-2.5">
-                  <UserCheck className="text-green-500" size={18} />
-                  <h3 className="font-black text-gray-800 uppercase tracking-tight text-sm">
+              <div className="p-5 border-b border-gray-50 flex items-center justify-between bg-white sticky top-0 z-10">
+                <div className="flex items-center gap-2">
+                  <UserCheck className="text-green-500" size={20} />
+                  <h3 className="font-black text-gray-800 uppercase tracking-tight text-base">
                     Asistentes
                   </h3>
-                  <span className="bg-green-100 text-green-600 px-2 py-0.5 rounded-full text-xs font-black">
+                  <span className="bg-green-100 text-green-600 px-2 py-0.5 rounded-full text-[10px] font-black">
                     {attendeesList.length}
                   </span>
                 </div>
                 <button
                   onClick={() => setShowAddMember(true)}
-                  className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center hover:bg-blue-600 hover:text-white transition-all shadow-sm"
+                  className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center hover:bg-blue-600 hover:text-white transition-all"
                 >
-                  <Plus size={16} />
+                  <Plus size={18} />
                 </button>
               </div>
 
@@ -1023,19 +1019,19 @@ export default function ForumSession() {
                   items={attendeesList.map((a) => a.uid)}
                   strategy={verticalListSortingStrategy}
                 >
-                  <div className="flex-1 overflow-y-auto">
-                    {attendeesList.map((a) => (
-                      <SortableAttendee key={a.uid} id={a.uid} attendee={a} />
-                    ))}
-                    {attendeesList.length === 0 && (
-                      <div className="h-full flex flex-col items-center justify-center text-gray-300 border-2 border-dashed border-gray-50 m-4 rounded-2xl">
-                        <UserCheck size={32} className="mb-2 opacity-50" />
-                        <p className="text-xs font-bold uppercase tracking-widest text-center">
-                          Invita o arrastra
-                        </p>
-                      </div>
-                    )}
-                  </div>
+                  {attendeesList.map((a) => (
+                    <SortableAttendee key={a.uid} id={a.uid} attendee={a} />
+                  ))}
+                  {attendeesList.length === 0 && (
+                    <div className="h-full flex flex-col items-center justify-center text-gray-300 border-2 border-dashed border-gray-50 rounded-2xl">
+                      <UserCheck size={32} className="mb-2 opacity-50" />
+                      <p className="text-xs font-bold uppercase tracking-widest text-center">
+                        Invita o arrastra
+                        <br />
+                        desde ausentes
+                      </p>
+                    </div>
+                  )}
                 </SortableContext>
               </Droppable>
             </div>
@@ -1043,54 +1039,52 @@ export default function ForumSession() {
             {/* Column 2: Ausentes */}
             <div
               id="absent-container"
-              className="bg-white rounded-2xl border border-gray-100 overflow-hidden flex flex-col h-full shadow-sm"
+              className="bg-white rounded-3xl border border-gray-100 overflow-hidden flex flex-col h-[600px]"
             >
-            <div className="p-4 border-b border-gray-50 bg-white sticky top-0 z-10">
-              <div className="flex items-center gap-2">
-                <UserX className="text-red-400" size={18} />
-                <h3 className="font-black text-gray-800 uppercase tracking-tight text-sm">
-                  Ausentes
-                </h3>
-                <span className="bg-red-50 text-red-500 px-2 py-0.5 rounded-full text-xs font-black">
-                  {absenteesList.length}
-                </span>
+              <div className="p-5 border-b border-gray-50 bg-white sticky top-0 z-10">
+                <div className="flex items-center gap-2">
+                  <UserX className="text-red-400" size={20} />
+                  <h3 className="font-black text-gray-800 uppercase tracking-tight text-base">
+                    Ausentes
+                  </h3>
+                  <span className="bg-red-50 text-red-500 px-2 py-0.5 rounded-full text-[10px] font-black">
+                    {absenteesList.length}
+                  </span>
+                </div>
               </div>
-            </div>
 
               <Droppable id="absent-container">
                 <SortableContext
                   items={absenteesList.map((a) => a.uid)}
                   strategy={verticalListSortingStrategy}
                 >
-                  <div className="flex-1 overflow-y-auto">
-                    {absenteesList.map((a) => (
-                      <SortableAttendee key={a.uid} id={a.uid} attendee={a} />
-                    ))}
-                    {absenteesList.length === 0 && (
-                      <div className="h-full flex flex-col items-center justify-center text-gray-200 border-2 border-dashed border-gray-100 m-4 rounded-2xl">
-                        <UserX size={32} className="mb-2 opacity-30" />
-                        <p className="text-xs font-bold uppercase tracking-widest text-center px-4">
-                          Arrastra aquí
-                        </p>
-                      </div>
-                    )}
-                  </div>
+                  {absenteesList.map((a) => (
+                    <SortableAttendee key={a.uid} id={a.uid} attendee={a} />
+                  ))}
+                  {absenteesList.length === 0 && (
+                    <div className="h-full flex flex-col items-center justify-center text-gray-200 border-2 border-dashed border-gray-100 rounded-2xl">
+                      <UserX size={32} className="mb-2 opacity-30" />
+                      <p className="text-xs font-bold uppercase tracking-widest text-center px-4">
+                        Arrastra aquí a quienes no han venido
+                      </p>
+                    </div>
+                  )}
                 </SortableContext>
               </Droppable>
             </div>
           </DndContext>
 
           {/* Column 3: Secciones */}
-          <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden flex flex-col h-full shadow-sm">
-            <div className="p-4 border-b border-gray-50 bg-white sticky top-0 z-10">
+          <div className="bg-white rounded-3xl border border-gray-100 overflow-hidden flex flex-col h-[600px]">
+            <div className="p-5 border-b border-gray-50 bg-white sticky top-0 z-10">
               <div className="flex items-center gap-2">
-                <Clock className="text-blue-500" size={18} />
-                <h3 className="font-black text-gray-800 uppercase tracking-tight text-sm">
+                <Clock className="text-blue-500" size={20} />
+                <h3 className="font-black text-gray-800 uppercase tracking-tight text-base">
                   Secciones
                 </h3>
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto p-3 space-y-2">
+            <div className="flex-1 overflow-y-auto p-4 space-y-2">
                   {steps.map((step, idx) => {
                     const isCurrent = idx === effectiveSectionIndex;
                     const isCompleted = idx < effectiveSectionIndex;
@@ -1100,30 +1094,30 @@ export default function ForumSession() {
                         key={idx}
                         onClick={() => (isAdmin || idx <= effectiveSectionIndex) && handleStepChange(idx)}
                         className={clsx(
-                          "flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer group",
+                          "flex items-center gap-3 p-4 rounded-xl border transition-all cursor-pointer group",
                           isCurrent
-                            ? "bg-blue-50 border-blue-200 text-blue-700 shadow-sm"
+                            ? "bg-blue-50 border-blue-200 text-blue-700"
                             : isCompleted
                               ? "bg-emerald-50 border-emerald-100 text-emerald-600"
-                              : "bg-white border-transparent text-gray-500 hover:bg-gray-50",
+                              : "bg-white border-transparent text-gray-500",
                         )}
                       >
                         <div
                           className={clsx(
-                            "w-7 h-7 rounded-lg flex items-center justify-center font-bold text-sm transition-colors",
+                            "w-6 h-6 rounded-lg flex items-center justify-center font-bold text-xs transition-colors",
                             isCurrent
-                              ? "bg-blue-600 text-white shadow-md"
+                              ? "bg-blue-600 text-white"
                               : isCompleted
                                 ? "bg-emerald-500 text-white"
                                 : "bg-gray-100 text-gray-400",
                           )}
                         >
-                          {isCompleted ? <Check size={14} /> : idx === 0 ? "•" : idx}
+                          {isCompleted ? <Check size={12} /> : idx === 0 ? "•" : idx}
                         </div>
-                        <span className="font-bold text-sm uppercase tracking-wider flex-1">
+                        <span className="font-bold text-xs uppercase tracking-wider flex-1">
                           {step}
                         </span>
-                        {isCompleted && <span className="text-[10px] font-black uppercase text-emerald-500/60 opacity-0 group-hover:opacity-100 transition-opacity">COMPLETADO</span>}
+                        {isCompleted && <span className="text-[9px] font-black uppercase text-emerald-500/60 opacity-0 group-hover:opacity-100 transition-opacity">Realizado</span>}
                       </div>
                     );
                   })}
@@ -1131,14 +1125,14 @@ export default function ForumSession() {
           </div>
         </div>
       ) : (
-        <div className="w-full flex-1 min-h-0 px-2 pb-2">
+        <div className="w-full flex-1 min-h-[600px]">
           <AnimatePresence mode="wait">
             <motion.div
               key={effectiveSectionIndex}
               initial={{ opacity: 0, scale: 0.98 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 1.02 }}
-              className="w-full h-full"
+              className="w-full"
             >
               {/* Step Content */}
               {(() => {
@@ -1157,61 +1151,63 @@ export default function ForumSession() {
                     (i) => i.id === selectedIndicatorId,
                   );
                   return (
-                    <div className="flex flex-col gap-1.5 h-full min-h-0 overflow-hidden">
+                    <div className="flex flex-col gap-4 min-h-[700px]">
                       {/* Top Indicators Panel */}
-                      <div className="bg-white rounded-xl border border-gray-100 p-2 shrink-0 shadow-sm">
-                        <div className="flex items-center justify-between mb-2 border-b border-gray-50 pb-2 px-2">
+                      <div className="bg-white rounded-3xl border border-gray-100 p-4">
+                        <div className="flex items-center justify-between mb-3 border-b border-gray-50 pb-2">
                           <div className="flex items-center gap-3">
-                            <BarChart3 className="text-blue-600" size={24} />
-                            <h4 className="font-black text-gray-800 uppercase tracking-widest text-base">
+                            <BarChart3 className="text-blue-600" size={18} />
+                            <h4 className="font-black text-gray-800 uppercase tracking-tighter text-sm">
                               Indicadores
                             </h4>
                           </div>
-                          <div className="flex bg-gray-50 p-2 rounded-2xl border border-gray-100 gap-3 origin-right">
+
+                          <div className="flex bg-gray-50 p-1 rounded-xl border border-gray-100 gap-1">
                             <button
                               onClick={() => setSelectedTypology(null)}
                               className={clsx(
-                                "px-6 py-2.5 rounded-xl text-xs font-black uppercase transition-all tracking-wider flex items-center gap-2.5 shadow-sm",
+                                "px-3 py-1 rounded-lg text-[9px] font-black uppercase transition-all tracking-wider flex items-center gap-1.5",
                                 selectedTypology === null
-                                  ? "bg-white text-blue-600 border-gray-200"
-                                  : "bg-transparent text-gray-400 hover:text-gray-600 border-transparent",
+                                  ? "bg-white text-blue-600 border border-gray-100"
+                                  : "text-gray-400",
                               )}
                             >
                               TODOS
-                              <span className="opacity-50 text-[11px]">({forumIndicators.length})</span>
+                              <span className="opacity-50 text-[8px]">({forumIndicators.length})</span>
                             </button>
                             {(
                               ["calidad", "personas", "coste", "plazo"] as const
                             ).map((type) => {
                               const count = forumIndicators.filter(i => i.typology === type).length;
-                              const isSelected = selectedTypology === type;
                               return (
                                 <button
                                   key={type}
                                   onClick={() => setSelectedTypology(type)}
                                   className={clsx(
-                                    "px-6 py-2.5 rounded-xl text-xs font-black uppercase transition-all tracking-wider flex items-center gap-2.5 border",
-                                    isSelected
-                                      ? "bg-white shadow-sm border-gray-200"
-                                      : "bg-transparent text-gray-400 border-transparent hover:text-gray-600",
-                                    isSelected && type === "calidad" && "text-amber-500",
-                                    isSelected && type === "personas" && "text-purple-500",
-                                    isSelected && type === "coste" && "text-emerald-500",
-                                    isSelected && type === "plazo" && "text-blue-500",
+                                    "px-3 py-1 rounded-lg text-[9px] font-black uppercase transition-all tracking-wider flex items-center gap-1.5",
+                                    selectedTypology === type
+                                      ? clsx(
+                                          "bg-white border border-gray-100",
+                                          type === "calidad" && "text-amber-500",
+                                          type === "personas" && "text-purple-500",
+                                          type === "coste" && "text-emerald-500",
+                                          type === "plazo" && "text-blue-500",
+                                        )
+                                      : "text-gray-400",
                                   )}
                                 >
-                                  {isSelected && type === "calidad" && <Award size={18} className="text-amber-500" />}
-                                  {isSelected && type === "personas" && <Users size={18} className="text-purple-500" />}
-                                  {isSelected && type === "coste" && <Coins size={18} className="text-emerald-500" />}
-                                  {isSelected && type === "plazo" && <Clock size={18} className="text-blue-500" />}
+                                  {type === "calidad" && <Award size={10} />}
+                                  {type === "personas" && <Users size={10} />}
+                                  {type === "coste" && <Coins size={10} />}
+                                  {type === "plazo" && <Clock size={10} />}
                                   {type}
-                                  <span className="opacity-50 text-[11px]">({count})</span>
+                                  <span className="opacity-50 text-[8px]">({count})</span>
                                 </button>
                               );
                             })}
                           </div>
                         </div>
-                        <div className="flex gap-2.5 overflow-x-auto pb-1.5 custom-scrollbar no-scrollbar-on-mobile">
+                        <div className="flex gap-3 overflow-x-auto pb-2 custom-scrollbar no-scrollbar-on-mobile">
                           {filteredIndicators.map((indicator) => {
                             const isViewed = viewedIndicatorIds.has(indicator.id);
                             const isActive = selectedIndicatorId === indicator.id;
@@ -1224,42 +1220,59 @@ export default function ForumSession() {
                                   setViewedIndicatorIds(prev => new Set(prev).add(indicator.id));
                                 }}
                                 className={clsx(
-                                  "flex-none w-72 px-8 py-6 rounded-3xl border transition-all text-left relative overflow-hidden",
+                                  "flex-none w-48 p-3 rounded-2xl border transition-all text-left relative overflow-hidden",
                                   isActive
-                                    ? "bg-blue-600 border-blue-600 text-white shadow-xl scale-[1.05] z-10"
+                                    ? "bg-blue-600 border-blue-600 text-white"
                                     : isViewed
-                                      ? "bg-gray-50 border-gray-50 text-gray-400 shadow-inner"
-                                      : "bg-white border-gray-100 text-gray-600 hover:border-blue-200 shadow-md",
+                                      ? "bg-gray-50 border-gray-100 text-gray-400"
+                                      : "bg-white border-gray-100 text-gray-600",
                                 )}
                               >
-                                <div className="flex items-center gap-4 mb-3">
-                                  {indicator.typology === 'calidad' && <Award size={24} className={isActive ? "text-white" : "text-amber-500"} />}
-                                  {indicator.typology === 'coste' && <Coins size={24} className={isActive ? "text-white" : "text-emerald-500"} />}
-                                  {indicator.typology === 'plazo' && <Clock size={24} className={isActive ? "text-white" : "text-blue-500"} />}
-                                  {indicator.typology === 'personas' && <Users size={24} className={isActive ? "text-white" : "text-purple-500"} />}
-                                  <div className={clsx(
-                                    "text-xs font-black uppercase tracking-widest",
-                                    isActive ? "text-white/60" : "opacity-60"
-                                  )}>
-                                    {indicator.typology || 'Ind'}
+                                <div className="flex items-center gap-1.5 mb-1.5">
+                                  {indicator.typology === 'calidad' && <Award size={10} className={isActive ? "text-white" : "text-amber-500"} />}
+                                  {indicator.typology === 'coste' && <Coins size={10} className={isActive ? "text-white" : "text-emerald-500"} />}
+                                  {indicator.typology === 'plazo' && <Clock size={10} className={isActive ? "text-white" : "text-blue-500"} />}
+                                  {indicator.typology === 'personas' && <Users size={10} className={isActive ? "text-white" : "text-purple-500"} />}
+                                  <div className="text-[7px] font-black uppercase tracking-widest opacity-70">
+                                    {indicator.typology || 'Indicador'}
                                   </div>
+                                  {isViewed && !isActive && <Check size={10} className="ml-auto text-emerald-500" />}
                                 </div>
-                                <div className="font-bold text-lg truncate leading-tight">
+                                <div className="font-bold text-xs truncate leading-tight">
                                   {indicator.name}
                                 </div>
+                                {indicator.description && (
+                                  <div
+                                    className={clsx(
+                                      "text-[9px] mt-1 truncate opacity-60",
+                                      isActive
+                                        ? "text-white"
+                                        : "text-gray-400",
+                                    )}
+                                  >
+                                    {indicator.description}
+                                  </div>
+                                )}
                               </button>
                             );
                           })}
+                          {filteredIndicators.length === 0 && (
+                            <p className="text-xs text-gray-400 italic py-2 px-4">
+                              {forumIndicators.length === 0
+                                ? "No hay indicadores asociados."
+                                : "No hay indicadores de esta tipología."}
+                            </p>
+                          )}
                         </div>
                       </div>
 
-                      <div className="flex flex-1 gap-3 min-h-0 overflow-hidden">
+                      <div className="flex flex-1 gap-4 h-[600px]">
                         {/* Left Incidents Panel */}
-                        <div className="w-64 bg-white rounded-xl border border-gray-100 flex flex-col overflow-hidden shrink-0 shadow-sm">
-                          <div className="p-4 border-b border-gray-50 flex items-center justify-between bg-white sticky top-0 z-10 shrink-0">
+                        <div className="w-64 md:w-80 bg-white rounded-3xl border border-gray-100 flex flex-col overflow-hidden">
+                          <div className="p-5 border-b border-gray-50 flex items-center justify-between bg-white sticky top-0 z-10">
                             <div className="flex items-center gap-2 text-red-600">
                               <AlertTriangle size={18} />
-                              <h4 className="font-black uppercase tracking-tighter text-[13px]">
+                              <h4 className="font-black uppercase tracking-tighter text-sm">
                                 Incidencias
                               </h4>
                             </div>
@@ -1278,12 +1291,13 @@ export default function ForumSession() {
                                 setType("incidencia");
                                 setIsEscalated(false);
                               }}
-                              className="w-8 h-8 rounded-lg bg-red-50 text-red-600 flex items-center justify-center hover:bg-red-600 hover:text-white transition-all shadow-sm"
+                              className="w-6 h-6 rounded-lg bg-red-50 text-red-600 flex items-center justify-center hover:bg-red-100 transition-colors"
+                              title="Nueva Incidencia"
                             >
-                              <Plus size={18} />
+                              <Plus size={14} />
                             </button>
                           </div>
-                          <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-gray-50/10 custom-scrollbar">
+                          <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50/20 text-left">
                             {forumIncidents.map((incident) => (
                               <div
                                 key={incident.id}
@@ -1300,79 +1314,121 @@ export default function ForumSession() {
                                     incident.escalatedToForumId || "",
                                   );
                                 }}
-                                className="bg-white p-4 rounded-xl border border-gray-100 transition-all cursor-pointer group shadow-sm hover:border-red-200"
+                                className="bg-white p-3 rounded-2xl border border-gray-100 transition-all cursor-pointer group"
                               >
-                                <div className="flex justify-between items-start gap-2 mb-1.5">
-                                  <h5 className="font-bold text-gray-800 text-[13px] leading-tight group-hover:text-red-600 transition-colors line-clamp-2">
+                                <div className="flex justify-between items-start gap-2 mb-2">
+                                  <h5 className="font-bold text-gray-800 text-[11px] leading-tight group-hover:text-red-600 transition-colors">
                                     {incident.title}
                                   </h5>
-                                  <div className={clsx("w-2 h-2 rounded-full shrink-0", incident.priority === "critica" ? "bg-red-600 animate-pulse" : "bg-red-400")} />
+                                  <div
+                                    className={clsx(
+                                      "w-2 h-2 rounded-full shrink-0",
+                                      incident.priority === "critica"
+                                        ? "bg-red-600 animate-pulse"
+                                        : "bg-red-400",
+                                    )}
+                                  />
                                 </div>
-                                <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-gray-400">
-                                  <div className="flex items-center gap-1.5">
-                                    <Calendar size={12} />
-                                    {format(new Date(incident.targetDate), "dd MMM", { locale: es })}
+                                <div className="flex items-center justify-between text-[9px] font-black uppercase tracking-widest text-gray-400">
+                                  <div className="flex items-center gap-1">
+                                    <Calendar size={10} />
+                                    {format(new Date(incident.targetDate), "dd MMM", {
+                                      locale: es,
+                                    })}
+                                  </div>
+                                  <div className="flex -space-x-1.5">
+                                    {incident.assignedToNames
+                                      ?.slice(0, 2)
+                                      .map((name, i) => (
+                                        <div
+                                          key={i}
+                                          className="w-5 h-5 rounded-full bg-blue-50 border border-white flex items-center justify-center text-[7px] font-black text-blue-600"
+                                          title={name}
+                                        >
+                                          {name.charAt(0)}
+                                        </div>
+                                      ))}
                                   </div>
                                 </div>
                               </div>
                             ))}
+                            {forumIncidents.length === 0 && (
+                              <div className="flex flex-col items-center justify-center py-12 text-center text-gray-400 opacity-40">
+                                <CheckCircle2 size={32} className="mb-2" />
+                                <p className="text-[10px] font-black uppercase tracking-widest">
+                                  Sin incidencias activas
+                                </p>
+                              </div>
+                            )}
                           </div>
                         </div>
 
                         {/* Central Content Panel */}
-                        <div className="flex-1 bg-white rounded-xl border border-gray-100 overflow-hidden flex flex-col min-w-0 shadow-sm">
+                        <div className="flex-1 bg-white rounded-3xl border border-gray-100 overflow-hidden flex flex-col">
                           {selectedIndicator ? (
                             <>
-                              <div className="px-3 py-2 border-b border-gray-50 flex justify-between items-center bg-white shrink-0 shadow-sm z-10">
-                                <div>
+                              <div className="p-4 border-b border-gray-50 flex justify-between items-center bg-white z-10">
+                                <div className="text-left">
                                   <h3 className="font-black text-gray-800 uppercase tracking-tighter text-sm">
                                     {selectedIndicator.name}
                                   </h3>
                                   {selectedIndicator.formula && (
-                                    <p className="text-[11px] text-gray-400 font-medium tracking-tight">
-                                      {selectedIndicator.formula}
+                                    <p className="text-[9px] text-gray-400 font-medium">
+                                      Fórmula: {selectedIndicator.formula}
                                     </p>
                                   )}
                                 </div>
-                                {selectedIndicator.link && (
-                                  <a
-                                    href={selectedIndicator.link}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-all text-[10px] font-black border border-blue-100 flex items-center gap-1.5 shadow-sm"
-                                  >
-                                    CUADRO MANDO
-                                    <LayoutDashboard size={12} />
-                                  </a>
-                                )}
+                                <div className="flex items-center gap-2">
+                                  {selectedIndicator.link && (
+                                    <a
+                                      href={selectedIndicator.link}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-all text-[9px] font-black border border-blue-100"
+                                    >
+                                      ABRIR CUADRO MANDO{" "}
+                                      <LayoutDashboard size={12} />
+                                    </a>
+                                  )}
+                                </div>
                               </div>
-                              // DESPUÉS
-                            <div className="flex-1 bg-gray-50 relative min-h-0 overflow-hidden">
-                              {selectedIndicator.link ? (
-                                <iframe
-                                  src={selectedIndicator.link}
-                                  className="absolute inset-0 w-full h-full border-none"
-                                  title={selectedIndicator.name}
-                                />
+                              <div className="flex-1 w-full bg-gray-50 relative">
+                                {selectedIndicator.link ? (
+                                  <iframe
+                                    src={selectedIndicator.link}
+                                    className="w-full h-full border-none"
+                                    title={selectedIndicator.name}
+                                  />
                                 ) : (
-                                  <div className="w-full h-full flex items-center justify-center text-center p-6 bg-white">
-                                    <div className="max-w-[180px] space-y-2">
-                                      <div className="w-12 h-12 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-center mx-auto text-blue-400">
-                                        <BarChart3 size={24} />
+                                  <div className="w-full h-full flex items-center justify-center text-center p-12">
+                                    <div className="max-w-xs space-y-4">
+                                      <div className="w-16 h-16 bg-white rounded-2xl border border-gray-100 flex items-center justify-center mx-auto text-blue-400">
+                                        <BarChart3 size={32} />
                                       </div>
-                                      <h4 className="font-bold text-gray-800 text-[11px]">Visualización pendiente</h4>
-                                      <p className="text-[10px] text-gray-400">Sin enlace configurado.</p>
+                                      <h4 className="font-bold text-gray-800 text-sm">
+                                        Visualización no disponible
+                                      </h4>
+                                      <p className="text-xs text-gray-400">
+                                        Este indicador no tiene un enlace de
+                                        visualización configurado.
+                                      </p>
                                     </div>
                                   </div>
                                 )}
                               </div>
                             </>
                           ) : (
-                            <div className="flex-1 flex flex-col items-center justify-center p-12 text-center bg-white">
-                              <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-200 mb-4 rotate-6">
-                                <BarChart3 size={32} />
+                            <div className="flex-1 flex flex-col items-center justify-center p-20 text-center">
+                              <div className="w-20 h-20 bg-blue-50 rounded-3xl flex items-center justify-center text-blue-300 mb-6 rotate-12">
+                                <BarChart3 size={40} />
                               </div>
-                              <h3 className="text-sm font-black text-gray-800 uppercase tracking-tight">Selecciona Indicador</h3>
+                              <h3 className="text-xl font-black text-gray-800 uppercase tracking-tight mb-2">
+                                Selecciona un indicador
+                              </h3>
+                              <p className="text-gray-400 max-w-sm text-sm">
+                                Usa el panel superior para navegar por los
+                                indicadores del foro.
+                              </p>
                             </div>
                           )}
                         </div>
@@ -1470,36 +1526,41 @@ export default function ForumSession() {
                   };
 
                   return (
-                    <div className="w-full h-full overflow-hidden flex flex-col gap-2 min-h-0">
-                      <div className="flex items-center justify-between px-2 shrink-0 mb-1">
-                        <div className="flex items-center gap-2">
-                          <LayoutDashboard size={18} className="text-blue-600" />
-                          <h3 className="text-xs font-black text-gray-800 uppercase tracking-tighter">
-                            Plan de Acción
+                    <div className="w-full h-full overflow-hidden flex flex-col gap-6">
+                      <div className="flex items-center justify-between px-2">
+                        <div className="flex items-center gap-3">
+                          <LayoutDashboard
+                            size={20}
+                            className="text-blue-600"
+                          />
+                          <h3 className="text-lg font-black text-gray-800 uppercase tracking-tighter">
+                            Plan de Acción: {forum.name}
                           </h3>
                         </div>
-                        <button
-                          onClick={() => {
-                            setEditingAction({
-                              assignedTo: [],
-                              assignedToNames: [],
-                              status: "pendiente",
-                              priority: "media",
-                              targetDate: format(new Date(), "yyyy-MM-dd"),
-                              originForumId: forum.id,
-                              originForumName: forum.name,
-                            });
-                            setTempSubActions([]);
-                            setType("accion");
-                            setIsEscalated(false);
-                          }}
-                          className="flex items-center gap-1.5 bg-blue-600 text-white px-4 py-2 rounded-xl hover:bg-blue-700 transition duration-200 text-[10px] font-black uppercase shadow-md"
-                        >
-                          <Plus size={14} />
-                          <span>Nueva Acción</span>
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => {
+                              setEditingAction({
+                                assignedTo: [],
+                                assignedToNames: [],
+                                status: "pendiente",
+                                priority: "media",
+                                targetDate: format(new Date(), "yyyy-MM-dd"),
+                                originForumId: forum.id,
+                                originForumName: forum.name,
+                              });
+                              setTempSubActions([]);
+                              setType("accion");
+                              setIsEscalated(false);
+                            }}
+                            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl hover:bg-blue-700 transition duration-200 text-xs font-bold"
+                          >
+                            <Plus size={16} />
+                            <span>Nueva Acción</span>
+                          </button>
+                        </div>
                       </div>
-                      <div className="flex gap-4 overflow-x-auto pb-2 custom-scrollbar snap-x snap-mandatory flex-1 min-h-0">
+                      <div className="flex gap-4 overflow-x-auto pb-4 custom-scrollbar snap-x snap-mandatory h-[700px]">
                         {columns.map((col) => {
                           const colActions = actions.filter(
                             (a) =>
@@ -1510,12 +1571,17 @@ export default function ForumSession() {
                           return (
                             <div
                               key={col.value}
-                              className="flex-none w-64 bg-white rounded-2xl border border-gray-100 flex flex-col snap-start overflow-hidden shadow-sm"
+                              className="flex-none w-[300px] bg-white rounded-3xl border border-gray-100 flex flex-col snap-start overflow-hidden"
                             >
-                              <div className="px-4 py-2.5 border-b border-gray-50 flex items-center justify-between bg-white sticky top-0 z-10 shrink-0">
+                              <div className="p-5 border-b border-gray-50 flex items-center justify-between bg-white sticky top-0 z-10">
                                 <div className="flex items-center gap-2">
-                                  <div className={clsx("w-2 h-2 rounded-full", col.color)} />
-                                  <h4 className="font-black text-gray-800 uppercase tracking-tight text-[11px]">
+                                  <div
+                                    className={clsx(
+                                      "w-3 h-3 rounded-full",
+                                      col.color,
+                                    )}
+                                  />
+                                  <h4 className="font-black text-gray-800 uppercase tracking-tighter text-sm">
                                     {col.label}
                                   </h4>
                                 </div>
@@ -1523,47 +1589,124 @@ export default function ForumSession() {
                                   {colActions.length}
                                 </span>
                               </div>
-                              <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-gray-50/10 custom-scrollbar">
+                              <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50/30">
                                 {colActions.map((action) => {
-                                  const actionSubActions = subActions.filter((s) => s.actionId === action.id);
-                                  const completedSubActions = actionSubActions.filter((s) => s.completed).length;
-                                  
+                                  const actionSubActions = subActions.filter(
+                                    (s) => s.actionId === action.id,
+                                  );
+                                  const completedSubActions =
+                                    actionSubActions.filter(
+                                      (s) => s.completed,
+                                    ).length;
+                                  const progress =
+                                    actionSubActions.length > 0
+                                      ? Math.round(
+                                          (completedSubActions /
+                                            actionSubActions.length) *
+                                            100,
+                                        )
+                                      : null;
+
                                   return (
                                     <div
                                       key={action.id}
                                       onClick={() => {
                                         setEditingAction({ ...action });
-                                        setTempSubActions(subActions.filter((s) => s.actionId === action.id));
+                                        setTempSubActions(
+                                          subActions.filter(
+                                            (s) => s.actionId === action.id,
+                                          ),
+                                        );
                                         setType(action.type || "accion");
-                                        setIsEscalated(action.isEscalated || false);
-                                        setEscalatedToForumId(action.escalatedToForumId || "");
+                                        setIsEscalated(
+                                          action.isEscalated || false,
+                                        );
+                                        setEscalatedToForumId(
+                                          action.escalatedToForumId || "",
+                                        );
                                       }}
-                                      className="bg-white p-4 rounded-xl border border-gray-50 hover:border-blue-200 transition-all cursor-pointer group shadow-sm bg-white"
+                                      className="bg-white p-4 rounded-2xl border border-gray-100 hover:border-blue-200 transition-all cursor-pointer group"
                                     >
                                       <div className="flex flex-col gap-2">
                                         <div className="flex justify-between items-start gap-2">
-                                          <h5 className="font-bold text-gray-800 text-[13px] leading-tight group-hover:text-blue-600 transition-colors line-clamp-2">
+                                          <h5 className="font-bold text-gray-800 text-xs leading-tight group-hover:text-blue-600 transition-colors line-clamp-2">
                                             {action.title}
                                           </h5>
-                                          {action.priority === "critica" && <div className="w-2 h-2 rounded-full bg-red-600 animate-pulse shrink-0" />}
+                                          {action.priority === "critica" && (
+                                            <div
+                                              className="w-2 h-2 rounded-full bg-red-600 animate-pulse shrink-0"
+                                              title="Prioridad Crítica"
+                                            />
+                                          )}
                                         </div>
-                                        <div className="flex items-center justify-between mt-1 pt-2 border-t border-gray-50">
-                                          <div className="flex -space-x-1.5">
-                                            {action.assignedToNames?.slice(0, 3).map((name, i) => (
-                                              <div key={i} className="w-6 h-6 rounded-full bg-blue-50 border border-white flex items-center justify-center text-[8px] font-black text-blue-600 uppercase shadow-inner" title={name}>
-                                                {name.charAt(0)}
-                                              </div>
-                                            ))}
+
+                                        {progress !== null && (
+                                          <div className="mt-1">
+                                            <div className="flex justify-between items-center mb-1">
+                                              <span className="text-[8px] font-bold text-gray-400">
+                                                Progreso
+                                              </span>
+                                              <span className="text-[8px] font-bold text-blue-600">
+                                                {progress}%
+                                              </span>
+                                            </div>
+                                            <div className="w-full h-1 bg-gray-100 rounded-full overflow-hidden">
+                                              <div
+                                                className="h-full bg-blue-500 transition-all duration-500"
+                                                style={{
+                                                  width: `${progress}%`,
+                                                }}
+                                              />
+                                            </div>
                                           </div>
-                                          <div className="flex items-center gap-1 text-[7px] font-bold text-gray-400">
-                                            <Calendar size={7} />
-                                            {action.targetDate.split("-").reverse().slice(0, 2).join("/")}
+                                        )}
+
+                                        <div className="flex items-center justify-between gap-2 mt-1">
+                                          <div className="flex -space-x-2">
+                                            {action.assignedToNames
+                                              ?.slice(0, 2)
+                                              .map((name, i) => (
+                                                <div
+                                                  key={i}
+                                                  className="w-6 h-6 rounded-full bg-blue-100 border-2 border-white flex items-center justify-center text-[8px] font-black text-blue-600"
+                                                  title={name}
+                                                >
+                                                  {name.charAt(0)}
+                                                </div>
+                                              ))}
+                                            {(action.assignedToNames?.length ||
+                                              0) > 2 && (
+                                              <div className="w-6 h-6 rounded-full bg-gray-100 border-2 border-white flex items-center justify-center text-[8px] font-black text-gray-500">
+                                                +
+                                                {(action.assignedToNames
+                                                  ?.length || 0) - 2}
+                                              </div>
+                                            )}
+                                          </div>
+                                          <div className="flex items-center gap-1 text-[10px] font-bold text-gray-400">
+                                            <Calendar size={10} />
+                                            {format(
+                                              new Date(action.targetDate),
+                                              "dd MMM",
+                                              { locale: es },
+                                            )}
                                           </div>
                                         </div>
                                       </div>
                                     </div>
                                   );
                                 })}
+                                {colActions.length === 0 && (
+                                  <div className="flex flex-col items-center justify-center py-10 opacity-20">
+                                    <CheckCircle2
+                                      size={32}
+                                      className="text-gray-400"
+                                    />
+                                    <p className="text-[10px] font-bold uppercase tracking-widest mt-2">
+                                      Al día
+                                    </p>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           );
@@ -1575,23 +1718,27 @@ export default function ForumSession() {
 
                 // Default view for other sections
                 return (
-                  <div className="max-w-xl mx-auto w-full bg-white rounded-2xl border border-gray-100 overflow-hidden p-6 text-center flex-1 flex flex-col justify-center shadow-sm">
-                    <div className="space-y-3">
-                      <div className="inline-block px-2 py-0.5 bg-blue-50 text-blue-600 rounded-md text-[8px] font-black uppercase tracking-widest mb-1 shadow-sm">
+                  <div className="max-w-4xl mx-auto w-full bg-white rounded-[40px] border border-gray-100 overflow-hidden p-12 md:p-20 text-center">
+                    <div className="space-y-8">
+                      <div className="inline-block px-4 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-[10px] font-black uppercase tracking-widest mb-2">
                         Punto {effectiveSectionIndex} de {steps.length - 1}
                       </div>
 
-                      <h3 className="text-xl font-black text-gray-800 uppercase tracking-tighter leading-tight">
+                      <h3 className="text-5xl font-black text-gray-800 uppercase tracking-tighter leading-tight">
                         {steps[effectiveSectionIndex]}
                       </h3>
 
-                      <div className="pt-4">
-                        <div className="p-6 border-2 border-dashed border-gray-50 rounded-2xl flex flex-col items-center gap-3">
-                          <div className="w-12 h-12 rounded-full bg-gray-50 flex items-center justify-center text-gray-200">
-                            <MessageSquare size={24} />
+                      <div className="pt-12">
+                        <div className="p-16 border-2 border-dashed border-gray-50 rounded-[48px] flex flex-col items-center gap-6">
+                          <div className="w-24 h-24 rounded-full bg-gray-50 flex items-center justify-center text-gray-200">
+                            <MessageSquare size={48} />
                           </div>
-                          <p className="text-gray-400 italic text-xs font-medium max-w-[200px]">
-                            Sección en desarrollo.
+                          <p className="text-gray-400 italic text-xl font-medium max-w-md">
+                            Este espacio se completará con las herramientas
+                            específicas para: <br />
+                            <strong className="text-gray-600 not-italic uppercase tracking-tight">
+                              {steps[effectiveSectionIndex]}
+                            </strong>
                           </p>
                         </div>
                       </div>

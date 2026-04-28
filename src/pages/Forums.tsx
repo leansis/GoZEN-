@@ -589,53 +589,53 @@ export default function Forums() {
   ];
 
   return (
-    <div className="space-y-4 h-[calc(100vh-140px)] flex flex-col overflow-hidden">
-      <div className="flex justify-between items-center shrink-0">
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-xl font-bold text-gray-800">Foros</h1>
-          <p className="text-[10px] text-gray-500 uppercase font-black tracking-widest">Gestión de equipo y reuniones</p>
+          <h1 className="text-2xl font-bold text-gray-800">Foros</h1>
+          <p className="text-sm text-gray-500">Gestión de foros de equipo y seguimiento de reuniones</p>
         </div>
-        <div className="flex gap-2">
-          <div className="flex bg-white border border-gray-200 rounded-xl p-0.5">
+        <div className="flex gap-3">
+          <div className="flex bg-white border border-gray-200 rounded-xl p-1">
             <button
               onClick={() => setViewMode('sessions')}
               className={clsx(
-                "flex items-center gap-1.5 px-2 py-1 rounded-lg transition-all font-bold text-[10px] uppercase",
+                "flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all font-medium text-xs",
                 viewMode === 'sessions' ? "bg-blue-50 text-blue-600" : "text-gray-500 hover:bg-gray-50",
               )}
             >
-              <MessagesSquare size={14} />
+              <MessagesSquare size={16} />
               Hoy
             </button>
             <button
               onClick={() => setViewMode('history')}
               className={clsx(
-                "flex items-center gap-1.5 px-2 py-1 rounded-lg transition-all font-bold text-[10px] uppercase",
+                "flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all font-medium text-xs",
                 viewMode === 'history' ? "bg-blue-50 text-blue-600" : "text-gray-500 hover:bg-gray-50",
               )}
             >
-              <History size={14} />
+              <History size={16} />
               Historial
             </button>
             <button
               onClick={() => setViewMode('calendar')}
               className={clsx(
-                "flex items-center gap-1.5 px-2 py-1 rounded-lg transition-all font-bold text-[10px] uppercase",
+                "flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all font-medium text-xs",
                 viewMode === 'calendar' ? "bg-blue-50 text-blue-600" : "text-gray-500 hover:bg-gray-50",
               )}
             >
-              <CalendarRange size={14} />
+              <CalendarRange size={16} />
               Calendario
             </button>
             <button
               onClick={() => setViewMode('list')}
               className={clsx(
-                "flex items-center gap-1.5 px-2 py-1 rounded-lg transition-all font-bold text-[10px] uppercase",
+                "flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all font-medium text-xs",
                 viewMode === 'list' ? "bg-blue-50 text-blue-600" : "text-gray-500 hover:bg-gray-50",
               )}
             >
-              <Settings size={14} />
-              Config
+              <Settings size={16} />
+              Definiciones
             </button>
           </div>
           {(isAdmin || isSupervisor) && (
@@ -651,27 +651,26 @@ export default function Forums() {
                 setShowRecurrence(false);
                 setIsForumModalOpen(true);
               }}
-              className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all font-bold text-xs"
+              className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all font-bold text-sm"
             >
-              <Plus size={16} />
+              <Plus size={18} />
               Nuevo Foro
             </button>
           )}
         </div>
       </div>
 
-      <div className="relative shrink-0">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+      <div className="relative">
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
         <input
           type="text"
           placeholder="Buscar foro o sesión..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full pl-11 pr-4 py-2 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm"
+          className="w-full pl-12 pr-4 py-3 bg-white border border-gray-200 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none transition-all"
         />
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto pr-2 custom-scrollbar">
       {viewMode === 'calendar' ? (
         <ForumCalendar 
           sessions={filteredSessions} 
@@ -725,8 +724,8 @@ export default function Forums() {
           />
         </div>
       ) : (
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredSessions.map(session => (
             <div 
               key={session.id}
@@ -771,22 +770,22 @@ export default function Forums() {
                   navigate(`/forums/${session.id}`);
                 }
               }}
-              className="group bg-white p-4 rounded-xl border border-gray-100 transition-all cursor-pointer relative overflow-hidden hover:border-blue-200"
+              className="group bg-white p-6 rounded-2xl border border-gray-100 transition-all cursor-pointer relative overflow-hidden"
             >
               <div className={clsx(
-                "absolute top-0 right-0 w-1 h-full",
+                "absolute top-0 right-0 w-1.5 h-full",
                 session.status === 'scheduled' ? "bg-blue-400" :
                 session.status === 'in_progress' ? "bg-orange-400 animate-pulse" :
                 session.status === 'completed' ? "bg-green-400" : "bg-gray-400"
               )} />
               
               <div className="flex flex-col h-full">
-                <div className="flex justify-between items-start mb-2">
-                  <div className="p-1.5 bg-gray-50 rounded-lg text-gray-400 group-hover:text-blue-600 group-hover:bg-blue-50 transition-colors">
-                    <MessagesSquare size={18} />
+                <div className="flex justify-between items-start mb-4">
+                  <div className="p-2 bg-gray-50 rounded-lg text-gray-400 group-hover:text-blue-600 group-hover:bg-blue-50 transition-colors">
+                    <MessagesSquare size={24} />
                   </div>
                   <span className={clsx(
-                    "text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider",
+                    "text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider",
                     session.status === 'scheduled' ? "bg-blue-50 text-blue-600" :
                     session.status === 'in_progress' ? "bg-orange-50 text-orange-600" :
                     session.status === 'completed' ? "bg-green-50 text-green-600" : "bg-gray-100 text-gray-500"
@@ -797,30 +796,30 @@ export default function Forums() {
                   </span>
                 </div>
 
-                <h3 className="font-bold text-gray-800 text-sm mb-1 group-hover:text-blue-600 transition-colors line-clamp-2">
+                <h3 className="font-bold text-gray-800 mb-1 group-hover:text-blue-600 transition-colors">
                   {session.forumName}
                 </h3>
                 
-                <div className="space-y-1 mt-auto">
-                  <div className="flex items-center gap-1.5 text-[10px] text-gray-500">
-                    <Calendar size={12} />
-                    {format(new Date(session.scheduledAt), "eee d MMM, HH:mm", { locale: es })}
+                <div className="space-y-2 mt-auto">
+                  <div className="flex items-center gap-2 text-xs text-gray-500">
+                    <Calendar size={14} />
+                    {format(new Date(session.scheduledAt), "eeee d 'de' MMMM, HH:mm", { locale: es })}
                   </div>
-                  <div className="flex items-center gap-1.5 text-[10px] text-gray-500">
-                    <Users size={12} />
+                  <div className="flex items-center gap-2 text-xs text-gray-500">
+                    <Users size={14} />
                     {session.attendees.length} invitados
                   </div>
                 </div>
 
-                <div className="mt-3 pt-3 border-t border-gray-50 flex justify-between items-center">
-                  <div className="flex -space-x-1.5">
+                <div className="mt-4 pt-4 border-t border-gray-50 flex justify-between items-center">
+                  <div className="flex -space-x-2">
                     {session.attendees.slice(0, 3).map((a, i) => (
-                      <div key={i} className="w-5 h-5 rounded-full bg-blue-100 border border-white flex items-center justify-center text-[8px] font-bold text-blue-600 uppercase">
+                      <div key={i} className="w-6 h-6 rounded-full bg-blue-100 border-2 border-white flex items-center justify-center text-[10px] font-bold text-blue-600 uppercase">
                         {a.name.charAt(0)}
                       </div>
                     ))}
                     {session.attendees.length > 3 && (
-                      <div className="w-5 h-5 rounded-full bg-gray-100 border border-white flex items-center justify-center text-[8px] font-bold text-gray-600">
+                      <div className="w-6 h-6 rounded-full bg-gray-100 border-2 border-white flex items-center justify-center text-[10px] font-bold text-gray-600">
                         +{session.attendees.length - 3}
                       </div>
                     )}
@@ -832,20 +831,19 @@ export default function Forums() {
         </div>
 
           {filteredSessions.length === 0 && (
-            <div className="py-12 text-center bg-white rounded-2xl border border-gray-100">
-              <div className="inline-flex p-3 bg-gray-50 rounded-xl text-gray-300 mb-3">
-                <MessagesSquare size={32} />
+            <div className="col-span-full py-20 text-center bg-white rounded-3xl border border-gray-100">
+              <div className="inline-flex p-4 bg-gray-50 rounded-2xl text-gray-300 mb-4">
+                <MessagesSquare size={48} />
               </div>
-              <p className="text-gray-400 font-bold text-xs uppercase tracking-widest whitespace-pre-wrap">
+              <p className="text-gray-400 font-medium whitespace-pre-wrap">
                 {viewMode === 'sessions' 
-                  ? "Sin reuniones para hoy" 
-                  : "Historial vacío"}
+                  ? "No tienes reuniones programadas para hoy.\n¡Un día tranquilo!" 
+                  : "No hay sesiones de foro en el historial."}
               </p>
             </div>
           )}
         </div>
       )}
-      </div>
 
       {/* Forum Definition Modal */}
       <Modal
