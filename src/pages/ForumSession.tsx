@@ -867,22 +867,22 @@ export default function ForumSession() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-3 pb-4 animate-in fade-in duration-500">
+    <div className="max-w-7xl mx-auto h-screen flex flex-col overflow-hidden bg-gray-50/20 px-2 sm:px-4">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-1 shrink-0 pt-2 pb-1">
         <div>
           <button
             onClick={() => navigate("/forums")}
-            className="flex items-center gap-1 text-gray-400 hover:text-blue-600 transition-colors text-[9px] font-black uppercase tracking-widest"
+            className="flex items-center gap-1 text-gray-400 hover:text-blue-600 transition-colors text-[8px] font-black uppercase tracking-widest"
           >
-            <ChevronLeft size={12} />
+            <ChevronLeft size={10} />
             Volver
           </button>
-          <div className="flex items-center gap-2 mt-0.5">
-            <div className="w-6 h-6 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center">
-              <MessageSquare size={16} />
+          <div className="flex items-center gap-1.5 mt-0">
+            <div className="w-5 h-5 bg-blue-50 text-blue-600 rounded-md flex items-center justify-center">
+              <MessageSquare size={12} />
             </div>
-            <h1 className="text-lg font-black text-gray-800 uppercase tracking-tight">
+            <h1 className="text-base font-black text-gray-800 uppercase tracking-tight">
               {forum.name}
             </h1>
           </div>
@@ -892,7 +892,7 @@ export default function ForumSession() {
           {session.status === "in_progress" && (
             <div
               className={clsx(
-                "flex items-center gap-3 px-4 py-1.5 rounded-xl border transition-all duration-300",
+                "flex items-center gap-2 px-3 py-1 rounded-lg border transition-all duration-300",
                 isExceeded
                   ? "bg-red-50 border-red-200 text-red-600"
                   : isNearEnd
@@ -902,14 +902,14 @@ export default function ForumSession() {
             >
               <Timer
                 className={clsx(isExceeded ? "animate-spin-slow" : "")}
-                size={20}
+                size={14}
               />
-              <div className="flex flex-col">
-                <span className="text-xl font-mono font-black tracking-tighter leading-none">
+              <div className="flex items-center gap-2">
+                <span className="text-lg font-mono font-black tracking-tighter leading-none">
                   {formatTimer(elapsedSeconds)}
                 </span>
-                <span className="text-[8px] font-bold uppercase tracking-widest opacity-60">
-                  Meta: {forum.estimatedDuration} min
+                <span className="text-[7px] font-bold uppercase tracking-widest opacity-60">
+                  Meta: {forum.estimatedDuration}m
                 </span>
               </div>
             </div>
@@ -920,35 +920,35 @@ export default function ForumSession() {
               <button
                 onClick={handleStartSession}
                 className={clsx(
-                  "flex items-center gap-2 px-6 py-2.5 text-white rounded-xl font-black text-sm transition-all",
+                  "flex items-center gap-2 px-4 py-1.5 text-white rounded-lg font-black text-xs transition-all",
                   isFuture
                     ? "bg-blue-600 hover:bg-blue-700"
                     : "bg-green-600 hover:bg-green-700",
                 )}
               >
-                <Play size={18} fill="currentColor" />
+                <Play size={14} fill="currentColor" />
                 {isFuture ? "PREPARAR" : "INICIAR"}
               </button>
             )}
 
             {(session.status === "in_progress" || isPreparationMode) && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 {effectiveSectionIndex > 0 && (
                   <button
                     onClick={() => handleStepChange(effectiveSectionIndex - 1)}
-                    className="p-2 bg-gray-50 text-gray-400 rounded-xl hover:bg-gray-100 transition-colors"
+                    className="p-1 px-2 bg-gray-50 text-gray-400 rounded-lg hover:bg-gray-100 transition-colors"
                   >
-                    <ChevronLeft size={20} />
+                    <ChevronLeft size={14} />
                   </button>
                 )}
 
                 {effectiveSectionIndex < steps.length - 1 ? (
                   <button
                     onClick={() => handleStepChange(effectiveSectionIndex + 1)}
-                    className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-xl font-black text-sm hover:bg-blue-700 transition-all shadow-sm"
+                    className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-600 text-white rounded-lg font-black text-xs hover:bg-blue-700 transition-all shadow-sm"
                   >
                     SIGUIENTE
-                    <ChevronRight size={18} />
+                    <ChevronRight size={14} />
                   </button>
                 ) : (
                   !isPreparationMode && (
@@ -956,16 +956,16 @@ export default function ForumSession() {
                       onClick={handleFinishSession}
                       disabled={isSaving}
                       className={clsx(
-                        "flex items-center gap-2 px-6 py-2.5 bg-red-600 text-white rounded-xl font-black text-sm hover:bg-red-700 transition-all shadow-sm",
+                        "flex items-center gap-1.5 px-4 py-1.5 bg-red-600 text-white rounded-lg font-black text-xs hover:bg-red-700 transition-all shadow-sm",
                         isSaving && "opacity-50 cursor-not-allowed",
                       )}
                     >
                       {isSaving ? (
-                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                       ) : (
-                        <CheckCircle2 size={18} />
+                        <CheckCircle2 size={14} />
                       )}
-                      {isSaving ? "GUARDANDO" : "FINALIZAR"}
+                      {isSaving ? "OK" : "FINALIZAR"}
                     </button>
                   )
                 )}
@@ -976,16 +976,18 @@ export default function ForumSession() {
       </div>
 
       {/* Progress Diagram */}
-      <ChevronDiagram
-        steps={steps}
-        currentStep={effectiveSectionIndex}
-        onStepClick={handleStepChange}
-        status={session.status}
-        isPreparationMode={isPreparationMode}
-      />
+      <div className="px-2 shrink-0">
+        <ChevronDiagram
+          steps={steps}
+          currentStep={effectiveSectionIndex}
+          onStepClick={handleStepChange}
+          status={session.status}
+          isPreparationMode={isPreparationMode}
+        />
+      </div>
 
       {effectiveSectionIndex === 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 h-[calc(100vh-140px)] min-h-0">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 flex-1 min-h-0 px-2 pb-2">
           {/* Column 1: Asistentes */}
           <DndContext
             sensors={sensors}
@@ -994,23 +996,23 @@ export default function ForumSession() {
           >
             <div
               id="attendee-container"
-              className="bg-white rounded-3xl border border-gray-100 overflow-hidden flex flex-col h-full"
+              className="bg-white rounded-2xl border border-gray-100 overflow-hidden flex flex-col h-full shadow-sm"
             >
-              <div className="p-4 border-b border-gray-50 flex items-center justify-between bg-white sticky top-0 z-10">
-                <div className="flex items-center gap-2">
-                  <UserCheck className="text-green-500" size={18} />
-                  <h3 className="font-black text-gray-800 uppercase tracking-tight text-sm">
+              <div className="p-2.5 border-b border-gray-50 flex items-center justify-between bg-white sticky top-0 z-10">
+                <div className="flex items-center gap-1.5">
+                  <UserCheck className="text-green-500" size={14} />
+                  <h3 className="font-black text-gray-800 uppercase tracking-tight text-[11px]">
                     Asistentes
                   </h3>
-                  <span className="bg-green-100 text-green-600 px-1.5 py-0.5 rounded-full text-[9px] font-black">
+                  <span className="bg-green-100 text-green-600 px-1 py-0.5 rounded-full text-[8px] font-black">
                     {attendeesList.length}
                   </span>
                 </div>
                 <button
                   onClick={() => setShowAddMember(true)}
-                  className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center hover:bg-blue-600 hover:text-white transition-all"
+                  className="w-5 h-5 rounded-md bg-blue-50 text-blue-600 flex items-center justify-center hover:bg-blue-600 hover:text-white transition-all shadow-sm"
                 >
-                  <Plus size={16} />
+                  <Plus size={12} />
                 </button>
               </div>
 
@@ -1039,15 +1041,15 @@ export default function ForumSession() {
             {/* Column 2: Ausentes */}
             <div
               id="absent-container"
-              className="bg-white rounded-3xl border border-gray-100 overflow-hidden flex flex-col h-full"
+              className="bg-white rounded-2xl border border-gray-100 overflow-hidden flex flex-col h-full shadow-sm"
             >
-              <div className="p-4 border-b border-gray-50 bg-white sticky top-0 z-10">
-                <div className="flex items-center gap-2">
-                  <UserX className="text-red-400" size={18} />
-                  <h3 className="font-black text-gray-800 uppercase tracking-tight text-sm">
+              <div className="p-2.5 border-b border-gray-50 bg-white sticky top-0 z-10">
+                <div className="flex items-center gap-1.5">
+                  <UserX className="text-red-400" size={14} />
+                  <h3 className="font-black text-gray-800 uppercase tracking-tight text-[11px]">
                     Ausentes
                   </h3>
-                  <span className="bg-red-50 text-red-500 px-1.5 py-0.5 rounded-full text-[9px] font-black">
+                  <span className="bg-red-50 text-red-500 px-1 py-0.5 rounded-full text-[8px] font-black">
                     {absenteesList.length}
                   </span>
                 </div>
@@ -1077,16 +1079,16 @@ export default function ForumSession() {
           </DndContext>
 
           {/* Column 3: Secciones */}
-          <div className="bg-white rounded-3xl border border-gray-100 overflow-hidden flex flex-col h-full">
-            <div className="p-4 border-b border-gray-50 bg-white sticky top-0 z-10">
-              <div className="flex items-center gap-2">
-                <Clock className="text-blue-500" size={18} />
-                <h3 className="font-black text-gray-800 uppercase tracking-tight text-sm">
+          <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden flex flex-col h-full shadow-sm">
+            <div className="p-2 border-b border-gray-50 bg-white sticky top-0 z-10">
+              <div className="flex items-center gap-1.5">
+                <Clock className="text-blue-500" size={12} />
+                <h3 className="font-black text-gray-800 uppercase tracking-tight text-[10px]">
                   Secciones
                 </h3>
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto p-2 space-y-1">
+            <div className="flex-1 overflow-y-auto p-1.5 space-y-1">
                   {steps.map((step, idx) => {
                     const isCurrent = idx === effectiveSectionIndex;
                     const isCompleted = idx < effectiveSectionIndex;
@@ -1127,14 +1129,14 @@ export default function ForumSession() {
           </div>
         </div>
       ) : (
-        <div className="w-full flex-1 min-h-0">
+        <div className="w-full flex-1 min-h-0 px-2 pb-2">
           <AnimatePresence mode="wait">
             <motion.div
               key={effectiveSectionIndex}
               initial={{ opacity: 0, scale: 0.98 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 1.02 }}
-              className="w-full"
+              className="w-full h-full"
             >
               {/* Step Content */}
               {(() => {
@@ -1153,17 +1155,17 @@ export default function ForumSession() {
                     (i) => i.id === selectedIndicatorId,
                   );
                   return (
-                    <div className="flex flex-col gap-2 h-[calc(100vh-140px)] min-h-0 overflow-hidden">
+                    <div className="flex flex-col gap-1.5 h-full min-h-0 overflow-hidden">
                       {/* Top Indicators Panel */}
-                      <div className="bg-white rounded-xl border border-gray-100 p-1.5 shrink-0">
-                        <div className="flex items-center justify-between mb-1 border-b border-gray-50 pb-0.5">
-                          <div className="flex items-center gap-1.5">
-                            <BarChart3 className="text-blue-600" size={12} />
-                            <h4 className="font-black text-gray-800 uppercase tracking-widest text-[9px]">
+                      <div className="bg-white rounded-xl border border-gray-100 p-1 shrink-0 shadow-sm">
+                        <div className="flex items-center justify-between mb-0.5 border-b border-gray-50 pb-0.5 px-1">
+                          <div className="flex items-center gap-1">
+                            <BarChart3 className="text-blue-600" size={10} />
+                            <h4 className="font-black text-gray-800 uppercase tracking-widest text-[8px]">
                               Indicadores
                             </h4>
                           </div>
-                          <div className="flex bg-gray-50 p-0.5 rounded-lg border border-gray-100 gap-0.5 scale-90 origin-right">
+                          <div className="flex bg-gray-50 p-0.5 rounded-md border border-gray-100 gap-0.5 scale-75 origin-right">
                             <button
                               onClick={() => setSelectedTypology(null)}
                               className={clsx(
@@ -1217,7 +1219,7 @@ export default function ForumSession() {
                                   setViewedIndicatorIds(prev => new Set(prev).add(indicator.id));
                                 }}
                                 className={clsx(
-                                  "flex-none w-28 px-1.5 py-1 rounded-lg border transition-all text-left relative overflow-hidden",
+                                  "flex-none w-24 px-1.5 py-0.5 rounded-lg border transition-all text-left relative overflow-hidden",
                                   isActive
                                     ? "bg-blue-600 border-blue-600 text-white shadow-sm"
                                     : isViewed
@@ -1226,15 +1228,15 @@ export default function ForumSession() {
                                 )}
                               >
                                 <div className="flex items-center gap-0.5 mb-0.5">
-                                  {indicator.typology === 'calidad' && <Award size={6} className={isActive ? "text-white" : "text-amber-500"} />}
-                                  {indicator.typology === 'coste' && <Coins size={6} className={isActive ? "text-white" : "text-emerald-500"} />}
-                                  {indicator.typology === 'plazo' && <Clock size={6} className={isActive ? "text-white" : "text-blue-500"} />}
-                                  {indicator.typology === 'personas' && <Users size={6} className={isActive ? "text-white" : "text-purple-500"} />}
-                                  <div className="text-[5px] font-black uppercase tracking-widest opacity-60">
+                                  {indicator.typology === 'calidad' && <Award size={5} className={isActive ? "text-white" : "text-amber-500"} />}
+                                  {indicator.typology === 'coste' && <Coins size={5} className={isActive ? "text-white" : "text-emerald-500"} />}
+                                  {indicator.typology === 'plazo' && <Clock size={5} className={isActive ? "text-white" : "text-blue-500"} />}
+                                  {indicator.typology === 'personas' && <Users size={5} className={isActive ? "text-white" : "text-purple-500"} />}
+                                  <div className="text-[4px] font-black uppercase tracking-widest opacity-60">
                                     {indicator.typology || 'Ind'}
                                   </div>
                                 </div>
-                                <div className="font-bold text-[8px] truncate leading-tight">
+                                <div className="font-bold text-[7px] truncate leading-tight">
                                   {indicator.name}
                                 </div>
                               </button>
@@ -1310,16 +1312,16 @@ export default function ForumSession() {
                         </div>
 
                         {/* Central Content Panel */}
-                        <div className="flex-1 bg-white rounded-2xl border border-gray-100 overflow-hidden flex flex-col min-w-0">
+                        <div className="flex-1 bg-white rounded-xl border border-gray-100 overflow-hidden flex flex-col min-w-0 shadow-sm">
                           {selectedIndicator ? (
                             <>
-                              <div className="px-3 py-2 border-b border-gray-50 flex justify-between items-center bg-white shrink-0 shadow-sm z-10">
+                              <div className="px-2 py-1 border-b border-gray-50 flex justify-between items-center bg-white shrink-0 shadow-sm z-10">
                                 <div>
-                                  <h3 className="font-black text-gray-800 uppercase tracking-tighter text-xs">
+                                  <h3 className="font-black text-gray-800 uppercase tracking-tighter text-[10px]">
                                     {selectedIndicator.name}
                                   </h3>
                                   {selectedIndicator.formula && (
-                                    <p className="text-[8px] text-gray-400 font-medium">
+                                    <p className="text-[7px] text-gray-400 font-medium">
                                       {selectedIndicator.formula}
                                     </p>
                                   )}
@@ -1329,10 +1331,10 @@ export default function ForumSession() {
                                     href={selectedIndicator.link}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="px-2 py-1 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-all text-[8px] font-black border border-blue-100 flex items-center gap-1 shadow-sm"
+                                    className="px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-600 hover:text-white transition-all text-[7px] font-black border border-blue-100 flex items-center gap-1 shadow-sm"
                                   >
-                                    CUADRO MANDO
-                                    <LayoutDashboard size={10} />
+                                    C. MANDO
+                                    <LayoutDashboard size={8} />
                                   </a>
                                 )}
                               </div>
@@ -1455,11 +1457,11 @@ export default function ForumSession() {
                   };
 
                   return (
-                    <div className="w-full h-[calc(100vh-140px)] overflow-hidden flex flex-col gap-2 min-h-0">
+                    <div className="w-full h-full overflow-hidden flex flex-col gap-1.5 min-h-0">
                       <div className="flex items-center justify-between px-1 shrink-0">
-                        <div className="flex items-center gap-2">
-                          <LayoutDashboard size={14} className="text-blue-600" />
-                          <h3 className="text-xs font-black text-gray-800 uppercase tracking-tighter">
+                        <div className="flex items-center gap-1.5">
+                          <LayoutDashboard size={12} className="text-blue-600" />
+                          <h3 className="text-[10px] font-black text-gray-800 uppercase tracking-tighter">
                             Plan de Acción
                           </h3>
                         </div>
@@ -1478,9 +1480,9 @@ export default function ForumSession() {
                             setType("accion");
                             setIsEscalated(false);
                           }}
-                          className="flex items-center gap-1.5 bg-blue-600 text-white px-2 py-1 rounded-lg hover:bg-blue-700 transition duration-200 text-[9px] font-black uppercase shadow-sm"
+                          className="flex items-center gap-1 bg-blue-600 text-white px-2 py-0.5 rounded-md hover:bg-blue-700 transition duration-200 text-[8px] font-black uppercase shadow-sm"
                         >
-                          <Plus size={10} />
+                          <Plus size={8} />
                           <span>Nueva Acción</span>
                         </button>
                       </div>
@@ -1495,25 +1497,24 @@ export default function ForumSession() {
                           return (
                             <div
                               key={col.value}
-                              className="flex-none w-[180px] bg-white rounded-xl border border-gray-100 flex flex-col snap-start overflow-hidden shadow-sm"
+                              className="flex-none w-[170px] bg-white rounded-xl border border-gray-100 flex flex-col snap-start overflow-hidden shadow-sm"
                             >
                               <div className="px-2 py-1 border-b border-gray-50 flex items-center justify-between bg-white sticky top-0 z-10 shrink-0">
                                 <div className="flex items-center gap-1">
                                   <div className={clsx("w-1.5 h-1.5 rounded-full", col.color)} />
-                                  <h4 className="font-black text-gray-800 uppercase tracking-tight text-[8px]">
+                                  <h4 className="font-black text-gray-800 uppercase tracking-tight text-[7px]">
                                     {col.label}
                                   </h4>
                                 </div>
-                                <span className="bg-gray-50 text-gray-500 text-[7px] font-black px-1 py-0.5 rounded-full border border-gray-100">
+                                <span className="bg-gray-50 text-gray-500 text-[6px] font-black px-1 py-0.5 rounded-full border border-gray-100">
                                   {colActions.length}
                                 </span>
                               </div>
-                              <div className="flex-1 overflow-y-auto p-1.5 space-y-1.5 bg-gray-50/10 custom-scrollbar">
+                              <div className="flex-1 overflow-y-auto p-1 space-y-1 bg-gray-50/10 custom-scrollbar">
                                 {colActions.map((action) => {
                                   const actionSubActions = subActions.filter((s) => s.actionId === action.id);
                                   const completedSubActions = actionSubActions.filter((s) => s.completed).length;
-                                  const progress = actionSubActions.length > 0 ? Math.round((completedSubActions / actionSubActions.length) * 100) : null;
-
+                                  
                                   return (
                                     <div
                                       key={action.id}
@@ -1524,25 +1525,25 @@ export default function ForumSession() {
                                         setIsEscalated(action.isEscalated || false);
                                         setEscalatedToForumId(action.escalatedToForumId || "");
                                       }}
-                                      className="bg-white p-2.5 rounded-xl border border-gray-50 hover:border-blue-200 transition-all cursor-pointer group shadow-sm"
+                                      className="bg-white p-2 rounded-lg border border-gray-50 hover:border-blue-200 transition-all cursor-pointer group shadow-sm"
                                     >
-                                      <div className="flex flex-col gap-1.5">
-                                        <div className="flex justify-between items-start gap-1.5">
-                                          <h5 className="font-bold text-gray-800 text-[10px] leading-tight group-hover:text-blue-600 transition-colors line-clamp-2">
+                                      <div className="flex flex-col gap-1">
+                                        <div className="flex justify-between items-start gap-1">
+                                          <h5 className="font-bold text-gray-800 text-[9px] leading-tight group-hover:text-blue-600 transition-colors line-clamp-2">
                                             {action.title}
                                           </h5>
-                                          {action.priority === "critica" && <div className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse shrink-0" />}
+                                          {action.priority === "critica" && <div className="w-1 h-1 rounded-full bg-red-600 animate-pulse shrink-0" />}
                                         </div>
-                                        <div className="flex items-center justify-between mt-1 pt-1.5 border-t border-gray-50">
+                                        <div className="flex items-center justify-between mt-0.5 pt-1 border-t border-gray-50">
                                           <div className="flex -space-x-1">
                                             {action.assignedToNames?.slice(0, 2).map((name, i) => (
-                                              <div key={i} className="w-4 h-4 rounded-full bg-blue-50 border border-white flex items-center justify-center text-[6px] font-black text-blue-600 uppercase" title={name}>
+                                              <div key={i} className="w-3.5 h-3.5 rounded-full bg-blue-50 border border-white flex items-center justify-center text-[5px] font-black text-blue-600 uppercase" title={name}>
                                                 {name.charAt(0)}
                                               </div>
                                             ))}
                                           </div>
-                                          <div className="flex items-center gap-1 text-[8px] font-bold text-gray-400">
-                                            <Calendar size={8} />
+                                          <div className="flex items-center gap-1 text-[7px] font-bold text-gray-400">
+                                            <Calendar size={7} />
                                             {action.targetDate.split("-").reverse().slice(0, 2).join("/")}
                                           </div>
                                         </div>
@@ -1561,24 +1562,23 @@ export default function ForumSession() {
 
                 // Default view for other sections
                 return (
-                  <div className="max-w-4xl mx-auto w-full bg-white rounded-3xl border border-gray-100 overflow-hidden p-8 text-center flex-1 flex flex-col justify-center">
-                    <div className="space-y-4">
-                      <div className="inline-block px-3 py-1 bg-blue-50 text-blue-600 rounded-lg text-[9px] font-black uppercase tracking-widest mb-1 shadow-sm">
+                  <div className="max-w-xl mx-auto w-full bg-white rounded-2xl border border-gray-100 overflow-hidden p-6 text-center flex-1 flex flex-col justify-center shadow-sm">
+                    <div className="space-y-3">
+                      <div className="inline-block px-2 py-0.5 bg-blue-50 text-blue-600 rounded-md text-[8px] font-black uppercase tracking-widest mb-1 shadow-sm">
                         Punto {effectiveSectionIndex} de {steps.length - 1}
                       </div>
 
-                      <h3 className="text-3xl font-black text-gray-800 uppercase tracking-tighter leading-tight">
+                      <h3 className="text-xl font-black text-gray-800 uppercase tracking-tighter leading-tight">
                         {steps[effectiveSectionIndex]}
                       </h3>
 
-                      <div className="pt-6">
-                        <div className="p-8 border-2 border-dashed border-gray-50 rounded-3xl flex flex-col items-center gap-4">
-                          <div className="w-16 h-16 rounded-full bg-gray-50 flex items-center justify-center text-gray-200">
-                            <MessageSquare size={32} />
+                      <div className="pt-4">
+                        <div className="p-6 border-2 border-dashed border-gray-50 rounded-2xl flex flex-col items-center gap-3">
+                          <div className="w-12 h-12 rounded-full bg-gray-50 flex items-center justify-center text-gray-200">
+                            <MessageSquare size={24} />
                           </div>
-                          <p className="text-gray-400 italic text-sm font-medium max-w-sm">
-                            Este espacio se completará con las herramientas
-                            específicas para esta sección.
+                          <p className="text-gray-400 italic text-xs font-medium max-w-[200px]">
+                            Sección en desarrollo.
                           </p>
                         </div>
                       </div>
