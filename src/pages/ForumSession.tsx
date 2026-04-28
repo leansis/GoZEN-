@@ -1346,9 +1346,14 @@ export default function ForumSession() {
                                   </a>
                                 )}
                               </div>
-                              <div className="flex-1 bg-gray-50 relative min-h-0">
-                                {selectedIndicator.link ? (
-                                  <iframe src={selectedIndicator.link} className="w-full h-full border-none" title={selectedIndicator.name} />
+                              // DESPUÉS
+                            <div className="flex-1 bg-gray-50 relative min-h-0 overflow-hidden">
+                              {selectedIndicator.link ? (
+                                <iframe
+                                  src={selectedIndicator.link}
+                                  className="absolute inset-0 w-full h-full border-none"
+                                  title={selectedIndicator.name}
+                                />
                                 ) : (
                                   <div className="w-full h-full flex items-center justify-center text-center p-6 bg-white">
                                     <div className="max-w-[180px] space-y-2">
