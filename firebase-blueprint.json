@@ -352,6 +352,27 @@
         "updatedAt": { "type": "string" }
       },
       "required": ["name", "companyId", "createdAt"]
+    },
+    "Incident": {
+      "title": "Incident",
+      "description": "A record of an incident that needs resolution",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "forumId": { "type": "string" },
+        "forumName": { "type": "string" },
+        "indicatorId": { "type": "string" },
+        "indicatorName": { "type": "string" },
+        "attachments": { "type": "array", "items": { "type": "string" } },
+        "companyId": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "createdByName": { "type": "string" },
+        "status": { "type": "string", "enum": ["abierta", "en_accion", "resuelta"] },
+        "actionId": { "type": "string" }
+      },
+      "required": ["title", "forumId", "companyId", "createdAt", "createdBy"]
     }
   },
   "firestore": {
@@ -418,6 +439,10 @@
     "/indicators/{indicatorId}": {
       "schema": { "$ref": "#/entities/Indicator" },
       "description": "Performance indicators"
+    },
+    "/incidents/{incidentId}": {
+      "schema": { "$ref": "#/entities/Incident" },
+      "description": "Incidents"
     }
   }
 }

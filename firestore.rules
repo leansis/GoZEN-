@@ -304,6 +304,25 @@ service cloud.firestore {
              (!('escalatedByName' in data) || data.escalatedByName is string) &&
              (!('escalatedAt' in data) || data.escalatedAt is string) &&
              (!('originForumId' in data) || data.originForumId is string) &&
+             (!('incidentId' in data) || data.incidentId is string) &&
+             (!('id' in data) || (data.id is string));
+    }
+
+    function isValidIncident(data) {
+      return data.keys().hasAll(['title', 'forumId', 'companyId', 'createdAt', 'createdBy']) &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
+             data.forumId is string &&
+             (!('forumName' in data) || data.forumName is string) &&
+             (!('description' in data) || data.description is string) &&
+             (!('indicatorId' in data) || data.indicatorId is string) &&
+             (!('indicatorName' in data) || data.indicatorName is string) &&
+             (!('attachments' in data) || data.attachments is list) &&
+             data.companyId is string &&
+             data.createdAt is string &&
+             data.createdBy is string &&
+             (!('createdByName' in data) || data.createdByName is string) &&
+             (!('status' in data) || data.status in ['abierta', 'en_accion', 'resuelta']) &&
+             (!('actionId' in data) || data.actionId is string) &&
              (!('id' in data) || (data.id is string));
     }
 
@@ -557,6 +576,13 @@ service cloud.firestore {
       allow read: if isAuthenticated() && belongsToCompany(resource.data.companyId);
       allow create, update: if isAdmin() && isValidIndicator(request.resource.data) && belongsToCompany(request.resource.data.companyId);
       allow delete: if isAdmin() && belongsToCompany(resource.data.companyId);
+    }
+
+    match /incidents/{incidentId} {
+      allow read: if isAuthenticated() && belongsToCompany(resource.data.companyId);
+      allow create: if isAuthenticated() && belongsToCompany(request.resource.data.companyId) && isValidIncident(request.resource.data);
+      allow update: if isAuthenticated() && belongsToCompany(resource.data.companyId) && isValidIncident(request.resource.data) && (request.auth.uid == resource.data.createdBy || isAdmin());
+      allow delete: if isAuthenticated() && belongsToCompany(resource.data.companyId) && (request.auth.uid == resource.data.createdBy || isAdmin());
     }
   }
 }

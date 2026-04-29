@@ -5,7 +5,7 @@ import clsx from 'clsx';
 interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
-  title: string;
+  title: React.ReactNode;
   children: React.ReactNode;
   maxWidth?: string;
 }
@@ -18,7 +18,7 @@ export default function Modal({ isOpen, onClose, title, children, maxWidth = 'ma
       <div className={clsx("relative w-full p-4 transition-all duration-300", maxWidth)}>
         <div className="relative bg-white rounded-xl shadow-lg">
           <div className="flex items-center justify-between p-4 border-b">
-            <h3 className="text-xl font-semibold text-gray-900">{title}</h3>
+            <div className="text-xl font-semibold text-gray-900 flex items-center gap-4">{title}</div>
             <button
               onClick={onClose}
               className="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ms-auto inline-flex justify-center items-center"

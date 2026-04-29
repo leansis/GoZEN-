@@ -69,15 +69,17 @@ function SortableRow<T extends { id: string }>({
     position: isDragging ? 'relative' as const : 'static' as const,
   };
 
+  const isEscalated = (item as any).isEscalated === true;
+
   return (
     <tr 
       ref={setNodeRef} 
       style={style} 
-      className={`bg-white border-b hover:bg-gray-50 ${isDragging ? 'shadow-lg bg-gray-50' : ''}`}
+      className={`bg-white border-b hover:bg-gray-50 transition-colors ${isDragging ? 'shadow-lg bg-gray-50' : ''} ${isEscalated ? 'opacity-50 grayscale-[0.5]' : ''}`}
     >
       {isDragEnabled && (
         <td className="px-2 py-4 w-10">
-          <div {...attributes} {...listeners} className="cursor-grab hover:text-blue-600 text-gray-400">
+          <div {...attributes} {...listeners} className={`cursor-grab hover:text-blue-600 text-gray-400 ${isEscalated ? 'pointer-events-none' : ''}`}>
             <GripVertical className="w-5 h-5" />
           </div>
         </td>
@@ -92,7 +94,7 @@ function SortableRow<T extends { id: string }>({
       {((onEdit || onDelete || onFinalize || actions)) && (
         <td className="px-6 py-4 text-right space-x-2">
           {actions && actions(item)}
-          {onFinalize && (item as any).status !== 'finalizada' && (
+          {onFinalize && (item as any).status !== 'finalizada' && !isEscalated && (
             <button
               onClick={(e) => { e.stopPropagation(); onFinalize(item); }}
               className="inline-flex items-center justify-center p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
@@ -103,18 +105,20 @@ function SortableRow<T extends { id: string }>({
           )}
           {onEdit && (
             <button
-              onClick={() => onEdit(item)}
-              className="inline-flex items-center justify-center p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-              title="Editar"
+              onClick={() => !isEscalated && onEdit(item)}
+              className={`inline-flex items-center justify-center p-2 rounded-lg transition-colors ${isEscalated ? 'text-gray-300 cursor-not-allowed' : 'text-blue-600 hover:bg-blue-50'}`}
+              title={isEscalated ? "Escalado (solo lectura)" : "Editar"}
+              disabled={isEscalated}
             >
               <Pencil className="w-4 h-4" />
             </button>
           )}
           {onDelete && (
             <button
-              onClick={() => onDelete(item)}
-              className="inline-flex items-center justify-center p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-              title="Eliminar"
+              onClick={() => !isEscalated && onDelete(item)}
+              className={`inline-flex items-center justify-center p-2 rounded-lg transition-colors ${isEscalated ? 'text-gray-300 cursor-not-allowed' : 'text-red-600 hover:bg-red-50'}`}
+              title={isEscalated ? "Escalado (solo lectura)" : "Eliminar"}
+              disabled={isEscalated}
             >
               <Trash2 className="w-4 h-4" />
             </button>

@@ -157,6 +157,40 @@ export type ActionStatus = 'pendiente' | 'en_progreso' | 'finalizada' | 'bloquea
 export type ActionPriority = 'baja' | 'media' | 'alta' | 'critica';
 export type ActionType = 'accion' | 'incidencia';
 
+export interface EscalationHistoryEntry {
+  fromForumId: string;
+  fromForumName: string;
+  toForumId: string;
+  toForumName: string;
+  at: string;
+  by: string;
+  byName: string;
+  note?: string;
+}
+
+export interface Incident {
+  id: string;
+  title: string;
+  description: string;
+  forumId: string;
+  forumName: string;
+  indicatorId?: string;
+  indicatorName?: string;
+  attachments?: Attachment[];
+  companyId: string;
+  createdAt: string;
+  createdBy: string;
+  createdByName?: string;
+  isEscalated?: boolean;
+  escalatedToForumId?: string;
+  escalatedBy?: string;
+  escalatedByName?: string;
+  escalatedAt?: string;
+  escalationHistory?: EscalationHistoryEntry[];
+  status: 'abierta' | 'en_accion' | 'resuelta';
+  actionId?: string;
+}
+
 export interface ActionPlan {
   id: string;
   title: string;
@@ -177,6 +211,11 @@ export interface ActionPlan {
   createdAt: string;
   updatedAt: string;
   
+  // Incident relationship
+  incidentId?: string;
+  indicatorId?: string;
+  indicatorName?: string;
+  
   // Escalation fields
   isEscalated?: boolean;
   escalatedToForumId?: string; // Optional target forum
@@ -185,6 +224,7 @@ export interface ActionPlan {
   escalatedAt?: string;
   originForumId?: string; // Forum where it was created
   originForumName?: string; // Name of the forum where it was created
+  escalationHistory?: EscalationHistoryEntry[];
 }
 
 export interface SubActionAudit {

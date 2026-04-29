@@ -34,7 +34,10 @@ import {
   orderBy,
   getDocs
 } from 'firebase/firestore';
-import { db } from '../firebase';
+import { 
+  db, 
+  handleDiagnosticError 
+} from '../firebase';
 import { useAuth } from '../AuthContext';
 import { useAppData } from '../contexts/AppDataContext';
 import { 
@@ -45,7 +48,8 @@ import {
   SubAction, 
   SubActionAudit,
   User,
-  ActionCategory
+  ActionCategory,
+  Incident
 } from '../types';
 import Table, { Column } from '../components/Table';
 import Modal from '../components/Modal';
@@ -55,6 +59,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { calculateAutomaticStatus } from '../lib/action-utils';
 import { handleFirestoreError, OperationType } from '../lib/firestore-utils';
+import { Indicator } from '../types';
 
 const STATUS_OPTIONS: { value: ActionStatus; label: string; color: string; bg: string }[] = [
   { value: 'pendiente', label: 'Pendiente', color: 'text-gray-600', bg: 'bg-gray-100' },
@@ -78,11 +83,13 @@ export default function ActionPlanPage() {
   const navigate = useNavigate();
   const [view, setView] = useState<'list' | 'kanban' | 'escalated'>('kanban');
   const [actions, setActions] = useState<ActionPlan[]>([]);
+  const [incidents, setIncidents] = useState<Incident[]>([]);
   const [onlyMineEscalated, setOnlyMineEscalated] = useState(false);
   const [subActions, setSubActions] = useState<SubAction[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [teams, setTeams] = useState<any[]>([]);
   const [categories, setCategories] = useState<ActionCategory[]>([]);
+  const [indicators, setIndicators] = useState<Indicator[]>([]);
   const [editingAction, setEditingAction] = useState<Partial<ActionPlan> | null>(null);
 
   // New State for Filters
@@ -108,6 +115,23 @@ export default function ActionPlanPage() {
   const [showUserSelector, setShowUserSelector] = useState(false);
   const [userSearchQuery, setUserSearchQuery] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [backToActionId, setBackToActionId] = useState<string | null>(null);
+
+  const checkIsReadOnly = (item: any) => {
+    if (!item || !item.isEscalated) return false;
+    if (filterForumId) {
+      const isOrigin = (item.type === 'incidencia' ? item.forumId : item.originForumId) === filterForumId;
+      return isOrigin;
+    }
+    return false;
+  };
+
+  const shouldBeInEscaladosColumn = (item: any) => {
+    if (!item || !item.isEscalated) return false;
+    if (!filterForumId) return false;
+    const originId = (item.type === 'incidencia' ? item.forumId : item.originForumId);
+    return originId === filterForumId;
+  };
 
   const companyId = dbUser?.companyId || activeCompanyId;
 
@@ -198,6 +222,23 @@ export default function ActionPlanPage() {
       status: calculateAutomaticStatus(a.targetDate, a.status)
     }));
   }, [actions, isAdmin, dbUser, teams, forums, onlyResponsible, filterTeamId, filterForumId]);
+
+  // Filter incidents based on status
+  const filteredIncidents = React.useMemo(() => {
+    if (!dbUser) return [];
+    let list = incidents.filter(i => i.status === 'abierta' || !i.status);
+    
+    if (filterTeamId) {
+        const forumIdsInTeam = forums.filter(f => f.teamId === filterTeamId).map(f => f.id);
+        list = list.filter(i => forumIdsInTeam.includes(i.forumId));
+    }
+    
+    if (filterForumId) {
+        list = list.filter(i => i.forumId === filterForumId);
+    }
+    
+    return list;
+  }, [incidents, filterTeamId, filterForumId, forums, dbUser]);
 
   // Filter assignable users based on hierarchy
   const assignableUsers = React.useMemo(() => {
@@ -297,12 +338,34 @@ export default function ActionPlanPage() {
       setTeams(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (err) => handleSnapError(err, 'teams'));
 
+    // Load Indicators
+    const qIndicators = query(collection(db, 'indicators'), where('companyId', '==', companyId));
+    const unsubIndicators = onSnapshot(qIndicators, (snap) => {
+      setIndicators(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Indicator)));
+    }, (err) => handleSnapError(err, 'indicators'));
+
+    // Load Incidents
+    const qIncidents = query(
+      collection(db, 'incidents'),
+      where('companyId', '==', companyId)
+    );
+    const unsubIncidents = onSnapshot(qIncidents, (snap) => {
+      const docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Incident));
+      docs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setIncidents(docs);
+    }, (err) => {
+      handleSnapError(err, 'incidents');
+      handleDiagnosticError(err, OperationType.LIST, 'incidents');
+    });
+
     return () => {
       unsubActions();
       unsubSubActions();
       unsubUsers();
       unsubCategories();
       unsubTeams();
+      unsubIndicators();
+      unsubIncidents();
     };
   }, [companyId, dbUser]);
 
@@ -312,13 +375,76 @@ export default function ActionPlanPage() {
       setError("Debes estar autenticado para guardar acciones.");
       return;
     }
-    if (!companyId || !editingAction?.title || !editingAction?.targetDate) {
+    if (!companyId || !editingAction?.title || (type !== 'incidencia' && !editingAction?.targetDate)) {
       setError("Por favor, completa todos los campos (título y fecha).");
       return;
     }
 
     try {
       const now = new Date().toISOString();
+
+      if (type === 'incidencia') {
+        const incidentPayload: any = {
+          title: editingAction.title,
+          description: editingAction.description || '',
+          forumId: editingAction.originForumId || '',
+          forumName: forums.find(f => f.id === editingAction.originForumId)?.name || '',
+          indicatorId: editingAction.indicatorId || '',
+          indicatorName: editingAction.indicatorName || '',
+          companyId: companyId,
+          createdAt: editingAction.createdAt || now,
+          createdBy: editingAction.createdBy || dbUser.uid,
+          createdByName: editingAction.createdByName || dbUser.name,
+          isEscalated: isEscalated,
+          escalatedToForumId: escalatedToForumId || '',
+          status: editingAction.status || 'abierta'
+        };
+
+        if (isEscalated && (!editingAction.isEscalated || (editingAction.escalatedToForumId !== escalatedToForumId))) {
+          incidentPayload.escalatedBy = dbUser.uid;
+          incidentPayload.escalatedByName = dbUser.name;
+          incidentPayload.escalatedAt = now;
+          
+          const fromForumName = forums.find(f => f.id === (editingAction.originForumId || incidentPayload.forumId))?.name || 'Origen';
+          const toForumName = forums.find(f => f.id === escalatedToForumId)?.name || 'Foro superior';
+          
+          const historyEntry: any = {
+            fromForumId: editingAction.originForumId || incidentPayload.forumId || '',
+            fromForumName: fromForumName,
+            toForumId: escalatedToForumId,
+            toForumName: toForumName,
+            at: now,
+            by: dbUser.uid,
+            byName: dbUser.name,
+            note: `Escalado de ${fromForumName} a ${toForumName}`
+          };
+          
+          incidentPayload.escalationHistory = [...(editingAction.escalationHistory || []), historyEntry];
+        }
+
+        if (editingAction.id) {
+          // If editing an existing incident
+          const incidentRef = doc(db, 'incidents', editingAction.id);
+          await updateDoc(incidentRef, incidentPayload);
+        } else {
+          // Creating a new incident
+          await addDoc(collection(db, 'incidents'), incidentPayload);
+        }
+
+        if (backToActionId) {
+          const prevAction = actions.find(a => a.id === backToActionId);
+          if (prevAction) {
+            setEditingAction(prevAction as any);
+            setType('accion');
+            setBackToActionId(null);
+            return;
+          }
+        }
+
+        setEditingAction(null);
+        setError(null);
+        return;
+      }
 
       // Create a clean object with only the fields we want to save
       // This prevents sending 'id' field to addDoc or 'undefined' values
@@ -344,13 +470,31 @@ export default function ActionPlanPage() {
         isEscalated: isEscalated,
         escalatedToForumId: escalatedToForumId || '',
         originForumId: editingAction.originForumId || '',
-        originForumName: forums.find(f => f.id === editingAction.originForumId)?.name || ''
+        originForumName: forums.find(f => f.id === editingAction.originForumId)?.name || '',
+        incidentId: editingAction.incidentId || '',
       };
 
-      if (isEscalated && !editingAction.isEscalated) {
+      if (isEscalated && (!editingAction.isEscalated || (editingAction.escalatedToForumId !== escalatedToForumId))) {
         actionPayload.escalatedBy = dbUser.uid;
         actionPayload.escalatedByName = dbUser.name;
         actionPayload.escalatedAt = now;
+        
+        // Add to history
+        const fromForumName = forums.find(f => f.id === (editingAction.originForumId))?.name || 'Origen';
+        const toForumName = forums.find(f => f.id === escalatedToForumId)?.name || 'Foro superior';
+        
+        const historyEntry: any = {
+          fromForumId: editingAction.originForumId || '',
+          fromForumName: fromForumName,
+          toForumId: escalatedToForumId,
+          toForumName: toForumName,
+          at: now,
+          by: dbUser.uid,
+          byName: dbUser.name,
+          note: `Escalado de ${fromForumName} a ${toForumName}`
+        };
+        
+        actionPayload.escalationHistory = [...(editingAction.escalationHistory || []), historyEntry];
       }
 
       let actionId = editingAction.id;
@@ -511,8 +655,25 @@ export default function ActionPlanPage() {
   };
 
   const openEditModal = (action: ActionPlan) => {
+    setType('accion');
     setEditingAction({ ...action });
     setTempSubActions(subActions.filter(s => s.actionId === action.id));
+  };
+
+  const openEditIncidentModal = (incident: Incident) => {
+    setType('incidencia');
+    setEditingAction({
+      id: incident.id,
+      title: incident.title,
+      description: incident.description,
+      originForumId: incident.forumId,
+      originForumName: incident.forumName,
+      indicatorId: incident.indicatorId,
+      indicatorName: incident.indicatorName,
+      createdAt: incident.createdAt,
+      createdBy: incident.createdBy,
+      type: 'incidencia'
+    });
   };
 
   const addTempSubAction = () => {
@@ -536,37 +697,254 @@ export default function ActionPlanPage() {
     setTempSubActions(newSubs);
   };
 
+  // Incident Drag & Drop logic
+  const handleDragStart = (e: React.DragEvent, incident: Incident) => {
+    e.dataTransfer.setData('incidentId', incident.id);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDropOnColumn = async (e: React.DragEvent, columnValue: string) => {
+    e.preventDefault();
+    const incidentId = e.dataTransfer.getData('incidentId');
+    const actionId = e.dataTransfer.getData('actionId');
+
+    if (incidentId) {
+      const incident = incidents.find(i => i.id === incidentId);
+      if (!incident || !dbUser || !companyId || columnValue === 'incidencias') return;
+
+      if (columnValue === 'escalados') {
+        // Escalate as incident, not action
+        setEditingAction({
+          id: incident.id,
+          title: incident.title,
+          description: incident.description,
+          originForumId: incident.forumId,
+          originForumName: incident.forumName,
+          indicatorId: incident.indicatorId,
+          indicatorName: incident.indicatorName,
+          isEscalated: incident.isEscalated || false,
+          escalatedToForumId: incident.escalatedToForumId || "",
+          escalationHistory: incident.escalationHistory || [],
+          createdAt: incident.createdAt,
+          createdBy: incident.createdBy,
+          createdByName: incident.createdByName,
+          status: incident.status || 'abierta'
+        } as any);
+        setType('incidencia');
+        setIsEscalated(true);
+        setEscalatedToForumId(incident.escalatedToForumId || "");
+        return;
+      }
+
+      try {
+        const now = new Date().toISOString();
+        let targetDate = '';
+        
+        // Determine target date based on column
+        const today = new Date();
+        if (columnValue === 'atrasadas') {
+          const yesterday = new Date(today);
+          yesterday.setDate(today.getDate() - 1);
+          targetDate = yesterday.toISOString().split('T')[0];
+        } else if (columnValue === 'hoy') {
+          targetDate = today.toISOString().split('T')[0];
+        } else {
+          // default for proximas
+          const nextWeek = new Date(today);
+          nextWeek.setDate(today.getDate() + 7);
+          targetDate = nextWeek.toISOString().split('T')[0];
+        }
+
+        const actionPayload: any = {
+          title: incident.title,
+          description: incident.description || '',
+          type: 'incidencia',
+          status: 'pendiente',
+          priority: 'media',
+          targetDate: targetDate,
+          dateChangeCount: 0,
+          notes: '',
+          companyId: companyId,
+          createdAt: now,
+          updatedAt: now,
+          createdBy: dbUser.uid,
+          createdByName: dbUser.name,
+          assignedTo: [dbUser.uid],
+          assignedToNames: [dbUser.name],
+          originForumId: incident.forumId,
+          originForumName: incident.forumName,
+          incidentId: incident.id,
+          indicatorId: incident.indicatorId || '',
+          indicatorName: incident.indicatorName || ''
+        };
+
+        // Add the action
+        const actionRef = await addDoc(collection(db, 'actionPlans'), actionPayload);
+        
+        // Update the incident instead of deleting it
+        await updateDoc(doc(db, 'incidents', incident.id), {
+          status: 'en_accion',
+          actionId: actionRef.id
+        });
+
+        // Open the modal to refine details
+        const newAction = { id: actionRef.id, ...actionPayload };
+        openEditModal(newAction as ActionPlan);
+        
+      } catch (err) {
+        handleDiagnosticError(err, OperationType.WRITE, 'actionPlans/incidents');
+        console.error("Error converting incident to action:", err);
+        setError("Error al convertir la incidencia en acción.");
+      }
+    } else if (actionId) {
+      const action = actions.find(a => a.id === actionId);
+      if (!action || columnValue === 'incidencias') return;
+
+      try {
+        if (columnValue === 'escalados') {
+          // Open edit modal to specify escalation forum
+          openEditModal(action);
+          // We'll handle the actual escalation field update in the modal save
+          return;
+        }
+
+        if (columnValue === 'proximas') {
+          // Open edit modal to change date
+          openEditModal(action);
+          return;
+        }
+
+        const todayStr = new Date().toISOString().split('T')[0];
+        if (columnValue === 'hoy' && action.targetDate !== todayStr) {
+          await updateDoc(doc(db, 'actionPlans', action.id), {
+            targetDate: todayStr,
+            updatedAt: new Date().toISOString(),
+            isEscalated: false // Un-escalate if manually moved to Hoy
+          });
+        }
+      } catch (err) {
+        console.error("Error moving action:", err);
+      }
+    }
+  };
+
+  const renderIncidentCard = (incident: Incident) => {
+    if (!incident) return null;
+    // Context-aware escalation logic
+    const isComingFromBelow = filterForumId ? incident.escalatedToForumId === filterForumId : false;
+    const isGoingToAbove = filterForumId ? (incident.forumId === filterForumId && incident.isEscalated) : false;
+    // General flag for global view
+    const isEscalationAnywhere = !!incident.isEscalated;
+
+    return (
+      <div 
+        key={incident.id}
+        draggable={!isGoingToAbove}
+        onDragStart={(e) => !isGoingToAbove && handleDragStart(e, incident)}
+        onClick={() => openEditIncidentModal(incident)}
+        className={clsx(
+          "bg-white p-2.5 rounded-xl border border-gray-100 transition-all group mb-2 hover:border-orange-300 hover:shadow-sm",
+          isGoingToAbove ? "opacity-50 grayscale-[0.5] cursor-pointer" : "cursor-grab active:cursor-grabbing"
+        )}
+      >
+        <div className="flex justify-between items-start mb-1.5">
+          <div className="flex flex-wrap gap-1">
+            {isComingFromBelow && (
+              <span className="bg-blue-50 text-blue-600 text-[8px] font-bold px-1.5 py-0.5 rounded-full uppercase border border-blue-100 flex items-center gap-1">
+                <ArrowUp size={8} className="transform rotate-180" />
+                Viene abajo
+              </span>
+            )}
+            {isGoingToAbove && (
+              <span className="bg-blue-100 text-blue-900 text-[8px] font-bold px-1.5 py-0.5 rounded-full uppercase border border-blue-200 flex items-center gap-1">
+                <ArrowUp size={8} />
+                Escalado
+              </span>
+            )}
+            {isEscalationAnywhere && !isComingFromBelow && !isGoingToAbove && (
+              <span className="bg-purple-50 text-purple-600 text-[8px] font-bold px-1.5 py-0.5 rounded-full uppercase border border-purple-100 flex items-center gap-1">
+                <ArrowUp size={8} className="transform rotate-45" />
+                Escalado
+              </span>
+            )}
+            {!isComingFromBelow && !isGoingToAbove && !isEscalationAnywhere && (
+              <span className="bg-orange-50 text-orange-600 text-[8px] font-bold px-1.5 py-0.5 rounded-full uppercase border border-orange-100">
+                 Incidencia
+              </span>
+            )}
+          </div>
+          {!isGoingToAbove && (
+            <button 
+              onClick={async (e) => { 
+                  e.stopPropagation(); 
+                  if (window.confirm("¿Estás seguro de eliminar esta incidencia?")) {
+                      await deleteDoc(doc(db, 'incidents', incident.id));
+                  }
+              }}
+              className="p-1 hover:bg-gray-100 rounded text-gray-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+              <Trash2 size={12} />
+            </button>
+          )}
+        </div>
+        <h4 className="font-bold text-gray-800 text-xs mb-1 line-clamp-2">{incident.title}</h4>
+        <p className="text-[10px] text-gray-500 line-clamp-2 mb-2 leading-tight">
+          {incident.description || 'Sin descripción'}
+        </p>
+        <div className="flex items-center justify-between text-[9px] text-gray-400 mt-1">
+           <div className="flex items-center gap-1">
+             <Calendar size={10} />
+             {format(new Date(incident.createdAt), 'dd MMM')}
+           </div>
+        </div>
+      </div>
+    );
+  };
+
   // Kanban logic - Grouping by Date
-  const getActionDateCategory = (dateStr: string): string => {
+  const getActionDateCategory = (action: ActionPlan): string => {
+    // If it's escalated AND we are NOT in the "Escalados" column context (which we handle in the loop)
+    // we want to know its "natural" column if it's been escalated TO this user (general view).
+    // But for simplicity in the general view, we keep the user's existing preference if they want a separate column.
+    
+    const dateStr = action.targetDate;
     if (!dateStr) return 'sin_fecha';
     const targetDate = new Date(dateStr);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
-    const tomorrow = new Date(today);
-    tomorrow.setDate(today.getDate() + 1);
-    
-    const nextWeek = new Date(today);
-    nextWeek.setDate(today.getDate() + 7);
-
     if (targetDate < today) return 'atrasadas';
     if (targetDate.getTime() === today.getTime()) return 'hoy';
-    if (targetDate < nextWeek) return 'esta_semana';
     return 'proximas';
   };
 
   const DATE_COLUMNS = [
-    { value: 'atrasadas', label: 'Atrasadas', color: 'text-red-600', bg: 'bg-red-100' },
-    { value: 'hoy', label: 'Para Hoy', color: 'text-blue-600', bg: 'bg-blue-100' },
-    { value: 'esta_semana', label: 'Esta Semana', color: 'text-orange-600', bg: 'bg-orange-100' },
-    { value: 'proximas', label: 'Próximas', color: 'text-gray-600', bg: 'bg-gray-100' },
+    { value: 'incidencias', label: 'Incidencias', color: 'text-red-600', bg: 'bg-red-50', icon: <AlertCircle size={10} /> },
+    { value: 'atrasadas', label: 'Retrasadas', color: 'text-blue-600', bg: 'bg-blue-50', icon: <div className="relative"><Clock size={10} /><span className="absolute -top-1 -right-1 text-[7px] font-bold">-</span></div> },
+    { value: 'hoy', label: 'Hoy', color: 'text-blue-600', bg: 'bg-blue-50', icon: <Clock size={10} /> },
+    { value: 'proximas', label: 'Próximas', color: 'text-blue-600', bg: 'bg-blue-50', icon: <div className="relative"><Clock size={10} /><span className="absolute -top-1 -right-1 text-[7px] font-bold">+</span></div> },
+    { value: 'escalados', label: 'Escalados', color: 'text-blue-900', bg: 'bg-blue-100', icon: <ArrowUp size={10} /> },
   ];
 
   const renderActionCard = (action: ActionPlan) => {
+    if (!action) return null;
     const assignedNames = action.assignedToNames?.join(', ') || 'Sin asignar';
     const subActionStats = subActions.filter(s => s.actionId === action.id);
     const completedCount = subActionStats.filter(s => s.completed).length;
     
+    // Check for linked incident
+    const linkedIncident = incidents.find(i => i.id === action.incidentId);
+    
+    const handleDragStartAction = (e: React.DragEvent) => {
+      e.dataTransfer.setData('actionId', action.id);
+      e.dataTransfer.effectAllowed = 'move';
+    };
+
     // Defensive date formatting
     const formatDateSafe = (dateStr: string) => {
       if (!dateStr) return 'N/A';
@@ -579,101 +957,104 @@ export default function ActionPlanPage() {
       }
     };
     
+    const isComingFromBelow = filterForumId ? action.escalatedToForumId === filterForumId : false;
+    const isGoingToAbove = filterForumId ? (action.originForumId === filterForumId && action.isEscalated) : false;
+    const isEscalationAnywhere = !!action.isEscalated;
+
     return (
       <div 
         key={action.id}
-        className="bg-white p-4 rounded-xl border border-gray-200 transition-all cursor-pointer group mb-3"
+        draggable={!isGoingToAbove}
+        onDragStart={!isGoingToAbove ? handleDragStartAction : undefined}
+        className={clsx(
+          "bg-white p-2.5 rounded-xl border border-gray-100 transition-all group mb-2 hover:border-blue-300 hover:shadow-sm",
+          isGoingToAbove ? "opacity-50 grayscale-[0.5] cursor-pointer" : "cursor-pointer"
+        )}
         onClick={() => openEditModal(action)}
       >
-        <div className="flex justify-between items-start mb-2">
-          <div className="flex flex-wrap gap-1.5">
-            <span className={clsx(
-              "text-[10px] font-bold px-2 py-0.5 rounded-full uppercase",
-              PRIORITY_OPTIONS.find(p => p.value === action.priority)?.color.replace('text-', 'bg-').replace('600', '100').replace('400', '100').replace('700', '200')
-            )}>
-              {PRIORITY_OPTIONS.find(p => p.value === action.priority)?.label}
-            </span>
-            {action.isEscalated && (
-              <span className="bg-orange-50 text-orange-600 text-[10px] font-bold px-2 py-0.5 rounded-md border border-orange-100 flex items-center gap-1 uppercase" title="Escalado">
-                <AlertCircle size={10} />
+        <div className="flex justify-between items-start mb-1.5">
+          <div className="flex flex-wrap gap-1">
+            {isComingFromBelow && (
+              <span className="bg-blue-50 text-blue-600 text-[8px] font-bold px-1.5 py-0.5 rounded-full uppercase border border-blue-100 flex items-center gap-1" title="Viene de foro inferior">
+                <ArrowUp size={8} className="transform rotate-180" />
+                Viene abajo
+              </span>
+            )}
+            {isGoingToAbove && (
+              <span className="bg-blue-100 text-blue-900 text-[8px] font-bold px-1.5 py-0.5 rounded-full uppercase border border-blue-200 flex items-center gap-1" title="Escalado a foro superior">
+                <ArrowUp size={8} />
                 Escalado
               </span>
             )}
+            {isEscalationAnywhere && !isComingFromBelow && !isGoingToAbove && (
+              <span className="bg-purple-50 text-purple-600 text-[8px] font-bold px-1.5 py-0.5 rounded-full uppercase border border-purple-100 flex items-center gap-1">
+                <ArrowUp size={8} className="transform rotate-45" />
+                Escalado
+              </span>
+            )}
+            {!isComingFromBelow && !isGoingToAbove && !isEscalationAnywhere && (
+              <span className={clsx(
+                "text-[8px] font-bold px-1.5 py-0.5 rounded-full uppercase",
+                PRIORITY_OPTIONS.find(p => p.value === action.priority)?.color.replace('text-', 'bg-').replace('600', '100').replace('400', '100').replace('700', '200')
+              )}>
+                {PRIORITY_OPTIONS.find(p => p.value === action.priority)?.label?.substring(0, 4)}
+              </span>
+            )}
             {action.type === 'incidencia' && (
-              <span className="bg-red-50 text-red-600 text-[10px] font-bold px-2 py-0.5 rounded-md border border-red-100 flex items-center gap-1 uppercase">
-                <AlertCircle size={10} />
-                Incidencia
-              </span>
-            )}
-            {action.categoryName && (
-              <span className="bg-blue-50 text-blue-600 text-[10px] font-bold px-2 py-0.5 rounded-md border border-blue-100 flex items-center gap-1 uppercase">
-                <Tag size={10} />
-                {action.categoryName}
+              <span className="bg-red-50 text-red-600 text-[8px] font-bold px-1.5 py-0.5 rounded border border-red-100 flex items-center gap-1 uppercase">
+                <AlertCircle size={8} />
+                Inci.
               </span>
             )}
           </div>
-          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-            {action.status !== 'finalizada' && action.status !== 'cancelada' && (
+          {!isGoingToAbove && (
+            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
               <button 
-                onClick={(e) => { e.stopPropagation(); handleFinalizeAction(action); }}
-                className="p-1 hover:bg-gray-100 rounded text-gray-400 hover:text-green-600"
-                title="Finalizar"
+                onClick={(e) => { e.stopPropagation(); openEditModal(action); }}
+                className="p-1 hover:bg-gray-100 rounded text-gray-400 hover:text-blue-600"
               >
-                <CheckCircle2 size={14} />
+                <Edit2 size={12} />
               </button>
-            )}
-            {action.status !== 'cancelada' && (
               <button 
-                onClick={(e) => { e.stopPropagation(); handleCancelAction(action); }}
-                className="p-1 hover:bg-gray-100 rounded text-gray-400 hover:text-orange-600"
-                title="Cerrar / Cancelar"
+                onClick={(e) => { e.stopPropagation(); setActionToDelete(action); }}
+                className="p-1 hover:bg-gray-100 rounded text-gray-400 hover:text-red-600"
               >
-                <XCircle size={14} />
+                <Trash2 size={12} />
               </button>
-            )}
-            <button 
-              onClick={(e) => { e.stopPropagation(); openEditModal(action); }}
-              className="p-1 hover:bg-gray-100 rounded text-gray-400 hover:text-blue-600"
-            >
-              <Edit2 size={14} />
-            </button>
-            <button 
-              onClick={(e) => { e.stopPropagation(); setActionToDelete(action); }}
-              className="p-1 hover:bg-gray-100 rounded text-gray-400 hover:text-red-600"
-            >
-              <Trash2 size={14} />
-            </button>
-          </div>
+            </div>
+          )}
         </div>
-        <h4 className="font-bold text-gray-800 text-sm mb-1">{action.title}</h4>
-        <p className="text-xs text-gray-500 line-clamp-2 mb-3 leading-relaxed">
-          {action.description || 'Sin descripción'}
-        </p>
+        <h4 className="font-bold text-gray-800 text-xs mb-1 line-clamp-2">
+          {action.title}
+          {action.incidentId && (
+            <AlertCircle size={10} className="inline-block ml-1 text-red-500" />
+          )}
+        </h4>
         
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center text-[10px] text-gray-500 gap-1.5">
-            <UserIcon size={12} className="text-gray-400" />
-            <span className="truncate">{assignedNames}</span>
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center text-[9px] text-gray-500 gap-1 mt-1">
+            <UserIcon size={10} className="text-gray-400" />
+            <span className="truncate uppercase font-black">{assignedNames.split(',')[0]}</span>
           </div>
-          <div className="flex items-center text-[10px] text-gray-500 gap-1.5 font-medium">
-            <Calendar size={12} className="text-gray-400" />
-            <span>Fin: {formatDateSafe(action.targetDate)}</span>
-            {action.dateChangeCount && action.dateChangeCount > 0 ? (
-              <span className="flex items-center gap-0.5 text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded-full border border-orange-100 ml-1" title={`${action.dateChangeCount} cambios de fecha`}>
-                <History size={10} />
-                {action.dateChangeCount}
-              </span>
-            ) : null}
+          <div className="flex items-center text-[9px] text-gray-500 gap-1 font-bold">
+            <Calendar size={10} className="text-gray-400" />
+            <span>Fin: {formatDateSafe(action.targetDate).split('202')[0]}</span>
           </div>
         </div>
 
+        {linkedIncident && (
+          <div className="mt-1.5 p-1.5 bg-red-50/30 rounded border border-red-100 flex flex-col gap-0.5">
+             <span className="text-[7px] font-black text-red-600 uppercase opacity-60">Origen: Incid.</span>
+             <p className="text-[8px] text-red-800 line-clamp-1 font-medium italic opacity-80">"{linkedIncident.title}"</p>
+          </div>
+        )}
+
         {subActionStats.length > 0 && (
-          <div className="mt-3 pt-3 border-t border-gray-100">
-            <div className="flex justify-between items-center text-[10px] mb-1">
-              <span className="text-gray-500 font-medium">Subacciones</span>
-              <span className="text-blue-600 font-bold">{completedCount}/{subActionStats.length}</span>
+          <div className="mt-2 pt-2 border-t border-gray-50">
+            <div className="flex justify-between items-center text-[7px] mb-0.5 font-black text-gray-400 uppercase">
+              <span>Subacciones {completedCount}/{subActionStats.length}</span>
             </div>
-            <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+            <div className="w-full bg-gray-100 rounded-full h-1 overflow-hidden">
               <div 
                 className="bg-blue-500 h-full rounded-full transition-all duration-500" 
                 style={{ width: `${(completedCount / subActionStats.length) * 100}%` }}
@@ -806,13 +1187,6 @@ export default function ActionPlanPage() {
             >
               <List size={20} />
             </button>
-            <button 
-              onClick={() => setView('escalated')}
-              className={clsx("p-1.5 rounded-md transition-all", view === 'escalated' ? "bg-orange-50 text-orange-600" : "text-gray-400")}
-              title="Vista Escalados"
-            >
-              <AlertCircle size={20} />
-            </button>
           </div>
           <button 
             onClick={() => { setEditingAction({ assignedTo: [], assignedToNames: [] }); setTempSubActions([]); }}
@@ -892,26 +1266,65 @@ export default function ActionPlanPage() {
       ) : (
         <>
           {view === 'kanban' && (
-            <div className="flex flex-row gap-4 overflow-x-auto pb-6 custom-scrollbar -mx-4 px-4 lg:mx-0 lg:px-0 snap-x snap-mandatory lg:snap-none">
+            <div className="flex flex-row gap-1.5 overflow-x-auto pb-4 custom-scrollbar -mx-4 px-4 lg:mx-0 lg:px-0 snap-x snap-mandatory lg:snap-none">
               {DATE_COLUMNS.map(col => {
-                const actionsInColumn = filteredActions.filter(a => getActionDateCategory(a.targetDate) === col.value);
+                const isIncidents = col.value === 'incidencias';
+                const isEscalados = col.value === 'escalados';
+                
+                const itemsInColumn = isIncidents 
+                  ? filteredIncidents.filter(i => {
+                      if (!i) return false;
+                      const isNormal = !i.isEscalated;
+                      const isReceived = i.isEscalated && !shouldBeInEscaladosColumn(i);
+                      return (isNormal || isReceived) && i.status !== 'en_accion';
+                    })
+                  : isEscalados
+                    ? [
+                        ...filteredActions.filter(a => a && shouldBeInEscaladosColumn(a)),
+                        ...filteredIncidents.filter(i => i && shouldBeInEscaladosColumn(i))
+                      ]
+                    : filteredActions.filter(a => {
+                        if (!a) return false;
+                        const isNormal = !a.isEscalated;
+                        const isReceivedEscalation = a.isEscalated && !shouldBeInEscaladosColumn(a);
+                        return (isNormal || isReceivedEscalation) && getActionDateCategory(a) === col.value;
+                      });
+
                 return (
-                  <div key={col.value} className="flex-none w-[85vw] sm:w-[350px] lg:flex-1 lg:min-w-0 bg-gray-50/50 rounded-2xl border border-gray-100 flex flex-col max-h-[calc(100vh-250px)] snap-center">
-                    <div className="p-4 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-gray-50/80 backdrop-blur-sm rounded-t-2xl z-10">
-                      <div className="flex items-center gap-2">
-                         <span className={clsx("w-3 h-3 rounded-full", col.color.replace('text-', 'bg-'))}></span>
-                         <h3 className="font-bold text-gray-800">{col.label}</h3>
+                  <div 
+                    key={col.value} 
+                    onDragOver={handleDragOver}
+                    onDrop={(e) => handleDropOnColumn(e, col.value)}
+                    className={clsx(
+                      "flex-none w-[85vw] sm:w-[200px] lg:flex-1 lg:min-w-0 rounded-xl border flex flex-col max-h-[calc(100vh-250px)] snap-center transition-all",
+                      col.bg,
+                      isIncidents ? "border-red-200" : 
+                      isEscalados ? "border-blue-300" : 
+                      "border-blue-200 hover:bg-opacity-80"
+                    )}
+                  >
+                    <div className={clsx(
+                      "p-3 border-b flex items-center justify-between sticky top-0 backdrop-blur-sm rounded-t-xl z-10",
+                      isIncidents ? "border-red-100 bg-red-50/80" : 
+                      isEscalados ? "border-blue-200 bg-blue-100/80" :
+                      "border-blue-100 bg-blue-50/80"
+                    )}>
+                      <div className="flex items-center gap-1.5 overflow-hidden">
+                         <span className={col.color}>{(col as any).icon}</span>
+                         <h3 className={clsx("font-bold uppercase tracking-widest text-[9px] truncate", col.color)}>{col.label}</h3>
                       </div>
-                      <span className="bg-white border border-gray-200 text-gray-500 text-[10px] font-bold px-2 py-0.5 rounded-lg">
-                        {actionsInColumn.length}
+                      <span className="bg-white border border-gray-200 text-gray-500 text-[9px] font-bold px-1.5 py-0.5 rounded shadow-sm">
+                        {itemsInColumn.length}
                       </span>
                     </div>
-                    <div className="p-3 overflow-y-auto flex-1 custom-scrollbar space-y-3">
-                      {actionsInColumn.map(renderActionCard)}
-                      {actionsInColumn.length === 0 && (
-                        <div className="border-2 border-dashed border-gray-200 rounded-xl p-8 flex flex-col items-center justify-center text-center opacity-50">
-                          <Clock size={24} className="text-gray-300 mb-2" />
-                          <span className="text-xs text-gray-400">Sin acciones</span>
+                    <div className="p-2 overflow-y-auto flex-1 custom-scrollbar space-y-2">
+                      {itemsInColumn.map(item => 'indicatorId' in item ? renderIncidentCard(item as Incident) : renderActionCard(item as ActionPlan))}
+                      {itemsInColumn.length === 0 && (
+                        <div className="border-2 border-dashed border-gray-200 rounded-xl p-8 flex flex-col items-center justify-center text-center opacity-40">
+                          {isIncidents ? <AlertCircle size={24} className="text-orange-400 mb-2" /> : <Clock size={24} className="text-gray-300 mb-2" />}
+                          <span className="text-[10px] font-bold uppercase tracking-tight text-gray-400">
+                            {isIncidents ? "Sin incidencias" : "Sin acciones"}
+                          </span>
                         </div>
                       )}
                     </div>
@@ -927,123 +1340,14 @@ export default function ActionPlanPage() {
                 columns={actionColumns}
                 data={filteredActions}
                 onEdit={openEditModal}
-                onDelete={setActionToDelete}
-                onFinalize={handleFinalizeAction}
+                onDelete={(a) => !checkIsReadOnly(a) && setActionToDelete(a)}
+                onFinalize={(a) => !checkIsReadOnly(a) && handleFinalizeAction(a)}
               />
               {filteredActions.length === 0 && (
                 <div className="p-12 text-center text-gray-400 border-t border-gray-100">
                   No hay acciones disponibles para mostrar.
                 </div>
               )}
-            </div>
-          )}
-
-          {view === 'escalated' && (
-            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
-               <div className="flex items-center gap-4 py-2">
-                 <span className="text-gray-700 font-bold text-sm">Filtrar escalados por mi</span>
-                 <label className="relative inline-flex items-center cursor-pointer">
-                    <input 
-                      type="checkbox" 
-                      checked={onlyMineEscalated}
-                      onChange={(e) => setOnlyMineEscalated(e.target.checked)}
-                      className="sr-only peer" 
-                    />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-600 transition-all"></div>
-                 </label>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12">
-                <div className="space-y-4">
-                  <h2 className="bg-blue-50/50 py-2.5 text-center text-blue-700 font-bold tracking-[0.2em] uppercase text-xs rounded-xl border border-blue-100/50">
-                    ACCIONES
-                  </h2>
-                  <div className="max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar space-y-4">
-                    {(() => {
-                      const escalatedActions = filteredActions.filter(a => a.isEscalated && (a.type === 'accion' || !a.type));
-                      const finalFilter = onlyMineEscalated ? escalatedActions.filter(a => a.escalatedBy === dbUser?.uid) : escalatedActions;
-                      
-                      if (finalFilter.length === 0) return <p className="text-center py-12 text-gray-400 italic text-sm">No hay acciones escaladas</p>;
-                      
-                      return finalFilter.map(action => {
-                        const subCount = subActions.filter(s => s.actionId === action.id).length;
-                        return (
-                          <div 
-                            key={action.id}
-                            onClick={() => openEditModal(action)}
-                            className="bg-[#C1B7CE] p-5 rounded-2xl relative hover:brightness-95 transition-all cursor-pointer group"
-                          >
-                            <div className="flex justify-between items-start mb-1">
-                              <h4 className="font-bold text-[#4F4F4F] text-lg leading-tight pr-8">{action.title}</h4>
-                              <ArrowUp size={20} className="text-white absolute right-5 top-5 group-hover:scale-125 transition-transform" />
-                            </div>
-                            <p className="text-sm text-[#5F5F5F] font-semibold mt-1">
-                              {action.createdByName || 'Usuario'}
-                            </p>
-                            <div className="flex items-center gap-2 mt-0.5">
-                              <span className="text-[10px] text-[#707070] font-bold bg-white/30 px-2 py-0.5 rounded uppercase tracking-wider">
-                                {action.escalatedAt ? format(new Date(action.escalatedAt), 'dd MMM yyyy', { locale: es }) : (action.createdAt ? format(new Date(action.createdAt), 'dd MMM yyyy', { locale: es }) : 'N/A')}
-                              </span>
-                            </div>
-                            
-                            <div className="mt-4 flex items-center justify-between">
-                              <div className="w-9 h-9 rounded-full bg-[#A89CB8] border-2 border-white flex items-center justify-center text-white text-sm font-black">
-                                {subCount}
-                              </div>
-                              <span className="text-[10px] font-black text-white/80 uppercase tracking-tighter">Detalles</span>
-                            </div>
-                          </div>
-                        );
-                      });
-                    })()}
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <h2 className="bg-red-50/50 py-2.5 text-center text-red-700 font-bold tracking-[0.2em] uppercase text-xs rounded-xl border border-red-100/50">
-                    INCIDENCIAS
-                  </h2>
-                  <div className="max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar space-y-4">
-                    {(() => {
-                      const escalatedIncidents = filteredActions.filter(a => a.isEscalated && a.type === 'incidencia');
-                      const finalFilter = onlyMineEscalated ? escalatedIncidents.filter(a => a.escalatedBy === dbUser?.uid) : escalatedIncidents;
-                      
-                      if (finalFilter.length === 0) return <p className="text-center py-12 text-gray-400 italic text-sm">No hay incidencias escaladas</p>;
-
-                      return finalFilter.map(action => {
-                        const subCount = subActions.filter(s => s.actionId === action.id).length;
-                        return (
-                          <div 
-                            key={action.id}
-                            onClick={() => openEditModal(action)}
-                            className="bg-[#C1B7CE] p-5 rounded-2xl relative hover:brightness-95 transition-all cursor-pointer group"
-                          >
-                            <div className="flex justify-between items-start mb-1">
-                              <h4 className="font-bold text-[#4F4F4F] text-lg leading-tight pr-8">{action.title}</h4>
-                              <ArrowUp size={20} className="text-white absolute right-5 top-5 group-hover:scale-125 transition-transform" />
-                            </div>
-                            <p className="text-sm text-[#5F5F5F] font-semibold mt-1">
-                              {action.createdByName || 'Usuario'}
-                            </p>
-                            <div className="flex items-center gap-2 mt-0.5">
-                              <span className="text-[10px] text-[#707070] font-bold bg-white/30 px-2 py-0.5 rounded uppercase tracking-wider">
-                                {action.escalatedAt ? format(new Date(action.escalatedAt), 'dd MMM yyyy', { locale: es }) : (action.createdAt ? format(new Date(action.createdAt), 'dd MMM yyyy', { locale: es }) : 'N/A')}
-                              </span>
-                            </div>
-                            
-                            <div className="mt-4 flex items-center justify-between">
-                              <div className="w-9 h-9 rounded-full bg-[#A89CB8] border-2 border-white flex items-center justify-center text-white text-sm font-black">
-                                {subCount}
-                              </div>
-                              <span className="text-[10px] font-black text-white/80 uppercase tracking-tighter">Detalles</span>
-                            </div>
-                          </div>
-                        );
-                      });
-                    })()}
-                  </div>
-                </div>
-              </div>
             </div>
           )}
         </>
@@ -1053,73 +1357,151 @@ export default function ActionPlanPage() {
       <Modal
         isOpen={!!editingAction}
         onClose={() => { 
+          if (type === 'incidencia' && backToActionId) {
+            const prevAction = actions.find(a => a.id === backToActionId);
+            if (prevAction) {
+              setEditingAction(prevAction as any);
+              setType('accion');
+              setBackToActionId(null);
+              return;
+            }
+          }
           setEditingAction(null); 
           setTempSubActions([]); 
           setShowUserSelector(false);
           setUserSearchQuery('');
+          setBackToActionId(null);
         }}
-        title={editingAction?.id ? "Editar Acción" : "Nueva Acción"}
+        title={
+          <div className="flex items-center gap-6">
+            <span>{editingAction?.id ? (type === 'incidencia' ? 'Editar Incidencia' : 'Editar Acción') : (type === 'incidencia' ? 'Nueva Incidencia' : 'Nueva Acción')}</span>
+            <div className="flex p-0.5 bg-gray-100 rounded-lg border border-gray-200 h-[32px] w-[200px]">
+              <button
+                type="button"
+                onClick={() => setType('accion')}
+                className={clsx(
+                  "flex-1 rounded-md text-[10px] font-black uppercase tracking-tighter transition-all",
+                  type === 'accion' ? "bg-white text-blue-600 shadow-sm" : "text-gray-400 hover:text-gray-600"
+                )}
+              >
+                Acción
+              </button>
+              <button
+                type="button"
+                onClick={() => setType('incidencia')}
+                className={clsx(
+                  "flex-1 rounded-md text-[10px] font-black uppercase tracking-tighter transition-all",
+                  type === 'incidencia' ? "bg-white text-orange-600 shadow-sm" : "text-gray-400 hover:text-gray-600"
+                )}
+              >
+                Incidencia
+              </button>
+            </div>
+          </div>
+        }
         maxWidth="max-w-5xl"
       >
-        <form onSubmit={handleSaveAction} className="flex flex-col max-h-[85vh]">
-          <div className="flex-1 overflow-y-auto p-1 custom-scrollbar">
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
-              <div className="lg:col-span-3 space-y-6">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Título de la acción</label>
-                  <input 
-                    type="text"
-                    required
-                    value={editingAction?.title || ''}
-                    onChange={(e) => setEditingAction({ ...editingAction, title: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm"
-                    placeholder="Ej: Revisar manual de mantenimiento"
-                  />
-                </div>
+        {(() => {
+          const isReadOnly = checkIsReadOnly(editingAction);
+          return (
+            <form 
+              onSubmit={(e) => {
+                if (isReadOnly) {
+                  e.preventDefault();
+                  setEditingAction(null);
+                  return;
+                }
+                handleSaveAction(e);
+              }} 
+              className="flex flex-col max-h-[85vh]"
+            >
+              <div className="flex-1 overflow-y-auto p-1 custom-scrollbar">
+                {isReadOnly && (
+                  <div className="mb-4 p-3 bg-blue-50 border border-blue-100 rounded-xl flex items-center gap-3">
+                    <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600">
+                      <ArrowUp size={16} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-blue-900 uppercase tracking-tight">Modo Lectura</p>
+                      <p className="text-[10px] text-blue-600 font-medium">Esta acción ha sido escalada y no puede modificarse en este foro.</p>
+                    </div>
+                  </div>
+                )}
+                <div className={clsx(
+                  "grid gap-8",
+                  type === 'incidencia' ? "grid-cols-1" : "grid-cols-1 lg:grid-cols-5"
+                )}>
+                  <div className={type === 'incidencia' ? "space-y-6" : "lg:col-span-3 space-y-6"}>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">Título {type === 'incidencia' ? 'de la incidencia' : 'de la acción'}</label>
+                      <input 
+                        type="text"
+                        required
+                        readOnly={isReadOnly}
+                        value={editingAction?.title || ''}
+                        onChange={(e) => setEditingAction({ ...editingAction, title: e.target.value })}
+                        className={clsx(
+                          "w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm",
+                          isReadOnly && "bg-gray-50 opacity-75 cursor-default focus:ring-gray-200"
+                        )}
+                        placeholder={type === 'incidencia' ? "Ej: Fallo en el sistema de refrigeración" : "Ej: Revisar manual de mantenimiento"}
+                      />
+                    </div>
+
+                {type === 'accion' && editingAction?.incidentId && (
+                  <div className="p-3 bg-red-50 border border-red-100 rounded-xl flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <AlertCircle className="text-red-600" size={20} />
+                      <div>
+                        <p className="text-[10px] font-black text-red-600 uppercase tracking-widest">Esta acción proviene de una incidencia</p>
+                        <p className="text-sm font-bold text-red-800">{incidents.find(i => i.id === editingAction.incidentId)?.title}</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const inc = incidents.find(i => i.id === editingAction.incidentId);
+                        if (inc) {
+                          if (editingAction.id) {
+                            setBackToActionId(editingAction.id);
+                          }
+                          setEditingAction(inc as any);
+                          setType('incidencia');
+                        }
+                      }}
+                      className="px-3 py-1 bg-red-600 text-white rounded-lg text-xs font-bold hover:bg-red-700 transition-colors shrink-0"
+                    >
+                      Ver Incidencia
+                    </button>
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1">Descripción</label>
                   <textarea 
                     rows={4}
+                    readOnly={isReadOnly}
                     value={editingAction?.description || ''}
                     onChange={(e) => setEditingAction({ ...editingAction, description: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm resize-none"
-                    placeholder="Detalles de la acción..."
+                    className={clsx(
+                      "w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm resize-none",
+                      isReadOnly && "bg-gray-50 opacity-75 cursor-default focus:ring-gray-200"
+                    )}
+                    placeholder="Detalles..."
                   />
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div className="sm:col-span-1">
-                    <label className="block text-sm font-semibold text-gray-700 mb-1">Tipo</label>
-                    <div className="flex p-1 bg-gray-50 rounded-xl border border-gray-100 h-[42px]">
-                      <button
-                        type="button"
-                        onClick={() => setType('accion')}
-                        className={clsx(
-                          "flex-1 rounded-lg text-xs font-bold transition-all",
-                          type === 'accion' ? "bg-white text-blue-600" : "text-gray-400 hover:text-gray-600"
-                        )}
-                      >
-                        Acción
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setType('incidencia')}
-                        className={clsx(
-                          "flex-1 rounded-lg text-xs font-bold transition-all",
-                          type === 'incidencia' ? "bg-white text-orange-600" : "text-gray-400 hover:text-gray-600"
-                        )}
-                      >
-                        Incidencia
-                      </button>
-                    </div>
-                  </div>
-                  <div className="sm:col-span-1">
                     <label className="block text-sm font-semibold text-gray-700 mb-1">Foro (Origen)</label>
                     <select 
                       value={editingAction?.originForumId || ''}
+                      disabled={isReadOnly}
                       onChange={(e) => setEditingAction({ ...editingAction, originForumId: e.target.value })}
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all bg-white text-sm"
+                      className={clsx(
+                        "w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all bg-white text-sm",
+                        isReadOnly && "bg-gray-50 opacity-75 cursor-not-allowed"
+                      )}
                     >
                       <option value="">Seleccionar...</option>
                       {forums.sort((a, b) => a.name.localeCompare(b.name)).map(f => (
@@ -1127,195 +1509,270 @@ export default function ActionPlanPage() {
                       ))}
                     </select>
                   </div>
-                  <div className="sm:col-span-1">
-                    <label className="block text-sm font-semibold text-gray-700 mb-1">Categoría</label>
-                    <select 
-                      value={editingAction?.categoryId || ''}
-                      onChange={(e) => setEditingAction({ ...editingAction, categoryId: e.target.value })}
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all bg-white text-sm"
-                    >
-                      <option value="">Seleccionar...</option>
-                      {categories.map(c => (
-                        <option key={c.id} value={c.id}>{c.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="sm:col-span-1">
-                    <label className="block text-sm font-semibold text-gray-700 mb-1">Prioridad</label>
-                    <select 
-                      value={editingAction?.priority || 'media'}
-                      onChange={(e) => setEditingAction({ ...editingAction, priority: e.target.value as ActionPriority })}
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all bg-white text-sm"
-                    >
-                      {PRIORITY_OPTIONS.map(p => (
-                        <option key={p.value} value={p.value}>{p.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="sm:col-span-1">
-                    <label className="block text-sm font-semibold text-gray-700 mb-1">
-                      Estado
-                    </label>
-                    <div className="relative">
-                      <select 
-                        value={editingAction?.status || 'pendiente'}
-                        onChange={(e) => setEditingAction({ ...editingAction, status: e.target.value as ActionStatus })}
-                        disabled={editingAction?.status === 'pendiente' || editingAction?.status === 'en_progreso' || editingAction?.status === 'retrasada'}
-                        className={clsx(
-                          "w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all bg-white text-sm appearance-none",
-                          (editingAction?.status === 'pendiente' || editingAction?.status === 'en_progreso' || editingAction?.status === 'retrasada') && "bg-gray-50 text-gray-500 cursor-not-allowed"
-                        )}
-                      >
-                        {STATUS_OPTIONS.map(s => (
-                          <option key={s.value} value={s.value}>
-                            {s.label}
-                          </option>
-                        ))}
-                      </select>
-                      {(editingAction?.status === 'pendiente' || editingAction?.status === 'en_progreso' || editingAction?.status === 'retrasada') && (
-                        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                          <span className="text-[9px] font-black bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded uppercase tracking-tighter">Auto</span>
-                        </div>
-                      )}
-                    </div>
-                    {(editingAction?.status === 'pendiente' || editingAction?.status === 'en_progreso' || editingAction?.status === 'retrasada') && (
-                      <p className="text-[10px] text-gray-400 mt-1 italic">Calculado según la fecha.</p>
-                    )}
-                  </div>
-                  <div className="sm:col-span-1">
-                    <label className="block text-sm font-semibold text-gray-700 mb-1">Vencimiento</label>
-                    <input 
-                      type="date"
-                      required
-                      value={editingAction?.targetDate || ''}
-                      onChange={(e) => {
-                        const newDate = e.target.value;
-                        const newStatus = calculateAutomaticStatus(newDate, editingAction?.status || 'pendiente');
-                        setEditingAction({ ...editingAction, targetDate: newDate, status: newStatus });
-                      }}
-                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm"
-                    />
-                  </div>
-                </div>
 
-                <div className="relative">
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Asignar a</label>
-                  {assignableUsers.length > 0 ? (
-                    <div className="space-y-2">
-                      <div className="flex flex-wrap gap-1.5 min-h-[38px] p-1.5 border border-gray-200 rounded-xl bg-white focus-within:ring-2 focus-within:ring-blue-500">
-                        {editingAction?.assignedTo?.map(uid => {
-                          const user = users.find(u => u.uid === uid);
-                          if (!user) return null;
-                          return (
-                            <span key={uid} className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-blue-50 text-blue-700 text-xs font-bold rounded-lg border border-blue-100">
-                              {user.name}
-                              <button 
-                                type="button"
-                                onClick={() => {
-                                  const updated = editingAction.assignedTo?.filter(id => id !== uid) || [];
-                                  setEditingAction({ ...editingAction, assignedTo: updated });
-                                }}
-                                className="hover:text-blue-900"
-                              >
-                                <X size={10} />
-                              </button>
-                            </span>
-                          );
-                        })}
-                        <button
-                          type="button"
-                          onClick={() => setShowUserSelector(!showUserSelector)}
-                          className="flex-1 text-left px-2 text-sm text-gray-400 font-medium min-w-[120px]"
-                        >
-                          {(!editingAction?.assignedTo || editingAction.assignedTo.length === 0) ? "Seleccionar personas..." : "Añadir más..."}
-                        </button>
+                  {type === 'incidencia' ? (
+                    <>
+                      <div className="sm:col-span-1">
+                        <label className="block text-sm font-semibold text-gray-700 mb-1">Fecha</label>
+                        <input 
+                          type="date"
+                          required
+                          readOnly={isReadOnly}
+                          value={editingAction?.createdAt ? new Date(editingAction.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]}
+                          onChange={(e) => setEditingAction({ ...editingAction, createdAt: new Date(e.target.value).toISOString() })}
+                          className={clsx(
+                            "w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm",
+                            isReadOnly && "bg-gray-50 opacity-75 cursor-default focus:ring-gray-200"
+                          )}
+                        />
                       </div>
-
-                      {showUserSelector && (
-                        <>
-                          <div 
-                            className="fixed inset-0 z-20" 
-                            onClick={() => setShowUserSelector(false)}
-                          />
-                          <div className="absolute left-0 right-0 top-full mt-2 bg-white border border-gray-100 rounded-xl z-30 flex flex-col max-h-80">
-                            <div className="p-2 border-b border-gray-100">
-                              <div className="relative">
-                                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                                <input
-                                  type="text"
-                                  autoFocus
-                                  placeholder="Buscar por nombre..."
-                                  value={userSearchQuery}
-                                  onChange={(e) => setUserSearchQuery(e.target.value)}
-                                  className="w-full pl-9 pr-4 py-2 text-sm bg-gray-50 border border-gray-100 rounded-lg outline-none focus:ring-1 focus:ring-blue-500 focus:bg-white transition-all"
-                                />
-                              </div>
-                            </div>
-                            <div className="p-2 space-y-1 overflow-y-auto custom-scrollbar flex-1">
-                              {(() => {
-                                const filtered = assignableUsers.filter(u => 
-                                  u.name.toLowerCase().includes(userSearchQuery.toLowerCase())
-                                );
-                                if (filtered.length === 0) {
-                                  return <p className="text-center py-4 text-xs text-gray-400 font-medium">No se encontraron resultados</p>;
-                                }
-                                return filtered.map(user => {
-                                  const isAssigned = editingAction?.assignedTo?.includes(user.uid);
-                                  return (
-                                    <button
-                                      key={user.uid}
-                                      type="button"
-                                      onClick={() => {
-                                        const current = editingAction?.assignedTo || [];
-                                        const updated = isAssigned 
-                                          ? current.filter(id => id !== user.uid)
-                                          : [...current, user.uid];
-                                        setEditingAction({ ...editingAction, assignedTo: updated });
-                                      }}
-                                      className={clsx(
-                                        "w-full text-left px-4 py-2.5 rounded-lg text-sm transition-colors flex items-center justify-between",
-                                        isAssigned ? "bg-blue-50 text-blue-600 font-bold" : "hover:bg-gray-50 text-gray-600"
-                                      )}
-                                    >
-                                      <span>{user.name}</span>
-                                      {isAssigned && <div className="w-2 h-2 bg-blue-600 rounded-full" />}
-                                    </button>
-                                  );
-                                });
-                              })()}
-                            </div>
-                          </div>
-                        </>
-                      )}
-                    </div>
+                      <div className="sm:col-span-2">
+                         <label className="block text-sm font-semibold text-gray-700 mb-1">Indicador Asociado</label>
+                         <select 
+                           value={editingAction?.indicatorId || ''}
+                           disabled={isReadOnly}
+                           onChange={(e) => setEditingAction({ ...editingAction, indicatorId: e.target.value, indicatorName: e.target.options[e.target.selectedIndex].text })}
+                           className={clsx(
+                             "w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all bg-white text-sm",
+                             isReadOnly && "bg-gray-50 opacity-75 cursor-not-allowed"
+                           )}
+                         >
+                           <option value="">Ninguno</option>
+                           {indicators.map(i => (
+                             <option key={i.id} value={i.id}>{i.name} ({i.typology})</option>
+                           ))}
+                         </select>
+                      </div>
+                    </>
                   ) : (
-                    <p className="text-xs text-gray-400 bg-gray-50 p-3 rounded-xl border border-gray-100">
-                      Solo puedes asignarte acciones a ti mismo o a miembros de tu equipo.
-                    </p>
+                    <>
+                      <div className="sm:col-span-1">
+                        <label className="block text-sm font-semibold text-gray-700 mb-1">Categoría</label>
+                        <select 
+                          value={editingAction?.categoryId || ''}
+                          disabled={isReadOnly}
+                          onChange={(e) => setEditingAction({ ...editingAction, categoryId: e.target.value })}
+                          className={clsx(
+                            "w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all bg-white text-sm",
+                            isReadOnly && "bg-gray-50 opacity-75 cursor-not-allowed"
+                          )}
+                        >
+                          <option value="">Seleccionar...</option>
+                          {categories.map(c => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="sm:col-span-1">
+                        <label className="block text-sm font-semibold text-gray-700 mb-1">Prioridad</label>
+                        <select 
+                          value={editingAction?.priority || 'media'}
+                          disabled={isReadOnly}
+                          onChange={(e) => setEditingAction({ ...editingAction, priority: e.target.value as ActionPriority })}
+                          className={clsx(
+                            "w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all bg-white text-sm",
+                            isReadOnly && "bg-gray-50 opacity-75 cursor-not-allowed"
+                          )}
+                        >
+                          {PRIORITY_OPTIONS.map(p => (
+                            <option key={p.value} value={p.value}>{p.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="sm:col-span-1">
+                        <label className="block text-sm font-semibold text-gray-700 mb-1">Vencimiento</label>
+                        <input 
+                          type="date"
+                          required
+                          readOnly={isReadOnly}
+                          value={editingAction?.targetDate || ''}
+                          onChange={(e) => {
+                            const newDate = e.target.value;
+                            const newStatus = calculateAutomaticStatus(newDate, editingAction?.status || 'pendiente');
+                            setEditingAction({ ...editingAction, targetDate: newDate, status: newStatus });
+                          }}
+                          className={clsx(
+                            "w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm",
+                            isReadOnly && "bg-gray-50 opacity-75 cursor-default focus:ring-gray-200"
+                          )}
+                        />
+                      </div>
+                    </>
                   )}
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Notas de seguimiento</label>
-                  <textarea 
-                    rows={2}
-                    value={editingAction?.notes || ''}
-                    onChange={(e) => setEditingAction({ ...editingAction, notes: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm"
-                    placeholder="Observaciones de progreso..."
-                  />
+                   <label className="block text-sm font-semibold text-gray-700 mb-1 text-[11px] uppercase tracking-wider opacity-60">Archivos / Adjuntos</label>
+                   <div className="flex items-center gap-3 p-4 bg-gray-50 border border-dashed border-gray-200 rounded-xl hover:bg-gray-100 transition-colors cursor-pointer">
+                      <div className="p-2 bg-white rounded-lg shadow-sm">
+                        <Plus size={16} className="text-gray-400" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-gray-600">Añadir archivos o evidencias</p>
+                        <p className="text-[10px] text-gray-400 font-medium">Imágenes, PDF o documentos (Máx. 10MB)</p>
+                      </div>
+                   </div>
                 </div>
+
+                {type !== 'incidencia' && (
+                  <>
+                    <div className="relative">
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">Asignar a</label>
+                      {assignableUsers.length > 0 ? (
+                        <div className="space-y-2">
+                          <div className={clsx(
+                            "flex flex-wrap gap-1.5 min-h-[38px] p-1.5 border border-gray-200 rounded-xl bg-white focus-within:ring-2 focus-within:ring-blue-500",
+                            isReadOnly && "bg-gray-50 opacity-75 cursor-default"
+                          )}>
+                            {editingAction?.assignedTo?.map(uid => {
+                              const user = users.find(u => u.uid === uid);
+                              if (!user) return null;
+                              return (
+                                <span key={uid} className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-blue-50 text-blue-700 text-xs font-bold rounded-lg border border-blue-100">
+                                  {user.name}
+                                  {!isReadOnly && (
+                                    <button 
+                                      type="button"
+                                      onClick={() => {
+                                        const updated = editingAction.assignedTo?.filter(id => id !== uid) || [];
+                                        setEditingAction({ ...editingAction, assignedTo: updated });
+                                      }}
+                                      className="hover:text-blue-900"
+                                    >
+                                      <X size={10} />
+                                    </button>
+                                  )}
+                                </span>
+                              );
+                            })}
+                            {!isReadOnly && (
+                              <button
+                                type="button"
+                                onClick={() => setShowUserSelector(!showUserSelector)}
+                                className="flex-1 text-left px-2 text-sm text-gray-400 font-medium min-w-[120px]"
+                              >
+                                {(!editingAction?.assignedTo || editingAction.assignedTo.length === 0) ? "Seleccionar personas..." : "Añadir más..."}
+                              </button>
+                            )}
+                          </div>
+
+                          {showUserSelector && (
+                            <>
+                              <div 
+                                className="fixed inset-0 z-20" 
+                                onClick={() => setShowUserSelector(false)}
+                              />
+                              <div className="absolute left-0 right-0 top-full mt-2 bg-white border border-gray-100 rounded-xl z-30 flex flex-col max-h-80">
+                                <div className="p-2 border-b border-gray-100">
+                                  <div className="relative">
+                                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                    <input
+                                      type="text"
+                                      autoFocus
+                                      placeholder="Buscar por nombre..."
+                                      value={userSearchQuery}
+                                      onChange={(e) => setUserSearchQuery(e.target.value)}
+                                      className="w-full pl-9 pr-4 py-2 text-sm bg-gray-50 border border-gray-100 rounded-lg outline-none focus:ring-1 focus:ring-blue-500 focus:bg-white transition-all"
+                                    />
+                                  </div>
+                                </div>
+                                <div className="p-2 space-y-1 overflow-y-auto custom-scrollbar flex-1">
+                                  {assignableUsers
+                                    .filter(u => {
+                                      const matchesSearch = u.name.toLowerCase().includes(userSearchQuery.toLowerCase());
+                                      
+                                      if (editingAction) {
+                                        // Use escalation target if escalated, otherwise use origin
+                                        const forumId = (editingAction as any).escalatedToForumId || 
+                                                       (editingAction as any).forumId || 
+                                                       (editingAction as ActionPlan).originForumId;
+                                        if (forumId) {
+                                          const forum = forums.find(f => f.id === forumId);
+                                          if (forum) {
+                                            const team = teams.find(t => t.id === forum.teamId);
+                                            if (team) {
+                                              const memberIds = new Set(team.members?.map((m: any) => typeof m === 'string' ? m : m.uid) || []);
+                                              // Handling different member structures (string[] or {uid, name}[])
+                                              if (team.hasGroups && team.groups) {
+                                                team.groups.forEach((g: any) => {
+                                                  g.members?.forEach((m: any) => memberIds.add(typeof m === 'string' ? m : m.uid));
+                                                });
+                                              }
+                                              return matchesSearch && memberIds.has(u.uid);
+                                            }
+                                          }
+                                        }
+                                      }
+                                      
+                                      return matchesSearch;
+                                    })
+                                    .map(user => {
+                                      const isAssigned = editingAction?.assignedTo?.includes(user.uid);
+                                      return (
+                                        <button
+                                          key={user.uid}
+                                          type="button"
+                                          onClick={() => {
+                                            const current = editingAction?.assignedTo || [];
+                                            const updated = isAssigned 
+                                              ? current.filter(id => id !== user.uid)
+                                              : [...current, user.uid];
+                                            setEditingAction({ ...editingAction, assignedTo: updated });
+                                          }}
+                                          className={clsx(
+                                            "w-full text-left px-4 py-2.5 rounded-lg text-sm transition-colors flex items-center justify-between",
+                                            isAssigned ? "bg-blue-50 text-blue-600 font-bold" : "hover:bg-gray-50 text-gray-600"
+                                          )}
+                                        >
+                                          <span>{user.name}</span>
+                                          {isAssigned && <div className="w-2 h-2 bg-blue-600 rounded-full" />}
+                                        </button>
+                                      );
+                                    })
+                                  }
+                                </div>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-gray-400 bg-gray-50 p-3 rounded-xl border border-gray-100">
+                          Solo puedes asignarte acciones a ti mismo o a miembros de tu equipo.
+                        </p>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">Notas de seguimiento</label>
+                      <textarea 
+                        rows={2}
+                        readOnly={isReadOnly}
+                        value={editingAction?.notes || ''}
+                        onChange={(e) => setEditingAction({ ...editingAction, notes: e.target.value })}
+                        className={clsx(
+                          "w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm",
+                          isReadOnly && "bg-gray-50 opacity-75 cursor-default focus:ring-gray-200"
+                        )}
+                        placeholder="Observaciones de progreso..."
+                      />
+                    </div>
+                  </>
+                )}
 
                 <div className="p-4 bg-orange-50/50 rounded-2xl border border-orange-100/50 space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                       <AlertCircle size={20} className="text-orange-600" />
-                       <span className="font-bold text-gray-800 text-sm">Escalación de PDCAs</span>
+                      <AlertCircle size={20} className="text-orange-600" />
+                      <span className="font-bold text-gray-800 text-sm">Escalación</span>
                     </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
+                    <label className={clsx(
+                      "relative inline-flex items-center",
+                      isReadOnly ? "cursor-default" : "cursor-pointer"
+                    )}>
                       <input 
                         type="checkbox" 
                         checked={isEscalated}
+                        disabled={isReadOnly}
                         onChange={(e) => setIsEscalated(e.target.checked)}
                         className="sr-only peer" 
                       />
@@ -1324,101 +1781,148 @@ export default function ActionPlanPage() {
                   </div>
                   
                   {isEscalated && (
-                    <div className="animate-in slide-in-from-top-2 duration-200 pb-2">
-                       <label className="block text-xs font-bold text-orange-700 mb-2 uppercase tracking-wider">Escalar a otro Foro</label>
-                       <select 
-                        value={escalatedToForumId}
-                        onChange={(e) => setEscalatedToForumId(e.target.value)}
-                        className="w-full px-4 py-2.5 border border-orange-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none bg-white text-sm"
-                       >
-                          <option value="">Seleccionar foro destino...</option>
-                          {forums.map(f => (
-                            <option key={f.id} value={f.id}>{f.name} ({f.teamName})</option>
-                          ))}
-                       </select>
+                    <div className="animate-in slide-in-from-top-2 duration-200 space-y-4">
+                       <div>
+                         <label className="block text-xs font-bold text-orange-700 mb-2 uppercase tracking-wider">Escalar a otro Foro</label>
+                         <select 
+                           value={escalatedToForumId}
+                           disabled={isReadOnly}
+                           onChange={(e) => setEscalatedToForumId(e.target.value)}
+                           className={clsx(
+                             "w-full px-4 py-2.5 border border-orange-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none bg-white text-sm",
+                             isReadOnly && "bg-gray-50 opacity-75 cursor-not-allowed"
+                           )}
+                         >
+                           <option value="">Seleccionar foro destino...</option>
+                           {forums.map(f => (
+                             <option key={f.id} value={f.id}>{f.name} ({f.teamName})</option>
+                           ))}
+                         </select>
+                       </div>
+
+                       {editingAction?.escalationHistory && editingAction.escalationHistory.length > 0 && (
+                          <div className="bg-white/50 rounded-xl border border-orange-100 p-4">
+                             <h4 className="text-[10px] font-black text-orange-800 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                               <History size={12} />
+                               Historial de Escalación
+                             </h4>
+                             <div className="space-y-4 relative before:absolute before:left-[7px] before:top-2 before:bottom-2 before:w-0.5 before:bg-orange-100">
+                                {editingAction.escalationHistory.map((entry, idx) => (
+                                  <div key={idx} className="relative pl-6">
+                                     <div className="absolute left-0 top-1.5 w-3.5 h-3.5 rounded-full bg-orange-100 border-2 border-orange-400 flex items-center justify-center">
+                                        <div className="w-1 h-1 bg-orange-600 rounded-full" />
+                                     </div>
+                                     <div className="bg-white border border-gray-100 rounded-lg p-3 shadow-sm">
+                                        <div className="flex justify-between items-start mb-1">
+                                           <span className="text-[10px] font-bold text-gray-700 uppercase">{entry.toForumName}</span>
+                                           <span className="text-[9px] text-gray-400 font-medium">{format(new Date(entry.at), 'dd/MM/yyyy HH:mm')}</span>
+                                        </div>
+                                        <p className="text-[11px] text-gray-600 leading-relaxed italic">"{entry.note}"</p>
+                                        <p className="text-[9px] text-gray-400 mt-1 font-medium">Por: {entry.byName}</p>
+                                     </div>
+                                  </div>
+                                ))}
+                             </div>
+                          </div>
+                       )}
                     </div>
                   )}
                 </div>
               </div>
 
-              <div className="lg:col-span-2 space-y-4 lg:border-l lg:border-gray-100 lg:pl-8 pt-8 lg:pt-0">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <h3 className="text-base font-bold text-gray-800">Subacciones</h3>
-                    <p className="text-xs text-gray-400">Pasos detallados para completar</p>
+              {type !== 'incidencia' && (
+                <div className="lg:col-span-2 space-y-4 lg:border-l lg:border-gray-100 lg:pl-8 pt-8 lg:pt-0">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h3 className="text-base font-bold text-gray-800">Subacciones</h3>
+                      <p className="text-xs text-gray-400">Pasos detallados para completar</p>
+                    </div>
+                    {!isReadOnly && (
+                      <button 
+                        type="button"
+                        onClick={addTempSubAction}
+                        className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-xl flex items-center gap-1.5 transition-all"
+                      >
+                        <Plus size={16} />
+                        <span className="text-xs font-bold">Añadir</span>
+                      </button>
+                    )}
                   </div>
-                  <button 
-                    type="button"
-                    onClick={addTempSubAction}
-                    className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-xl flex items-center gap-1.5 transition-all"
-                  >
-                    <Plus size={16} />
-                    <span className="text-xs font-bold">Añadir</span>
-                  </button>
-                </div>
 
-                <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
-                  {tempSubActions.map((sub, idx) => (
-                    <div key={idx} className="bg-white p-4 rounded-xl border border-gray-100 space-y-4 relative group hover:border-blue-200 transition-colors">
-                      <div className="flex items-start gap-3">
-                        <input 
-                          type="checkbox"
-                          checked={sub.completed}
-                          onChange={(e) => handleSubActionChange(idx, 'completed', e.target.checked)}
-                          className="mt-1 w-5 h-5 rounded-lg text-blue-600 focus:ring-blue-500 transition-all border-gray-300 cursor-pointer"
-                        />
-                        <textarea
-                          rows={1}
-                          value={sub.title || ''}
-                          onChange={(e) => handleSubActionChange(idx, 'title', e.target.value)}
-                          className="flex-1 bg-transparent border-none p-0 focus:ring-0 text-sm font-medium text-gray-800 placeholder-gray-400 resize-none"
-                          placeholder="Título de la subacción..."
-                        />
-                        <button 
-                          type="button"
-                          onClick={() => removeTempSubAction(idx, sub.id)}
-                          className="text-gray-300 hover:text-red-500 transition-colors p-1"
-                        >
-                           <Trash2 size={16} />
-                        </button>
+                  <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+                    {tempSubActions.map((sub, idx) => (
+                      <div key={idx} className="bg-white p-4 rounded-xl border border-gray-100 space-y-4 relative group hover:border-blue-200 transition-colors">
+                        <div className="flex items-start gap-3">
+                          <input 
+                            type="checkbox"
+                            checked={sub.completed}
+                            disabled={isReadOnly}
+                            onChange={(e) => handleSubActionChange(idx, 'completed', e.target.checked)}
+                            className={clsx(
+                              "mt-1 w-5 h-5 rounded-lg text-blue-600 focus:ring-blue-500 transition-all border-gray-300",
+                              isReadOnly ? "cursor-default" : "cursor-pointer"
+                            )}
+                          />
+                          <textarea
+                            rows={1}
+                            readOnly={isReadOnly}
+                            value={sub.title || ''}
+                            onChange={(e) => handleSubActionChange(idx, 'title', e.target.value)}
+                            className="flex-1 bg-transparent border-none p-0 focus:ring-0 text-sm font-medium text-gray-800 placeholder-gray-400 resize-none"
+                            placeholder="Título de la subacción..."
+                          />
+                          {!isReadOnly && (
+                            <button 
+                              type="button"
+                              onClick={() => removeTempSubAction(idx, sub.id)}
+                              className="text-gray-300 hover:text-red-500 transition-colors p-1"
+                            >
+                               <Trash2 size={16} />
+                            </button>
+                          )}
+                        </div>
+                        
+                        <div className="flex items-center justify-between pt-3 border-t border-gray-50">
+                           <div className="flex items-center gap-2">
+                              <Clock size={14} className="text-gray-400" />
+                              <input 
+                                type="date"
+                                value={sub.currentProposedDate || ''}
+                                disabled={isReadOnly}
+                                onChange={(e) => handleSubActionChange(idx, 'currentProposedDate', e.target.value)}
+                                className={clsx(
+                                  "bg-gray-50 border-none rounded-lg px-2 py-1 text-xs text-gray-600 focus:ring-2 focus:ring-blue-500 outline-none",
+                                  isReadOnly && "opacity-50 cursor-not-allowed"
+                                )}
+                              />
+                           </div>
+                           {sub.id && (
+                            <button 
+                              type="button"
+                              onClick={() => setSelectedSubActionForHistory(sub as SubAction)}
+                              className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 transition-colors"
+                              title="Ver histórico"
+                            >
+                              <History size={16} />
+                            </button>
+                           )}
+                        </div>
                       </div>
-                      
-                      <div className="flex items-center justify-between pt-3 border-t border-gray-50">
-                         <div className="flex items-center gap-2">
-                            <Clock size={14} className="text-gray-400" />
-                            <input 
-                              type="date"
-                              value={sub.currentProposedDate || ''}
-                              onChange={(e) => handleSubActionChange(idx, 'currentProposedDate', e.target.value)}
-                              className="bg-gray-50 border-none rounded-lg px-2 py-1 text-xs text-gray-600 focus:ring-2 focus:ring-blue-500 outline-none"
-                            />
-                         </div>
-                         {sub.id && (
-                          <button 
-                            type="button"
-                            onClick={() => setSelectedSubActionForHistory(sub as SubAction)}
-                            className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 transition-colors"
-                            title="Ver histórico"
-                          >
-                            <History size={16} />
-                          </button>
-                         )}
+                    ))}
+                    {tempSubActions.length === 0 && (
+                      <div className="text-center py-12 bg-gray-50/50 rounded-2xl border-2 border-dashed border-gray-200">
+                         <CheckCircle2 size={32} className="mx-auto text-gray-300 mb-2" />
+                         <p className="text-sm text-gray-400">Sin pasos adicionales</p>
                       </div>
-                    </div>
-                  ))}
-                  {tempSubActions.length === 0 && (
-                    <div className="text-center py-12 bg-gray-50/50 rounded-2xl border-2 border-dashed border-gray-200">
-                       <CheckCircle2 size={32} className="mx-auto text-gray-300 mb-2" />
-                       <p className="text-sm text-gray-400">Sin pasos adicionales</p>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
 
           <div className="pt-6 mt-6 flex flex-col sm:flex-row justify-end gap-3 border-t border-gray-100">
-            {editingAction?.id && editingAction.status !== 'finalizada' && editingAction.status !== 'cancelada' && (
+            {!isReadOnly && type !== 'incidencia' && editingAction?.id && editingAction.status !== 'finalizada' && editingAction.status !== 'cancelada' && (
               <button
                 type="button"
                 onClick={() => handleFinalizeAction(editingAction as ActionPlan)}
@@ -1428,7 +1932,7 @@ export default function ActionPlanPage() {
                 Finalizar
               </button>
             )}
-            {editingAction?.id && editingAction.status !== 'cancelada' && (
+            {!isReadOnly && editingAction?.id && editingAction.status !== 'cancelada' && (
               <button
                 type="button"
                 onClick={() => handleCancelAction(editingAction as ActionPlan)}
@@ -1441,18 +1945,25 @@ export default function ActionPlanPage() {
             <button
               type="button"
               onClick={() => { setEditingAction(null); setTempSubActions([]); }}
-              className="w-full sm:w-auto px-6 py-3 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded-xl transition-all"
+              className={clsx(
+                "w-full sm:w-auto px-6 py-3 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded-xl transition-all",
+                isReadOnly && "flex-1"
+              )}
             >
               Cerrar
             </button>
-            <button
-              type="submit"
-              className="w-full sm:w-auto px-10 py-3 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-all transform hover:-translate-y-0.5 active:translate-y-0"
-            >
-              Guardar Cambios
-            </button>
+            {!isReadOnly && (
+              <button
+                type="submit"
+                className="w-full sm:w-auto px-10 py-3 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-all transform hover:-translate-y-0.5 active:translate-y-0"
+              >
+                {editingAction?.id ? 'Guardar Cambios' : (type === 'incidencia' ? 'Crear Incidencia' : 'Crear Acción')}
+              </button>
+            )}
           </div>
         </form>
+        );
+      })()}
       </Modal>
 
       {/* History Modal */}
