@@ -3,6 +3,7 @@ export type Status = 'active' | 'inactive';
 
 export interface CompanySettings {
   forumVirtualHorizonMonths: number;
+  maxEscalationLevels?: number;
 }
 
 export interface Company {
@@ -189,6 +190,8 @@ export interface Incident {
   escalationHistory?: EscalationHistoryEntry[];
   status: 'abierta' | 'en_accion' | 'resuelta';
   actionId?: string;
+  viewedUpdates?: Record<string, boolean>;
+  modifiedFields?: string[];
 }
 
 export interface ActionPlan {
@@ -225,6 +228,8 @@ export interface ActionPlan {
   originForumId?: string; // Forum where it was created
   originForumName?: string; // Name of the forum where it was created
   escalationHistory?: EscalationHistoryEntry[];
+  viewedUpdates?: Record<string, boolean>;
+  modifiedFields?: string[];
 }
 
 export interface SubActionAudit {
@@ -284,6 +289,7 @@ export interface Forum {
   sections: ForumSection[];
   createdBy: string;
   createdAt: string;
+  level?: number;
 }
 
 export interface ForumAttendee {

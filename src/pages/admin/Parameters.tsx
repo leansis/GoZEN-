@@ -8,13 +8,19 @@ import { handleFirestoreError, OperationType } from '../../lib/firestore-utils';
 export default function Parameters() {
   const { company, activeCompanyId, isAdmin } = useAuth();
   const [horizonMonths, setHorizonMonths] = useState<number>(3);
+  const [maxEscalationLevels, setMaxEscalationLevels] = useState<number>(1);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    if (company?.settings?.forumVirtualHorizonMonths) {
-      setHorizonMonths(company.settings.forumVirtualHorizonMonths);
+    if (company?.settings) {
+      if (company.settings.forumVirtualHorizonMonths) {
+        setHorizonMonths(company.settings.forumVirtualHorizonMonths);
+      }
+      if (company.settings.maxEscalationLevels !== undefined) {
+        setMaxEscalationLevels(company.settings.maxEscalationLevels);
+      }
     }
   }, [company]);
 
@@ -27,7 +33,8 @@ export default function Parameters() {
 
     try {
       await updateDoc(doc(db, 'companies', activeCompanyId), {
-        'settings.forumVirtualHorizonMonths': horizonMonths
+        'settings.forumVirtualHorizonMonths': horizonMonths,
+        'settings.maxEscalationLevels': maxEscalationLevels
       });
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
@@ -85,6 +92,28 @@ export default function Parameters() {
                 max="24"
                 value={horizonMonths}
                 onChange={(e) => setHorizonMonths(parseInt(e.target.value) || 1)}
+                className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-center font-semibold"
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pt-6 border-t border-gray-100">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Niveles permitidos a escalar
+              </label>
+              <p className="text-xs text-gray-500 mb-3">
+                Define cuántos niveles superiores puede saltar una acción al ser escalada. 
+                Por ejemplo, si es 1, solo se puede escalar al nivel inmediatamente superior.
+              </p>
+            </div>
+            <div className="w-full md:w-32">
+              <input
+                type="number"
+                min="1"
+                max="5"
+                value={maxEscalationLevels}
+                onChange={(e) => setMaxEscalationLevels(parseInt(e.target.value) || 1)}
                 className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-center font-semibold"
               />
             </div>

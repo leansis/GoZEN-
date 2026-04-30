@@ -577,6 +577,7 @@ export default function Forums() {
   const forumColumns = [
     { header: 'Nombre', accessor: 'name' as keyof Forum },
     { header: 'Equipo', accessor: 'teamName' as keyof Forum },
+    { header: 'Nivel', accessor: (f: Forum) => f.level || 0 },
     { header: 'Frecuencia', accessor: (f: Forum) => getFrequencyLabel(f) },
     { 
       header: 'Duración', 
@@ -888,6 +889,18 @@ export default function Forums() {
                 value={editingForum?.estimatedDuration || 15}
                 onChange={(e) => setEditingForum({ ...editingForum, estimatedDuration: parseInt(e.target.value) })}
                 className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Nivel del Foro</label>
+              <input
+                type="number"
+                min="0"
+                required
+                value={editingForum?.level || 0}
+                onChange={(e) => setEditingForum({ ...editingForum, level: parseInt(e.target.value) || 0 })}
+                className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm"
+                placeholder="0 = Base, 1 = Nivel 1, etc."
               />
             </div>
             

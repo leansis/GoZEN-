@@ -61,7 +61,7 @@ export default function Layout() {
     { name: 'Indicadores', path: '/admin/indicators', icon: BarChart3 },
     { name: 'Categorías de Acción', path: '/admin/action-categories', icon: Tag },
     { name: 'Importación de maestros', path: '/admin/master-data', icon: Database },
-    { name: 'Parámetros', path: '/admin/parameters', icon: Settings },
+    { name: 'Configuración', path: '/admin/parameters', icon: Settings },
   ];
 
   return (

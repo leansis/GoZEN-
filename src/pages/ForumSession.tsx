@@ -33,6 +33,7 @@ import {
   List as ListIcon,
   ArrowUp,
 } from "lucide-react";
+import { motion, AnimatePresence } from "motion/react";
 import { useAuth } from "../AuthContext";
 import { useAppData } from "../contexts/AppDataContext";
 import { 
@@ -97,7 +98,6 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { motion, AnimatePresence } from "motion/react";
 import Modal from "../components/Modal";
 
 // --- Components ---
@@ -254,7 +254,7 @@ const ChevronDiagram = ({
 export default function ForumSession() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
-  const { dbUser, activeCompanyId } = useAuth();
+  const { dbUser, company, activeCompanyId } = useAuth();
   const { forums, users, indicators } = useAppData();
 
   const [session, setSession] = useState<ForumSessionType | null>(null);
@@ -363,10 +363,12 @@ export default function ForumSession() {
       const allActions = snap.docs.map(
         (doc) => ({ id: doc.id, ...doc.data() }) as ActionPlan,
       );
-      // Filter by forum association (origin or escalated)
+      // Filter by forum association (origin, escalated to, or escalated from)
       const forumActions = allActions.filter(
         (a) =>
-          a.originForumId === forum.id || a.escalatedToForumId === forum.id,
+          a.originForumId === forum.id || 
+          a.escalatedToForumId === forum.id ||
+          a.escalationHistory?.some((h: any) => h.fromForumId === forum.id),
       );
       setActions(
         forumActions.map((a) => ({
@@ -475,7 +477,12 @@ export default function ForumSession() {
   }, [selectedTypology, forumIndicators, selectedIndicatorId]);
 
   const forumIncidents = useMemo(() => {
-    return incidents.filter((i) => (i.forumId === forum?.id || i.escalatedToForumId === forum?.id) && (i.status === 'abierta' || !i.status));
+    return incidents.filter((i) => 
+      (i.forumId === forum?.id || 
+       i.escalatedToForumId === forum?.id || 
+       i.escalationHistory?.some((h: any) => h.fromForumId === forum?.id)) && 
+      (i.status === 'abierta' || !i.status)
+    );
   }, [incidents, forum]);
 
   const effectiveSectionIndex =
@@ -611,6 +618,34 @@ export default function ForumSession() {
     }
   };
 
+  const handleCloseModal = async () => {
+    if (editingAction?.id && forum?.id) {
+      const currentOriginId = (editingAction as any).originForumId || (editingAction as any).forumId;
+      const isOrigin = currentOriginId === forum.id;
+      if (isOrigin && (editingAction as any).viewedUpdates?.[forum.id] === false) {
+         const ref = doc(db, type === 'incidencia' ? 'incidents' : 'actionPlans', editingAction.id);
+         await updateDoc(ref, {
+            [`viewedUpdates.${forum.id}`]: true,
+            modifiedFields: []
+         });
+      }
+    }
+    if (type === 'incidencia' && backToActionId) {
+      const prevAction = actions.find(a => a.id === backToActionId);
+      if (prevAction) {
+        setEditingAction(prevAction as any);
+        setType('accion');
+        setBackToActionId(null);
+        return;
+      }
+    }
+    setEditingAction(null);
+    setTempSubActions([]);
+    setShowUserSelector(false);
+    setUserSearchQuery("");
+    setBackToActionId(null);
+  };
+
   const handleFinalizeAction = async () => {
     if (!editingAction?.id || !dbUser) return;
     try {
@@ -673,10 +708,15 @@ export default function ForumSession() {
           createdByName: editingAction.createdByName || dbUser.name,
           isEscalated: isEscalated,
           escalatedToForumId: escalatedToForumId || '',
-          status: 'abierta'
+          status: 'abierta',
+          viewedUpdates: editingAction.viewedUpdates || {},
+          modifiedFields: editingAction.modifiedFields || []
         };
 
-        if (isEscalated && (!editingAction.isEscalated || (editingAction.escalatedToForumId !== escalatedToForumId))) {
+        const isNewlyEscalated = isEscalated && !editingAction.isEscalated;
+        const escalationChanged = isEscalated && (editingAction.escalatedToForumId !== escalatedToForumId);
+
+        if (isNewlyEscalated || escalationChanged) {
           incidentPayload.escalatedBy = dbUser.uid;
           incidentPayload.escalatedByName = dbUser.name;
           incidentPayload.escalatedAt = now;
@@ -696,6 +736,26 @@ export default function ForumSession() {
           };
           
           incidentPayload.escalationHistory = [...(editingAction.escalationHistory || []), historyEntry];
+          
+          // Clear notification markers if re-escalating
+          incidentPayload.viewedUpdates = {};
+          incidentPayload.modifiedFields = [];
+        }
+
+        // Notification Track for incidents
+        if (editingAction.id) {
+          const original = incidents.find(i => i.id === editingAction.id);
+          if (original && forum?.id !== original.forumId) {
+            const modifiedKeys: string[] = [];
+            if (original.title !== incidentPayload.title) modifiedKeys.push('title');
+            if (original.description !== incidentPayload.description) modifiedKeys.push('description');
+            if (original.status !== incidentPayload.status) modifiedKeys.push('status');
+            
+            if (modifiedKeys.length > 0) {
+              incidentPayload.viewedUpdates = { ...(original.viewedUpdates || {}), [original.forumId]: false };
+              incidentPayload.modifiedFields = modifiedKeys;
+            }
+          }
         }
 
         if (editingAction.id) {
@@ -746,12 +806,17 @@ export default function ForumSession() {
         ),
         isEscalated: isEscalated,
         escalatedToForumId: escalatedToForumId || "",
-        originForumId: forum?.id || "",
-        originForumName: forum?.name || "",
+        originForumId: editingAction.originForumId || forum?.id || "",
+        originForumName: editingAction.originForumName || forum?.name || "",
         incidentId: editingAction.incidentId || "",
+        viewedUpdates: editingAction.viewedUpdates || {},
+        modifiedFields: editingAction.modifiedFields || []
       };
 
-      if (isEscalated && (!editingAction.isEscalated || (editingAction.escalatedToForumId !== escalatedToForumId))) {
+      const isNewlyEscalated = isEscalated && !editingAction.isEscalated;
+      const escalationChanged = isEscalated && (editingAction.escalatedToForumId !== escalatedToForumId);
+
+      if (isNewlyEscalated || escalationChanged) {
         actionPayload.escalatedBy = dbUser.uid;
         actionPayload.escalatedByName = dbUser.name;
         actionPayload.escalatedAt = now;
@@ -772,6 +837,36 @@ export default function ForumSession() {
         };
         
         actionPayload.escalationHistory = [...(editingAction.escalationHistory || []), historyEntry];
+        
+        // (1) Una acción escalada pierde el responsable y fecha originales
+        actionPayload.assignedTo = [];
+        actionPayload.assignedToNames = [];
+        actionPayload.targetDate = "";
+        actionPayload.status = "pendiente";
+        
+        // Clear notification markers if re-escalating
+        actionPayload.viewedUpdates = {};
+        actionPayload.modifiedFields = [];
+      }
+
+      // Notification Track for actions
+      if (editingAction.id) {
+        const original = actions.find(a => a.id === editingAction.id);
+        if (original && forum?.id !== original.originForumId) {
+          const modifiedKeys: string[] = [];
+          if (original.title !== actionPayload.title) modifiedKeys.push('title');
+          if (original.description !== actionPayload.description) modifiedKeys.push('description');
+          if (original.status !== actionPayload.status) modifiedKeys.push('status');
+          if (JSON.stringify(original.assignedTo) !== JSON.stringify(actionPayload.assignedTo)) modifiedKeys.push('assignedTo');
+          if (original.targetDate !== actionPayload.targetDate) modifiedKeys.push('targetDate');
+          if (original.priority !== actionPayload.priority) modifiedKeys.push('priority');
+          if (original.notes !== actionPayload.notes) modifiedKeys.push('notes');
+          
+          if (modifiedKeys.length > 0) {
+            actionPayload.viewedUpdates = { ...(original.viewedUpdates || {}), [original.originForumId || '']: false };
+            actionPayload.modifiedFields = modifiedKeys;
+          }
+        }
       }
 
       let actionId = editingAction.id;
@@ -1552,9 +1647,10 @@ export default function ForumSession() {
                                 <div className="flex items-center justify-between text-[9px] font-black uppercase tracking-widest text-gray-400">
                                   <div className="flex items-center gap-1">
                                     <Clock size={10} />
-                                    {format(new Date(incident.createdAt), "dd MMM", {
-                                      locale: es,
-                                    })}
+                                    {(() => {
+                                      const d = new Date(incident.createdAt);
+                                      return !isNaN(d.getTime()) ? format(d, "dd MMM", { locale: es }) : 'N/A';
+                                    })()}
                                   </div>
                                   <div className="flex -space-x-1.5">
                                     <div 
@@ -1717,8 +1813,14 @@ export default function ForumSession() {
                               })
                             : col.value === 'escalados'
                               ? [
-                                  ...actions.filter(a => a && a.originForumId === forum.id && a.isEscalated && a.status !== 'finalizada'),
-                                  ...forumIncidents.filter(i => i && i.forumId === forum.id && i.isEscalated)
+                                  ...actions.filter(a => 
+                                    a && a.isEscalated && a.escalatedToForumId !== forum.id && 
+                                    (a.originForumId === forum.id || a.escalationHistory?.some((h: any) => h.fromForumId === forum.id))
+                                  ),
+                                  ...forumIncidents.filter(i => 
+                                    i && i.isEscalated && i.escalatedToForumId !== forum.id && 
+                                    (i.forumId === forum.id || i.escalationHistory?.some((h: any) => h.fromForumId === forum.id))
+                                  )
                                 ]
                               : actions.filter(a => {
                                   if (!a) return false;
@@ -1756,13 +1858,14 @@ export default function ForumSession() {
                               </div>
                               <div className="flex-1 overflow-y-auto p-2.5 space-y-2 bg-gray-50/30">
                                 {colItems.map((item: any) => {
+                                  if (!item) return null;
                                   const isIncident = 'indicatorId' in item;
                                   const action = item as ActionPlan;
                                   const incident = item as Incident;
 
                                   // Direction indicators
                                   const isComingFromBelow = item.escalatedToForumId === forum?.id;
-                                  const isGoingToAbove = item.forumId === forum?.id && item.isEscalated;
+                                  const isGoingToAbove = item.isEscalated && item.escalatedToForumId !== forum?.id;
 
                                   if (isIncident) {
                                     return (
@@ -1784,9 +1887,17 @@ export default function ForumSession() {
                                         }}
                                         className={clsx(
                                           "bg-white p-2.5 rounded-xl border border-red-100 transition-all group shadow-sm active:scale-95 relative",
-                                          isGoingToAbove ? "opacity-50 grayscale-[0.5] cursor-pointer" : "hover:border-red-300 cursor-pointer"
+                                          isGoingToAbove ? "opacity-60 grayscale-[0.4] cursor-pointer shadow-none" : "hover:border-red-300 cursor-pointer"
                                         )}
       >
+                                        {incident.viewedUpdates?.[forum?.id || ''] === false && (
+                                          <motion.div 
+                                            animate={{ opacity: [0.4, 1, 0.4], scale: [0.8, 1.1, 0.8] }}
+                                            transition={{ duration: 1.5, repeat: Infinity }}
+                                            className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full border-2 border-white shadow-sm z-20"
+                                            title="Actualizado"
+                                          />
+                                        )}
                                         <div className="flex justify-between items-start gap-1 mb-1.5">
                                           <div className="flex gap-1 items-start">
                                             {isComingFromBelow && (
@@ -1804,7 +1915,10 @@ export default function ForumSession() {
                                         <div className="flex items-center justify-between mt-2">
                                           <div className="flex items-center gap-1 text-[8px] font-black uppercase tracking-widest text-gray-400">
                                             <Clock size={9} />
-                                            {format(new Date(incident.createdAt), "dd MMM", { locale: es })}
+                                            {(() => {
+                                              const d = new Date(incident.createdAt);
+                                              return !isNaN(d.getTime()) ? format(d, "dd MMM", { locale: es }) : 'N/A';
+                                            })()}
                                           </div>
                                           <span className="text-[7px] font-black text-red-600 bg-red-50 px-1 py-0.5 rounded uppercase">Incid.</span>
                                         </div>
@@ -1835,10 +1949,18 @@ export default function ForumSession() {
                                         setEscalatedToForumId(action.escalatedToForumId || "");
                                       }}
                                       className={clsx(
-                                        "bg-white p-2.5 rounded-xl border border-gray-100 transition-all group shadow-sm active:scale-95",
-                                        isGoingToAbove ? "opacity-50 grayscale-[0.5] cursor-pointer" : "hover:border-blue-200 cursor-pointer"
+                                        "bg-white p-2.5 rounded-xl border border-gray-100 transition-all group shadow-sm active:scale-95 relative",
+                                        isGoingToAbove ? "opacity-60 grayscale-[0.4] cursor-pointer shadow-none" : "hover:border-blue-200 cursor-pointer"
                                       )}
                                     >
+                                      {action.viewedUpdates?.[forum?.id || ''] === false && (
+                                        <motion.div 
+                                          animate={{ opacity: [0.4, 1, 0.4], scale: [0.8, 1.1, 0.8] }}
+                                          transition={{ duration: 1.5, repeat: Infinity }}
+                                          className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full border-2 border-white shadow-sm z-20"
+                                          title="Actualizado"
+                                        />
+                                      )}
                                       <div className="flex flex-col gap-2">
                                         <div className="flex justify-between items-start gap-1">
                                           <div className="flex gap-1 items-start">
@@ -1855,6 +1977,11 @@ export default function ForumSession() {
                                               )}
                                             </h5>
                                           </div>
+                                          {isGoingToAbove && action.escalatedToForumId && (
+                                            <div className="px-1.5 py-0.5 bg-orange-50 rounded border border-orange-100 flex items-center gap-1 mt-1">
+                                              <span className="text-[7px] font-black text-orange-700 uppercase">Destino: {forums.find(f => f.id === action.escalatedToForumId)?.name || 'Foro Superior'}</span>
+                                            </div>
+                                          )}
                                         </div>
 
                                         {linkedIncident && (
@@ -1888,7 +2015,10 @@ export default function ForumSession() {
                                           </div>
                                           <div className="flex items-center gap-1 text-[10px] font-bold text-gray-400">
                                             <Calendar size={10} />
-                                            {format(new Date(action.targetDate), "dd MMM", { locale: es })}
+                                            {(() => {
+                                              const d = new Date(action.targetDate);
+                                              return !isNaN(d.getTime()) ? format(d, "dd MMM", { locale: es }) : 'N/A';
+                                            })()}
                                           </div>
                                         </div>
                                       </div>
@@ -2015,22 +2145,7 @@ export default function ForumSession() {
       {/* Action Modal Copy from ActionPlan.tsx for consistency */}
       <Modal
         isOpen={!!editingAction}
-        onClose={() => {
-          if (type === 'incidencia' && backToActionId) {
-            const prevAction = actions.find(a => a.id === backToActionId);
-            if (prevAction) {
-              setEditingAction(prevAction as any);
-              setType('accion');
-              setBackToActionId(null);
-              return;
-            }
-          }
-          setEditingAction(null);
-          setTempSubActions([]);
-          setShowUserSelector(false);
-          setUserSearchQuery("");
-          setBackToActionId(null);
-        }}
+        onClose={handleCloseModal}
         title={
           <div className="flex items-center gap-6">
             <span>{editingAction?.id ? (type === 'incidencia' ? 'Editar Incidencia' : 'Editar Acción') : (type === 'incidencia' ? 'Nueva Incidencia' : 'Nueva Acción')}</span>
@@ -2061,10 +2176,7 @@ export default function ForumSession() {
         maxWidth="max-w-5xl"
       >
         {(() => {
-          const isReadOnly = (editingAction as any)?.isEscalated === true && (
-            (type === 'incidencia' && (editingAction as any)?.forumId === forum?.id) ||
-            (type === 'accion' && (editingAction as any)?.originForumId === forum?.id)
-          );
+          const isReadOnly = (editingAction as any)?.isEscalated === true && (editingAction as any)?.escalatedToForumId !== forum?.id;
           return (
             <form
               onSubmit={(e) => {
@@ -2091,13 +2203,35 @@ export default function ForumSession() {
                 )}
                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
                   <div className="lg:col-span-3 space-y-6">
-                    <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-widest text-[10px]">
-                        {type === 'incidencia' ? 'Título de la Incidencia' : 'Título de la Acción'}
-                      </label>
-                      <input
-                        type="text"
-                        required
+                    {(() => {
+                        const renderLabel = (text: string, fieldName: string) => {
+                            const currentOriginId = (editingAction as any)?.originForumId || (editingAction as any)?.forumId;
+                            const isOrigin = currentOriginId === forum?.id;
+                            const isModified = editingAction?.modifiedFields?.includes(fieldName);
+                            const showMark = isOrigin && isModified && (editingAction as any)?.viewedUpdates?.[forum?.id || ''] === false;
+                            
+                            return (
+                                <div className="flex items-center gap-2 mb-2">
+                                <label className="block text-sm font-bold text-gray-700 uppercase tracking-widest text-[10px]">
+                                    {text}
+                                </label>
+                                {showMark && (
+                                    <motion.div 
+                                    animate={{ opacity: [0.4, 1, 0.4], scale: [0.8, 1.2, 0.8] }}
+                                    transition={{ duration: 1.5, repeat: Infinity }}
+                                    className="w-2 h-2 bg-blue-500 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.6)]"
+                                    />
+                                )}
+                                </div>
+                            );
+                        };
+                        return (
+                            <>
+                            <div>
+                              {renderLabel(type === 'incidencia' ? 'Título de la Incidencia' : 'Título de la Acción', 'title')}
+                              <input
+                                type="text"
+                                required
                         readOnly={isReadOnly}
                         value={editingAction?.title || ""}
                         onChange={(e) =>
@@ -2144,15 +2278,28 @@ export default function ForumSession() {
 
                 {type === 'incidencia' && (
                   <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-widest text-[10px]">
-                      Fecha de Creación
-                    </label>
+                    <div className="flex items-center gap-2 mb-2">
+                      <label className="block text-sm font-bold text-gray-700 uppercase tracking-widest text-[10px]">
+                        Fecha de Creación
+                      </label>
+                    </div>
                     <input
                       type="date"
                       required
                       readOnly={isReadOnly}
-                      value={editingAction?.createdAt ? new Date(editingAction.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]}
-                      onChange={(e) => setEditingAction({ ...editingAction, createdAt: new Date(e.target.value).toISOString() })}
+                      value={(() => {
+                        if (!editingAction?.createdAt) return new Date().toISOString().split('T')[0];
+                        const d = new Date(editingAction.createdAt);
+                        return !isNaN(d.getTime()) ? d.toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+                      })()}
+                      onChange={(e) => {
+                        if (editingAction) {
+                          const d = new Date(e.target.value);
+                          if (!isNaN(d.getTime())) {
+                            setEditingAction({ ...editingAction, createdAt: d.toISOString() });
+                          }
+                        }
+                      }}
                       className={clsx(
                         "w-full px-4 py-3 border-none rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium",
                         isReadOnly ? "bg-gray-100 cursor-default" : "bg-gray-50"
@@ -2186,9 +2333,18 @@ export default function ForumSession() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-widest text-[10px]">
-                    Descripción / Contexto
-                  </label>
+                  <div className="flex items-center gap-2 mb-2">
+                    <label className="block text-sm font-bold text-gray-700 uppercase tracking-widest text-[10px]">
+                      Descripción / Contexto
+                    </label>
+                    {editingAction?.originForumId === forum?.id && editingAction?.modifiedFields?.includes('description') && (editingAction as any)?.viewedUpdates?.[forum?.id || ''] === false && (
+                      <motion.div 
+                         animate={{ opacity: [0.4, 1, 0.4], scale: [0.8, 1.2, 0.8] }}
+                         transition={{ duration: 1.5, repeat: Infinity }}
+                         className="w-2 h-2 bg-blue-500 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.6)]"
+                      />
+                    )}
+                  </div>
                   <textarea
                     value={editingAction?.description || ""}
                     readOnly={isReadOnly}
@@ -2300,15 +2456,27 @@ export default function ForumSession() {
                     </div>
                   </div>
                 )}
+                            </>
+                        );
+                    })()}
               </div>
 
               <div className="lg:col-span-2 space-y-6">
                 {type !== "incidencia" ? (
                   <>
                     <div className="relative">
-                    <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-widest text-[10px]">
-                      Responsables
-                    </label>
+                    <div className="flex items-center gap-2 mb-2">
+                      <label className="block text-sm font-bold text-gray-700 uppercase tracking-widest text-[10px]">
+                        Responsables
+                      </label>
+                      {editingAction?.originForumId === forum?.id && editingAction?.modifiedFields?.includes('assignedTo') && (editingAction as any)?.viewedUpdates?.[forum?.id || ''] === false && (
+                        <motion.div 
+                           animate={{ opacity: [0.4, 1, 0.4], scale: [0.8, 1.2, 0.8] }}
+                           transition={{ duration: 1.5, repeat: Infinity }}
+                           className="w-2 h-2 bg-blue-500 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.6)]"
+                        />
+                      )}
+                    </div>
                   <div className="bg-gray-50 p-3 rounded-2xl flex flex-wrap gap-2 min-h-[50px] items-center">
                     {(editingAction?.assignedTo || []).map((uid) => {
                       const user = users.find((u) => u.uid === uid);
@@ -2435,9 +2603,18 @@ export default function ForumSession() {
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-widest text-[10px]">
-                        Fecha Límite
-                      </label>
+                      <div className="flex items-center gap-2 mb-2">
+                        <label className="block text-sm font-bold text-gray-700 uppercase tracking-widest text-[10px]">
+                          Fecha Límite
+                        </label>
+                        {editingAction?.originForumId === forum?.id && editingAction?.modifiedFields?.includes('targetDate') && (editingAction as any)?.viewedUpdates?.[forum?.id || ''] === false && (
+                          <motion.div 
+                             animate={{ opacity: [0.4, 1, 0.4], scale: [0.8, 1.2, 0.8] }}
+                             transition={{ duration: 1.5, repeat: Infinity }}
+                             className="w-2 h-2 bg-blue-500 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.6)]"
+                          />
+                        )}
+                      </div>
                       <div className="relative">
                         <Calendar
                           size={14}
@@ -2468,9 +2645,18 @@ export default function ForumSession() {
                       </div>
                     </div>
                     <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-widest text-[10px]">
-                        Prioridad
-                      </label>
+                      <div className="flex items-center gap-2 mb-2">
+                        <label className="block text-sm font-bold text-gray-700 uppercase tracking-widest text-[10px]">
+                          Prioridad
+                        </label>
+                        {editingAction?.originForumId === forum?.id && editingAction?.modifiedFields?.includes('priority') && (editingAction as any)?.viewedUpdates?.[forum?.id || ''] === false && (
+                          <motion.div 
+                             animate={{ opacity: [0.4, 1, 0.4], scale: [0.8, 1.2, 0.8] }}
+                             transition={{ duration: 1.5, repeat: Infinity }}
+                             className="w-2 h-2 bg-blue-500 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.6)]"
+                          />
+                        )}
+                      </div>
                       <select
                         value={editingAction?.priority || "media"}
                         disabled={isReadOnly}
@@ -2500,9 +2686,9 @@ export default function ForumSession() {
                       Indicador del que se genera
                     </label>
                     <select
-                      value={(editingAction as any).indicatorId || ""}
+                      value={(editingAction as any)?.indicatorId || ""}
                       disabled={isReadOnly}
-                      onChange={(e) => setEditingAction({ ...editingAction, indicatorId: e.target.value } as any)}
+                      onChange={(e) => editingAction && setEditingAction({ ...editingAction, indicatorId: e.target.value } as any)}
                       className={clsx(
                         "w-full px-4 py-3 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium",
                         isReadOnly && "opacity-50 cursor-not-allowed"
@@ -2574,7 +2760,11 @@ export default function ForumSession() {
                            <p className="text-[10px] font-bold text-gray-600">De <span className="text-blue-600">{h.fromForumName}</span> a <span className="text-indigo-600">{h.toForumName}</span></p>
                            <div className="flex justify-between items-center text-[8px] font-black uppercase text-gray-400">
                               <span>{h.byName}</span>
-                              <span>{h.at ? format(new Date(h.at), 'dd MMM HH:mm', { locale: es }) : 'N/A'}</span>
+                              <span>{(() => {
+                                if (!h.at) return 'N/A';
+                                const d = new Date(h.at);
+                                return !isNaN(d.getTime()) ? format(d, 'dd MMM HH:mm', { locale: es }) : 'N/A';
+                              })()}</span>
                            </div>
                         </div>
                       ))}
@@ -2625,7 +2815,19 @@ export default function ForumSession() {
                       >
                         <option value="">Seleccionar foro superior...</option>
                         {forums
-                          .filter((f) => f.id !== forum?.id)
+                          .filter((f) => {
+                            if (f.id === forum?.id) return false;
+                            
+                            // If levels are defined and different, use the hierarchy logic
+                            const currentLevel = forum?.level || 0;
+                            const targetLevel = f.level || 0;
+                            
+                            // Better logic: if there are different levels, show those with higher level (assuming higher number = more authority)
+                            // or if levels aren't used (both 0), show all others.
+                            if (currentLevel === 0 && targetLevel === 0) return true;
+                            
+                            return targetLevel > currentLevel;
+                          })
                           .map((f) => (
                             <option key={f.id} value={f.id}>
                               {f.name}
@@ -2665,10 +2867,7 @@ export default function ForumSession() {
             <div className={clsx("flex gap-3", (!editingAction?.id || isReadOnly) && "w-full")}>
               <button
                 type="button"
-                onClick={() => {
-                  setEditingAction(null);
-                  setTempSubActions([]);
-                }}
+                onClick={handleCloseModal}
                 className={clsx(
                   "px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-widest hover:bg-gray-100 rounded-2xl transition-all",
                   (!editingAction?.id || isReadOnly) && "flex-1",
