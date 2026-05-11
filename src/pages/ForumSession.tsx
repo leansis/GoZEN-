@@ -255,7 +255,7 @@ export default function ForumSession() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
   const { dbUser, company, activeCompanyId } = useAuth();
-  const { forums, users, indicators } = useAppData();
+  const { forums, users, indicators, getTeamParentChain } = useAppData();
 
   const [session, setSession] = useState<ForumSessionType | null>(null);
   const [forum, setForum] = useState<Forum | null>(null);
@@ -284,6 +284,8 @@ export default function ForumSession() {
   const [escalatedToForumId, setEscalatedToForumId] = useState("");
   const [showUserSelector, setShowUserSelector] = useState(false);
   const [userSearchQuery, setUserSearchQuery] = useState("");
+  const [showIncidentSelector, setShowIncidentSelector] = useState(false);
+  const [incidentSearchQuery, setIncidentSearchQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [backToActionId, setBackToActionId] = useState<string | null>(null);
   const isAdmin = dbUser?.role === "admin";
@@ -302,6 +304,19 @@ export default function ForumSession() {
   const [dragOverId, setDragOverId] = useState<string | null>(null);
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  
+  useEffect(() => {
+    if (editingAction) {
+      setType(editingAction.type || 'accion');
+      setIsEscalated(false); // Reset to false when opening
+      setEscalatedToForumId(editingAction.escalatedToForumId || '');
+    } else {
+      setShowIncidentSelector(false);
+      setIncidentSearchQuery("");
+      setShowUserSelector(false);
+      setUserSearchQuery("");
+    }
+  }, [editingAction]);
 
   // DnD Sensors
   const sensors = useSensors(
@@ -366,7 +381,7 @@ export default function ForumSession() {
       // Filter by forum association (origin, escalated to, or escalated from)
       const forumActions = allActions.filter(
         (a) =>
-          a.originForumId === forum.id || 
+          (a.originForumId || (a as any).forumId) === forum.id || 
           a.escalatedToForumId === forum.id ||
           a.escalationHistory?.some((h: any) => h.fromForumId === forum.id),
       );
@@ -488,11 +503,14 @@ export default function ForumSession() {
   const effectiveSectionIndex =
     localSectionIndex ?? session?.currentSectionIndex ?? 0;
 
-  const isFuture = useMemo(() => {
-    if (!session) return false;
+  const { isFuture, isToday } = useMemo(() => {
+    if (!session) return { isFuture: false, isToday: false };
     const today = format(new Date(), "yyyy-MM-dd");
     const sessionDate = session.scheduledAt.split("T")[0];
-    return sessionDate > today;
+    return {
+      isFuture: sessionDate > today,
+      isToday: sessionDate === today
+    };
   }, [session]);
 
   useEffect(() => {
@@ -556,12 +574,15 @@ export default function ForumSession() {
               createdByName: dbUser?.name || '',
               assignedTo: [],
               assignedToNames: [],
-              originForumId: forum?.id || "",
-              originForumName: forum?.name || "",
+              originForumId: incident.forumId || forum?.id || "",
+              originForumName: incident.forumName || forum?.name || "",
               forumId: forum?.id || "",
               companyId: forum?.companyId || incident.companyId || dbUser?.companyId || '',
               incidentId: incident.id,
-              type: 'incidencia'
+              type: 'incidencia',
+              isEscalated: incident.isEscalated || false,
+              escalatedToForumId: incident.escalatedToForumId || "",
+              escalationHistory: incident.escalationHistory || []
             };
 
             const actionRef = await addDoc(collection(db, 'actionPlans'), actionPayload);
@@ -600,7 +621,7 @@ export default function ForumSession() {
           setEditingAction({ ...action });
           setTempSubActions(subActions.filter(s => s.actionId === action.id));
           setType(action.type || 'accion');
-          setIsEscalated(action.isEscalated || false);
+          setIsEscalated(false);
           setEscalatedToForumId(action.escalatedToForumId || "");
           return;
         }
@@ -608,6 +629,7 @@ export default function ForumSession() {
         if (columnValue === 'hoy') {
            await updateDoc(doc(db, "actionPlans", id), {
              targetDate: todayStr,
+             priority: action.priority || 'media',
              updatedAt: now.toISOString(),
              status: calculateAutomaticStatus(todayStr, action.status)
            });
@@ -618,17 +640,34 @@ export default function ForumSession() {
     }
   };
 
+  const checkAndResolveIncident = async (incidentId: string, currentActionId?: string, isCompleting?: boolean) => {
+    if (!incidentId) return;
+    
+    // Get all actions linked to this incident
+    const linkedActions = (actions as ActionPlan[]).filter(a => a.incidentId === incidentId);
+    
+    // Check if all actions are 'finalizada'
+    const allDone = linkedActions.every(a => {
+      if (a.id === currentActionId) return isCompleting;
+      return a.status === 'finalizada';
+    });
+
+    if (allDone && linkedActions.length > 0) {
+      await updateDoc(doc(db, 'incidents', incidentId), {
+        status: 'resuelta'
+      });
+    }
+  };
+
   const handleCloseModal = async () => {
     if (editingAction?.id && forum?.id) {
-      const currentOriginId = (editingAction as any).originForumId || (editingAction as any).forumId;
-      const isOrigin = currentOriginId === forum.id;
-      if (isOrigin && (editingAction as any).viewedUpdates?.[forum.id] === false) {
-         const ref = doc(db, type === 'incidencia' ? 'incidents' : 'actionPlans', editingAction.id);
-         await updateDoc(ref, {
-            [`viewedUpdates.${forum.id}`]: true,
-            modifiedFields: []
-         });
-      }
+       // Mark as read for the current forum if they were notified
+       if ((editingAction as any).viewedUpdates?.[forum.id] === false) {
+          const ref = doc(db, type === 'incidencia' ? 'incidents' : 'actionPlans', editingAction.id);
+          await updateDoc(ref, {
+             [`viewedUpdates.${forum.id}`]: true
+          });
+       }
     }
     if (type === 'incidencia' && backToActionId) {
       const prevAction = actions.find(a => a.id === backToActionId);
@@ -650,13 +689,29 @@ export default function ForumSession() {
     if (!editingAction?.id || !dbUser) return;
     try {
       setIsSaving(true);
-      await updateDoc(doc(db, "actionPlans", editingAction.id), {
-        status: "finalizada",
+      const isIncident = type === "incidencia" || "indicatorId" in editingAction;
+      const collectionName = isIncident ? "incidents" : "actionPlans";
+      const newStatus = isIncident ? "resuelta" : "finalizada";
+
+      const updatePayload: any = {
+        status: newStatus,
         updatedAt: new Date().toISOString(),
-      });
+      };
+
+      if (!isIncident) {
+        updatePayload.priority = (editingAction as any).priority || "media";
+      }
+
+      await updateDoc(doc(db, collectionName, editingAction.id), updatePayload);
+      
+      const originalAction = (isIncident ? forumIncidents : actions).find(a => a.id === editingAction.id);
+      if (!isIncident && (originalAction as any)?.incidentId) {
+        await checkAndResolveIncident((originalAction as any).incidentId, originalAction.id, true);
+      }
+
       setEditingAction(null);
     } catch (err) {
-      console.error("Error finalizing action:", err);
+      console.error("Error finalizing:", err);
     } finally {
       setIsSaving(false);
     }
@@ -668,6 +723,7 @@ export default function ForumSession() {
       setIsSaving(true);
       await updateDoc(doc(db, "actionPlans", editingAction.id), {
         status: "cancelada",
+        priority: (editingAction as any).priority || "media",
         updatedAt: new Date().toISOString(),
       });
       setEditingAction(null);
@@ -745,14 +801,31 @@ export default function ForumSession() {
         // Notification Track for incidents
         if (editingAction.id) {
           const original = incidents.find(i => i.id === editingAction.id);
-          if (original && forum?.id !== original.forumId) {
+          const ownerId = original?.isEscalated && original.escalatedToForumId 
+            ? original.escalatedToForumId 
+            : (original?.forumId);
+            
+          if (original && forum?.id === ownerId) {
             const modifiedKeys: string[] = [];
             if (original.title !== incidentPayload.title) modifiedKeys.push('title');
             if (original.description !== incidentPayload.description) modifiedKeys.push('description');
             if (original.status !== incidentPayload.status) modifiedKeys.push('status');
             
             if (modifiedKeys.length > 0) {
-              incidentPayload.viewedUpdates = { ...(original.viewedUpdates || {}), [original.forumId]: false };
+              const updateObj: Record<string, boolean> = { ...(original.viewedUpdates || {}) };
+              
+              // Notify origin
+              const originId = original.forumId;
+              if (originId && originId !== forum?.id) updateObj[originId] = false;
+              
+              // Notify history
+              original.escalationHistory?.forEach((h: any) => {
+                if (h.fromForumId && h.fromForumId !== forum?.id) {
+                  updateObj[h.fromForumId] = false;
+                }
+              });
+
+              incidentPayload.viewedUpdates = updateObj;
               incidentPayload.modifiedFields = modifiedKeys;
             }
           }
@@ -791,13 +864,14 @@ export default function ForumSession() {
         description: editingAction.description || "",
         type: type,
         status: autoStatus,
-        priority: editingAction.priority || "media",
+        priority: (editingAction as any).priority || "media",
         categoryId: editingAction.categoryId || "",
         categoryName:
           categories.find((c) => c.id === editingAction.categoryId)?.name || "",
         targetDate: editingAction.targetDate,
         dateChangeCount: editingAction.dateChangeCount || 0,
         notes: editingAction.notes || "",
+        customFields: editingAction.customFields || {},
         companyId: companyId,
         updatedAt: now,
         assignedTo: editingAction.assignedTo || [],
@@ -852,65 +926,177 @@ export default function ForumSession() {
       // Notification Track for actions
       if (editingAction.id) {
         const original = actions.find(a => a.id === editingAction.id);
-        if (original && forum?.id !== original.originForumId) {
+        const ownerId = original?.isEscalated && original.escalatedToForumId 
+          ? original.escalatedToForumId 
+          : (original?.originForumId || (original as any)?.forumId);
+
+        if (original && forum?.id === ownerId) {
           const modifiedKeys: string[] = [];
           if (original.title !== actionPayload.title) modifiedKeys.push('title');
           if (original.description !== actionPayload.description) modifiedKeys.push('description');
           if (original.status !== actionPayload.status) modifiedKeys.push('status');
           if (JSON.stringify(original.assignedTo) !== JSON.stringify(actionPayload.assignedTo)) modifiedKeys.push('assignedTo');
           if (original.targetDate !== actionPayload.targetDate) modifiedKeys.push('targetDate');
-          if (original.priority !== actionPayload.priority) modifiedKeys.push('priority');
           if (original.notes !== actionPayload.notes) modifiedKeys.push('notes');
+          if (JSON.stringify(original.customFields) !== JSON.stringify(actionPayload.customFields)) modifiedKeys.push('customFields');
           
           if (modifiedKeys.length > 0) {
-            actionPayload.viewedUpdates = { ...(original.viewedUpdates || {}), [original.originForumId || '']: false };
+            const updateObj: Record<string, boolean> = { ...(original.viewedUpdates || {}) };
+            
+            // Notify origin
+            const originId = original.originForumId || (original as any).forumId;
+            if (originId && originId !== forum?.id) updateObj[originId] = false;
+            
+            // Notify history
+            original.escalationHistory?.forEach((h: any) => {
+              if (h.fromForumId && h.fromForumId !== forum?.id) {
+                updateObj[h.fromForumId] = false;
+              }
+            });
+
+            actionPayload.viewedUpdates = updateObj;
             actionPayload.modifiedFields = modifiedKeys;
           }
         }
       }
 
       let actionId = editingAction.id;
+      const splitMode = company?.settings?.actionPlanMultipleAssigneeMode === 'split';
+      const assignees = actionPayload.assignedTo || [];
 
-      if (editingAction.id) {
-        await updateDoc(
-          doc(db, "actionPlans", editingAction.id),
-          actionPayload,
-        );
-      } else {
-        const newAction = {
+      if (splitMode && assignees.length > 1 && type === 'accion') {
+        // Handle Splitting logic
+        const firstUid = assignees[0];
+        const firstActionPayload = {
           ...actionPayload,
-          createdBy: dbUser.uid,
-          createdByName: dbUser.name,
-          createdAt: now,
+          assignedTo: [firstUid],
+          assignedToNames: [users.find(u => u.uid === firstUid)?.name || 'Desconocido']
         };
-        const docRef = await addDoc(collection(db, "actionPlans"), newAction);
-        actionId = docRef.id;
-      }
 
-      // If this action was created from an incident, update the incident
-      if (actionId && editingAction.incidentId && !editingAction.id) {
-        await updateDoc(doc(db, "incidents", editingAction.incidentId), {
-          status: 'en_accion',
-          actionId: actionId
-        });
-      }
+        if (editingAction.id) {
+          // Update the original document for the first assignee
+          await updateDoc(doc(db, 'actionPlans', editingAction.id), firstActionPayload);
+          actionId = editingAction.id;
 
-      if (actionId) {
+          // Auto-resolve incident if applicable
+          const originalAction = actions.find(a => a.id === editingAction.id);
+          if (firstActionPayload.status === 'finalizada' && originalAction?.incidentId) {
+            await checkAndResolveIncident(originalAction.incidentId, editingAction.id, true);
+          }
+        } else {
+          // Create the first document
+          const newAction = {
+            ...firstActionPayload,
+            createdBy: dbUser.uid,
+            createdByName: dbUser.name,
+            createdAt: now
+          };
+          const docRef = await addDoc(collection(db, 'actionPlans'), newAction);
+          actionId = docRef.id;
+        }
+
+        // Link incident to the first action only
+        if (actionId && editingAction.incidentId && !editingAction.id) {
+          await updateDoc(doc(db, "incidents", editingAction.incidentId), {
+            status: 'en_accion',
+            actionId: actionId
+          });
+        }
+
+        // Handle Subactions for the first action
         for (const sub of tempSubActions) {
           if (sub.id) {
-            await updateDoc(doc(db, "subActions", sub.id), {
-              title: sub.title || "",
+            await updateDoc(doc(db, 'subActions', sub.id), {
+              title: sub.title || '',
               completed: !!sub.completed,
-              currentProposedDate: sub.currentProposedDate || "",
+              currentProposedDate: sub.currentProposedDate || ''
             });
           } else {
-            await addDoc(collection(db, "subActions"), {
-              title: sub.title || "",
+            await addDoc(collection(db, 'subActions'), {
+              title: sub.title || '',
               actionId: actionId,
               companyId: companyId,
               completed: !!sub.completed,
-              currentProposedDate: sub.currentProposedDate || "",
+              currentProposedDate: sub.currentProposedDate || ''
             });
+          }
+        }
+
+        // Create separate actions for the rest of assignees
+        for (let i = 1; i < assignees.length; i++) {
+          const uid = assignees[i];
+          const splitPayload = {
+            ...actionPayload,
+            assignedTo: [uid],
+            assignedToNames: [users.find(u => u.uid === uid)?.name || 'Desconocido'],
+            createdBy: dbUser.uid,
+            createdByName: dbUser.name,
+            createdAt: now,
+            updatedAt: now
+          };
+          const docRef = await addDoc(collection(db, 'actionPlans'), splitPayload);
+          const newActionId = docRef.id;
+
+          // Duplicate subactions for the split action
+          for (const sub of tempSubActions) {
+            await addDoc(collection(db, 'subActions'), {
+              title: sub.title || '',
+              actionId: newActionId,
+              companyId: companyId,
+              completed: !!sub.completed,
+              currentProposedDate: sub.currentProposedDate || ''
+            });
+          }
+        }
+      } else {
+        // Standard non-split logic
+        if (editingAction.id) {
+          await updateDoc(
+            doc(db, "actionPlans", editingAction.id),
+            actionPayload,
+          );
+
+          // Auto-resolve incident if applicable
+          const originalAction = actions.find(a => a.id === editingAction.id);
+          if (actionPayload.status === 'finalizada' && originalAction?.incidentId) {
+            await checkAndResolveIncident(originalAction.incidentId, editingAction.id, true);
+          }
+        } else {
+          const newAction = {
+            ...actionPayload,
+            createdBy: dbUser.uid,
+            createdByName: dbUser.name,
+            createdAt: now,
+          };
+          const docRef = await addDoc(collection(db, "actionPlans"), newAction);
+          actionId = docRef.id;
+        }
+
+        // If this action was created from an incident, update the incident
+        if (actionId && editingAction.incidentId && !editingAction.id) {
+          await updateDoc(doc(db, "incidents", editingAction.incidentId), {
+            status: 'en_accion',
+            actionId: actionId
+          });
+        }
+
+        if (actionId) {
+          for (const sub of tempSubActions) {
+            if (sub.id) {
+              await updateDoc(doc(db, "subActions", sub.id), {
+                title: sub.title || "",
+                completed: !!sub.completed,
+                currentProposedDate: sub.currentProposedDate || "",
+              });
+            } else {
+              await addDoc(collection(db, "subActions"), {
+                title: sub.title || "",
+                actionId: actionId,
+                companyId: companyId,
+                completed: !!sub.completed,
+                currentProposedDate: sub.currentProposedDate || "",
+              });
+            }
           }
         }
       }
@@ -1004,26 +1190,22 @@ export default function ForumSession() {
   const handleStartSession = async () => {
     if (!session) return;
 
-    const today = format(new Date(), "yyyy-MM-dd");
-    const sessionDate = session.scheduledAt.split("T")[0];
-
-    if (sessionDate > today) {
-      // Preparation mode
-      setIsPreparationMode(true);
-      setLocalSectionIndex(1); // Jump to first real section
-      return;
-    }
-
     try {
       await updateDoc(doc(db, "forumSessions", session.id), {
         status: "in_progress",
         startedAt: new Date().toISOString(),
         currentSectionIndex: 0,
       });
+      setIsPreparationMode(false);
       setLocalSectionIndex(0);
     } catch (err) {
       console.error("Error starting session:", err);
     }
+  };
+
+  const handlePrepareSession = () => {
+    setIsPreparationMode(true);
+    setLocalSectionIndex(1); // Jump to first real section
   };
 
   const handleStepChange = async (newStep: number) => {
@@ -1236,22 +1418,39 @@ export default function ForumSession() {
 
           <div className="flex items-center gap-3 shrink-0">
             {session.status === "scheduled" && !isPreparationMode && (
-              <button
-                onClick={handleStartSession}
-                className={clsx(
-                  "flex items-center gap-3 px-8 py-4 text-white rounded-2xl font-black text-xl transition-all",
-                  isFuture
-                    ? "bg-blue-600 hover:bg-blue-700"
-                    : "bg-green-600 hover:bg-green-700",
+              <div className="flex items-center gap-3">
+                {(isFuture || isToday) && (
+                  <button
+                    onClick={handlePrepareSession}
+                    className="flex items-center gap-3 px-8 py-4 bg-blue-600 text-white rounded-2xl font-black text-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-200"
+                  >
+                    <Play size={24} fill="currentColor" />
+                    PREPARAR
+                  </button>
                 )}
-              >
-                <Play size={24} fill="currentColor" />
-                {isFuture ? "PREPARAR" : "INICIAR"}
-              </button>
+                {isToday && (
+                  <button
+                    onClick={handleStartSession}
+                    className="flex items-center gap-3 px-8 py-4 bg-green-600 text-white rounded-2xl font-black text-xl hover:bg-green-700 transition-all shadow-lg shadow-green-200"
+                  >
+                    <Play size={24} fill="currentColor" />
+                    INICIAR
+                  </button>
+                )}
+              </div>
             )}
 
             {(session.status === "in_progress" || isPreparationMode) && (
               <div className="flex items-center gap-3">
+                {isPreparationMode && isToday && (
+                  <button
+                    onClick={handleStartSession}
+                    className="flex items-center gap-3 px-6 py-4 bg-green-600 text-white rounded-2xl font-black text-lg hover:bg-green-700 transition-all shadow-lg shadow-green-200 mr-4"
+                  >
+                    <Play size={20} fill="currentColor" />
+                    INICIAR REUNIÓN
+                  </button>
+                )}
                 {effectiveSectionIndex > 0 && (
                   <button
                     onClick={() => handleStepChange(effectiveSectionIndex - 1)}
@@ -1601,7 +1800,7 @@ export default function ForumSession() {
                                   assignedTo: [],
                                   assignedToNames: [],
                                   status: "pendiente",
-                                  priority: "alta",
+                                  customFields: {},
                                   targetDate: format(new Date(), "yyyy-MM-dd"),
                                   originForumId: forum.id,
                                   originForumName: forum.name,
@@ -1786,10 +1985,10 @@ export default function ForumSession() {
                                 assignedTo: [],
                                 assignedToNames: [],
                                 status: "pendiente",
-                                priority: "media",
                                 targetDate: format(new Date(), "yyyy-MM-dd"),
                                 originForumId: forum.id,
                                 originForumName: forum.name,
+                                customFields: {}
                               });
                               setTempSubActions([]);
                               setType("accion");
@@ -1807,28 +2006,57 @@ export default function ForumSession() {
                           const colItems = col.value === 'incidencias' 
                             ? forumIncidents.filter(i => {
                                 if (!i) return false;
-                                const isNormal = i.forumId === forum.id && !i.isEscalated;
-                                const isReceived = i.escalatedToForumId === forum.id;
-                                return (isNormal || isReceived) && i.status !== 'en_accion';
+                                return i.forumId === forum.id && !i.isEscalated && i.status !== 'en_accion';
                               })
                             : col.value === 'escalados'
-                              ? [
-                                  ...actions.filter(a => 
-                                    a && a.isEscalated && a.escalatedToForumId !== forum.id && 
-                                    (a.originForumId === forum.id || a.escalationHistory?.some((h: any) => h.fromForumId === forum.id))
-                                  ),
-                                  ...forumIncidents.filter(i => 
-                                    i && i.isEscalated && i.escalatedToForumId !== forum.id && 
-                                    (i.forumId === forum.id || i.escalationHistory?.some((h: any) => h.fromForumId === forum.id))
-                                  )
+                               ? [
+                                  ...actions.filter(a => {
+                                    if (!a) return false;
+                                    const ownerId = a.isEscalated && a.escalatedToForumId ? a.escalatedToForumId : (a.escalationHistory?.length ? a.escalationHistory[a.escalationHistory.length - 1].toForumId : (a.originForumId || (a as any).forumId));
+                                    const isOwner = ownerId === forum.id;
+                                    
+                                    // Should it be in "Escalados" for this forum?
+                                    // 1. We are NOT the owner but we are the origin or in history (we sent it away)
+                                    const isOrigin = (a.originForumId || (a as any).forumId) === forum.id;
+                                    const isInHistory = a.escalationHistory?.some((h: any) => h.fromForumId === forum.id);
+                                    if (!isOwner && (isOrigin || isInHistory)) return true;
+                                    
+                                    // 2. We ARE the owner and it is currently escalated but has no date (incoming)
+                                    if (isOwner && a.isEscalated && !a.targetDate) return true;
+                                    
+                                    return false;
+                                  }),
+                                  ...forumIncidents.filter(i => {
+                                    if (!i) return false;
+                                    const ownerId = i.isEscalated && i.escalatedToForumId ? i.escalatedToForumId : (i.escalationHistory?.length ? i.escalationHistory[i.escalationHistory.length - 1].toForumId : i.forumId);
+                                    const isOwner = ownerId === forum.id;
+
+                                    // 1. We are NOT the owner but we are the origin or in history
+                                    const isOrigin = i.forumId === forum.id;
+                                    const isInHistory = i.escalationHistory?.some((h: any) => h.fromForumId === forum.id);
+                                    if (!isOwner && (isOrigin || isInHistory)) return true;
+
+                                    // 2. We ARE the owner and it is currently escalated and not yet converted to action
+                                    if (isOwner && i.isEscalated && i.status !== 'en_accion') return true;
+
+                                    return false;
+                                  })
                                 ]
                               : actions.filter(a => {
                                   if (!a) return false;
-                                  // Show normal actions OR actions escalated TO this forum
-                                  const isNormal = a.originForumId === forum.id && !a.isEscalated;
-                                  const isReceived = a.escalatedToForumId === forum.id;
-                                  return (isNormal || isReceived) && 
-                                         a.status !== 'finalizada' && 
+                                  
+                                  const ownerId = a.isEscalated && a.escalatedToForumId ? a.escalatedToForumId : (a.escalationHistory?.length ? a.escalationHistory[a.escalationHistory.length - 1].toForumId : (a.originForumId || (a as any).forumId));
+                                  const isOwner = ownerId === forum.id;
+                                  
+                                  // In date columns, we ONLY show it if we are the current owner
+                                  // AND (it's not escalated OR it has a date if it is escalated)
+                                  if (!isOwner) return false;
+                                  
+                                  // If we are owner, and it's escalated, it MUST have a date to show in date columns
+                                  // (otherwise it stays in "Escalados")
+                                  if (a.isEscalated && !a.targetDate) return false;
+
+                                  return a.status !== 'finalizada' && 
                                          getActionDateCategory(a.targetDate) === col.value;
                                 });
 
@@ -1863,9 +2091,12 @@ export default function ForumSession() {
                                   const action = item as ActionPlan;
                                   const incident = item as Incident;
 
+                                  const itemOwnerId = item.isEscalated && item.escalatedToForumId ? item.escalatedToForumId : (item.escalationHistory?.length ? item.escalationHistory[item.escalationHistory.length - 1].toForumId : (item.originForumId || (item as any).forumId));
+                                  const isItemOwner = itemOwnerId === forum?.id;
+
                                   // Direction indicators
-                                  const isComingFromBelow = item.escalatedToForumId === forum?.id;
-                                  const isGoingToAbove = item.isEscalated && item.escalatedToForumId !== forum?.id;
+                                  const isComingFromBelow = isItemOwner && (item.originForumId || (item as any).forumId) !== forum?.id;
+                                  const isGoingToAbove = !isItemOwner;
 
                                   if (isIncident) {
                                     return (
@@ -1882,23 +2113,27 @@ export default function ForumSession() {
                                           setEditingAction({ ...incident } as any);
                                           setTempSubActions([]);
                                           setType("incidencia");
-                                          setIsEscalated(incident.isEscalated || false);
+                                          setIsEscalated(false);
                                           setEscalatedToForumId(incident.escalatedToForumId || "");
                                         }}
                                         className={clsx(
-                                          "bg-white p-2.5 rounded-xl border border-red-100 transition-all group shadow-sm active:scale-95 relative",
-                                          isGoingToAbove ? "opacity-60 grayscale-[0.4] cursor-pointer shadow-none" : "hover:border-red-300 cursor-pointer"
+                                          "bg-white rounded-xl border border-red-100 transition-all group shadow-sm active:scale-95 relative overflow-hidden",
+                                          isGoingToAbove ? "cursor-pointer shadow-none" : "hover:border-red-300 cursor-pointer"
                                         )}
       >
                                         {incident.viewedUpdates?.[forum?.id || ''] === false && (
                                           <motion.div 
                                             animate={{ opacity: [0.4, 1, 0.4], scale: [0.8, 1.1, 0.8] }}
                                             transition={{ duration: 1.5, repeat: Infinity }}
-                                            className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full border-2 border-white shadow-sm z-20"
+                                            className="absolute top-1.5 right-1.5 w-3 h-3 bg-blue-500 rounded-full border-2 border-white shadow-md z-30"
                                             title="Actualizado"
                                           />
                                         )}
-                                        <div className="flex justify-between items-start gap-1 mb-1.5">
+                                        <div className={clsx(
+                                          "p-2.5 transition-all duration-200",
+                                          isGoingToAbove && "opacity-50 grayscale-[0.5]"
+                                        )}>
+                                          <div className="flex justify-between items-start gap-1 mb-1.5">
                                           <div className="flex gap-1 items-start">
                                             {isComingFromBelow && (
                                               <ArrowUp className="w-3.5 h-3.5 text-orange-500 shrink-0 transform rotate-180" />
@@ -1923,7 +2158,8 @@ export default function ForumSession() {
                                           <span className="text-[7px] font-black text-red-600 bg-red-50 px-1 py-0.5 rounded uppercase">Incid.</span>
                                         </div>
                                       </div>
-                                    );
+                                    </div>
+                                  );
                                   }
 
                                   const actionSubActions = subActions.filter(s => s.actionId === action.id);
@@ -1945,23 +2181,26 @@ export default function ForumSession() {
                                         setEditingAction({ ...action });
                                         setTempSubActions(subActions.filter(s => s.actionId === action.id));
                                         setType(action.type || "accion");
-                                        setIsEscalated(action.isEscalated || false);
+                                        setIsEscalated(false);
                                         setEscalatedToForumId(action.escalatedToForumId || "");
                                       }}
                                       className={clsx(
-                                        "bg-white p-2.5 rounded-xl border border-gray-100 transition-all group shadow-sm active:scale-95 relative",
-                                        isGoingToAbove ? "opacity-60 grayscale-[0.4] cursor-pointer shadow-none" : "hover:border-blue-200 cursor-pointer"
+                                        "bg-white rounded-xl border border-gray-100 transition-all group shadow-sm active:scale-95 relative overflow-hidden",
+                                        isGoingToAbove ? "cursor-pointer shadow-none" : "hover:border-blue-200 cursor-pointer"
                                       )}
                                     >
                                       {action.viewedUpdates?.[forum?.id || ''] === false && (
                                         <motion.div 
                                           animate={{ opacity: [0.4, 1, 0.4], scale: [0.8, 1.1, 0.8] }}
                                           transition={{ duration: 1.5, repeat: Infinity }}
-                                          className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full border-2 border-white shadow-sm z-20"
+                                          className="absolute top-1.5 right-1.5 w-3 h-3 bg-blue-500 rounded-full border-2 border-white shadow-md z-30"
                                           title="Actualizado"
                                         />
                                       )}
-                                      <div className="flex flex-col gap-2">
+                                      <div className={clsx(
+                                        "p-2.5 transition-all duration-200 flex flex-col gap-2",
+                                        isGoingToAbove && "opacity-50 grayscale-[0.5]"
+                                      )}>
                                         <div className="flex justify-between items-start gap-1">
                                           <div className="flex gap-1 items-start">
                                             {isComingFromBelow && (
@@ -2149,34 +2388,44 @@ export default function ForumSession() {
         title={
           <div className="flex items-center gap-6">
             <span>{editingAction?.id ? (type === 'incidencia' ? 'Editar Incidencia' : 'Editar Acción') : (type === 'incidencia' ? 'Nueva Incidencia' : 'Nueva Acción')}</span>
-            <div className="flex p-0.5 bg-gray-100 rounded-lg border border-gray-200 h-[32px] w-[200px]">
-              <button
-                type="button"
-                onClick={() => setType('accion')}
-                className={clsx(
-                  "flex-1 rounded-md text-[10px] font-black uppercase tracking-tighter transition-all",
-                  type === 'accion' ? "bg-white text-blue-600 shadow-sm" : "text-gray-400 hover:text-gray-600"
-                )}
-              >
-                Acción
-              </button>
-              <button
-                type="button"
-                onClick={() => setType('incidencia')}
-                className={clsx(
-                  "flex-1 rounded-md text-[10px] font-black uppercase tracking-tighter transition-all",
-                  type === 'incidencia' ? "bg-white text-orange-600 shadow-sm" : "text-gray-400 hover:text-gray-600"
-                )}
-              >
-                Incidencia
-              </button>
-            </div>
+            {!editingAction?.id && (
+              <div className="flex p-0.5 bg-gray-100 rounded-lg border border-gray-200 h-[32px] w-[200px]">
+                <button
+                  type="button"
+                  onClick={() => setType('accion')}
+                  className={clsx(
+                    "flex-1 rounded-md text-[10px] font-black uppercase tracking-tighter transition-all",
+                    type === 'accion' ? "bg-white text-blue-600 shadow-sm" : "text-gray-400 hover:text-gray-600"
+                  )}
+                >
+                  Acción
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setType('incidencia')}
+                  className={clsx(
+                    "flex-1 rounded-md text-[10px] font-black uppercase tracking-tighter transition-all",
+                    type === 'incidencia' ? "bg-white text-orange-600 shadow-sm" : "text-gray-400 hover:text-gray-600"
+                  )}
+                >
+                  Incidencia
+                </button>
+              </div>
+            )}
           </div>
         }
         maxWidth="max-w-5xl"
       >
         {(() => {
-          const isReadOnly = (editingAction as any)?.isEscalated === true && (editingAction as any)?.escalatedToForumId !== forum?.id;
+          if (!editingAction) return null;
+          
+          const ownerId = (editingAction as any)?.isEscalated && (editingAction as any)?.escalatedToForumId 
+            ? (editingAction as any).escalatedToForumId 
+            : ((editingAction as any)?.escalationHistory?.length 
+                ? (editingAction as any).escalationHistory[(editingAction as any).escalationHistory.length - 1].toForumId 
+                : ((editingAction as any)?.originForumId || (editingAction as any)?.forumId));
+          
+          const isReadOnly = isAdmin ? false : (ownerId !== forum?.id);
           return (
             <form
               onSubmit={(e) => {
@@ -2205,10 +2454,9 @@ export default function ForumSession() {
                   <div className="lg:col-span-3 space-y-6">
                     {(() => {
                         const renderLabel = (text: string, fieldName: string) => {
-                            const currentOriginId = (editingAction as any)?.originForumId || (editingAction as any)?.forumId;
-                            const isOrigin = currentOriginId === forum?.id;
                             const isModified = editingAction?.modifiedFields?.includes(fieldName);
-                            const showMark = isOrigin && isModified && (editingAction as any)?.viewedUpdates?.[forum?.id || ''] === false;
+                            // Show mark if this forum has an unread update for this field
+                            const showMark = isModified && (editingAction as any)?.viewedUpdates?.[forum?.id || ''] === false;
                             
                             return (
                                 <div className="flex items-center gap-2 mb-2">
@@ -2247,6 +2495,97 @@ export default function ForumSession() {
                         placeholder={type === 'incidencia' ? '¿Qué ha pasado?' : "¿Qué hay que hacer?"}
                       />
                     </div>
+                                 {type === 'accion' && (
+                  <div className="relative space-y-2">
+                    <label className="block text-sm font-bold text-gray-700 uppercase tracking-widest text-[10px]">
+                      Incidencia vinculada
+                    </label>
+                    <div className={clsx(
+                      "w-full px-4 py-3 bg-gray-50 border-none rounded-2xl flex items-center justify-between cursor-pointer focus-within:ring-2 focus-within:ring-blue-500 transition-all",
+                      isReadOnly ? "cursor-default opacity-60" : "hover:bg-gray-100 transition-colors"
+                    )}
+                    onClick={() => !isReadOnly && setShowIncidentSelector(!showIncidentSelector)}
+                    >
+                      <span className={clsx("text-sm font-medium", !editingAction?.incidentId && "text-gray-400 text-xs italic")}>
+                        {editingAction?.incidentId 
+                          ? incidents.find(i => i.id === editingAction.incidentId)?.title || "Incidencia no encontrada"
+                          : "Ninguna"
+                        }
+                      </span>
+                      {!isReadOnly && <Search size={16} className="text-gray-400" />}
+                    </div>
+
+                    {showIncidentSelector && !isReadOnly && (
+                      <>
+                        <div 
+                          className="fixed inset-0 z-20" 
+                          onClick={() => setShowIncidentSelector(false)}
+                        />
+                        <div className="absolute left-0 right-0 top-full mt-2 bg-white border border-gray-100 rounded-3xl shadow-2xl z-30 flex flex-col max-h-80 overflow-hidden animate-in fade-in slide-in-from-top-2">
+                          <div className="p-3 border-b border-gray-50 bg-gray-50/50">
+                            <div className="relative">
+                              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                              <input
+                                type="text"
+                                autoFocus
+                                placeholder="Buscar incidencia..."
+                                value={incidentSearchQuery}
+                                onChange={(e) => setIncidentSearchQuery(e.target.value)}
+                                className="w-full pl-9 pr-4 py-2 text-xs bg-white border border-gray-100 rounded-xl outline-none focus:ring-1 focus:ring-blue-500 transition-all"
+                              />
+                            </div>
+                          </div>
+                          <div className="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar min-h-0">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingAction({ ...editingAction, incidentId: "" });
+                                setShowIncidentSelector(false);
+                                setIncidentSearchQuery("");
+                              }}
+                              className="w-full text-left px-3 py-2 text-[10px] uppercase font-bold tracking-wider text-gray-400 hover:bg-gray-50 rounded-xl transition-colors flex items-center gap-2"
+                            >
+                              <X size={12} />
+                              Ninguna
+                            </button>
+                            {incidents
+                              .filter(i => 
+                                (i.forumId === forum?.id || 
+                                i.escalatedToForumId === forum?.id || 
+                                i.escalationHistory?.some((h: any) => h.fromForumId === forum?.id)) &&
+                                i.title.toLowerCase().includes(incidentSearchQuery.toLowerCase())
+                              )
+                              .map((i) => (
+                                <button
+                                  key={i.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingAction({ ...editingAction, incidentId: i.id });
+                                    setShowIncidentSelector(false);
+                                    setIncidentSearchQuery("");
+                                  }}
+                                  className={clsx(
+                                    "w-full text-left px-4 py-2.5 rounded-2xl transition-all group",
+                                    editingAction?.incidentId === i.id 
+                                      ? "bg-blue-600 text-white shadow-lg shadow-blue-200" 
+                                      : "text-gray-700 hover:bg-blue-50"
+                                  )}
+                                >
+                                  <div className="text-[11px] font-black uppercase tracking-tight truncate leading-tight">{i.title}</div>
+                                  <div className={clsx(
+                                    "text-[9px] font-bold uppercase tracking-widest mt-0.5",
+                                    editingAction?.incidentId === i.id ? "text-blue-100" : "text-gray-400"
+                                  )}>
+                                    Estado: {i.status || 'abierta'}
+                                  </div>
+                                </button>
+                              ))}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
 
                 {type === 'accion' && editingAction?.incidentId && (
                   <div className="p-3 bg-red-50 border border-red-100 rounded-xl flex items-center justify-between gap-3">
@@ -2366,7 +2705,7 @@ export default function ForumSession() {
                   <div>
                     <div className="flex justify-between items-center mb-4">
                       <label className="text-sm font-bold text-gray-700 uppercase tracking-widest text-[10px]">
-                        Sub-acciones ({tempSubActions.length})
+                        Sub-acciones ({tempSubActions?.length || 0})
                       </label>
                       {!isReadOnly && (
                         <button
@@ -2442,7 +2781,7 @@ export default function ForumSession() {
                           </div>
                         </div>
                       ))}
-                      {tempSubActions.length === 0 && (
+                      {(tempSubActions?.length || 0) === 0 && (
                         <div className="p-8 border-2 border-dashed border-gray-100 rounded-2xl text-center opacity-40">
                           <CheckCircle2
                             size={32}
@@ -2644,40 +2983,63 @@ export default function ForumSession() {
                         />
                       </div>
                     </div>
-                    <div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <label className="block text-sm font-bold text-gray-700 uppercase tracking-widest text-[10px]">
+                    {type === "accion" && (
+                      <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-widest text-[10px]">
                           Prioridad
                         </label>
-                        {editingAction?.originForumId === forum?.id && editingAction?.modifiedFields?.includes('priority') && (editingAction as any)?.viewedUpdates?.[forum?.id || ''] === false && (
-                          <motion.div 
-                             animate={{ opacity: [0.4, 1, 0.4], scale: [0.8, 1.2, 0.8] }}
-                             transition={{ duration: 1.5, repeat: Infinity }}
-                             className="w-2 h-2 bg-blue-500 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.6)]"
-                          />
-                        )}
+                        <select
+                          value={(editingAction as any)?.priority || "media"}
+                          disabled={isReadOnly}
+                          onChange={(e) =>
+                            setEditingAction({
+                              ...editingAction,
+                              priority: e.target.value as any,
+                            })
+                          }
+                          className={clsx(
+                            "w-full px-4 py-3 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none text-xs font-medium appearance-none",
+                            isReadOnly && "opacity-50 cursor-not-allowed"
+                          )}
+                        >
+                          <option value="baja">Baja</option>
+                          <option value="media">Media</option>
+                          <option value="alta">Alta</option>
+                          <option value="critica">Crítica</option>
+                        </select>
                       </div>
-                      <select
-                        value={editingAction?.priority || "media"}
-                        disabled={isReadOnly}
-                        onChange={(e) =>
-                          setEditingAction({
-                            ...editingAction,
-                            priority: e.target.value as ActionPriority,
-                          })
-                        }
-                        className={clsx(
-                          "w-full px-4 py-3 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none text-xs font-medium appearance-none",
-                          isReadOnly && "opacity-50 cursor-not-allowed"
-                        )}
-                      >
-                        {PRIORITY_OPTIONS.map((opt) => (
-                          <option key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                    )}
+                    {type === "accion" && categories.filter(c => c.active).map(cat => (
+                      <div key={cat.id}>
+                        <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-widest text-[10px]">
+                          {cat.name}
+                        </label>
+                        <select
+                          value={editingAction?.customFields?.[cat.id] || ""}
+                          disabled={isReadOnly}
+                          onChange={(e) => {
+                            setEditingAction({
+                              ...editingAction,
+                              customFields: {
+                                ...(editingAction.customFields || {}),
+                                [cat.id]: e.target.value
+                              }
+                            });
+                          }}
+                          className={clsx(
+                            "w-full px-4 py-3 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none text-xs font-medium appearance-none",
+                            isReadOnly && "opacity-50 cursor-not-allowed"
+                          )}
+                        >
+                          <option value="">Seleccionar...</option>
+                          {cat.options?.map((opt) => (
+                            <option key={opt} value={opt}>
+                              {opt}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    ))}
                   </div>
                 </>
               ) : (
@@ -2722,31 +3084,6 @@ export default function ForumSession() {
                     </div>
                   </div>
                 </div>
-
-                {type !== "incidencia" && (
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-widest text-[10px]">
-                      Categoría (Opcional)
-                    </label>
-                    <select
-                      value={editingAction?.categoryId || ""}
-                      onChange={(e) =>
-                        setEditingAction({
-                          ...editingAction,
-                          categoryId: e.target.value,
-                        })
-                      }
-                      className="w-full px-4 py-3 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none text-xs font-medium appearance-none"
-                    >
-                      <option value="">Sin categoría</option>
-                      {categories.map((cat) => (
-                        <option key={cat.id} value={cat.id}>
-                          {cat.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
 
                 {editingAction?.escalationHistory && editingAction.escalationHistory.length > 0 && (
                   <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 flex flex-col gap-3 mb-4">
@@ -2816,17 +3153,13 @@ export default function ForumSession() {
                         <option value="">Seleccionar foro superior...</option>
                         {forums
                           .filter((f) => {
-                            if (f.id === forum?.id) return false;
+                            if (f.id === forum?.id || !forum) return false;
                             
-                            // If levels are defined and different, use the hierarchy logic
-                            const currentLevel = forum?.level || 0;
-                            const targetLevel = f.level || 0;
+                            const parentTeamChain = getTeamParentChain(forum.teamId);
+                            const targetTeamIndex = parentTeamChain.indexOf(f.teamId);
+                            const maxLevels = Number(company?.settings?.maxEscalationLevels || 1);
                             
-                            // Better logic: if there are different levels, show those with higher level (assuming higher number = more authority)
-                            // or if levels aren't used (both 0), show all others.
-                            if (currentLevel === 0 && targetLevel === 0) return true;
-                            
-                            return targetLevel > currentLevel;
+                            return targetTeamIndex !== -1 && (targetTeamIndex + 1) <= maxLevels;
                           })
                           .map((f) => (
                             <option key={f.id} value={f.id}>
@@ -2841,9 +3174,10 @@ export default function ForumSession() {
             </div>
           </div>
           <div className="flex justify-end gap-3 pt-6 border-t border-gray-100 p-2">
-            {!isReadOnly && type !== "incidencia" &&
+            {!isReadOnly &&
               editingAction?.id &&
-              editingAction.status !== "finalizada" &&
+              (editingAction as any).status !== "finalizada" &&
+              (editingAction as any).status !== "resuelta" &&
               editingAction.status !== "cancelada" && (
                 <button
                   type="button"

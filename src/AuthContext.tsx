@@ -11,7 +11,7 @@ import {
   sendPasswordResetEmail,
   updateProfile
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, getDocFromServer, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, getDocFromServer, deleteDoc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { User, Role, Company } from './types';
 import { handleFirestoreError, OperationType } from './lib/firestore-utils';
@@ -53,21 +53,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    const fetchActiveCompany = async () => {
-      if (activeCompanyId) {
-        try {
-          const companyDoc = await getDoc(doc(db, 'companies', activeCompanyId));
-          if (companyDoc.exists()) {
-            setCompany(companyDoc.data() as Company);
+    if (activeCompanyId) {
+      const unsubscribe = onSnapshot(doc(db, 'companies', activeCompanyId), 
+        (doc) => {
+          if (doc.exists()) {
+            setCompany(doc.data() as Company);
           }
-        } catch (error) {
+        },
+        (error) => {
           handleFirestoreError(error, OperationType.GET, `companies/${activeCompanyId}`);
         }
-      } else {
-        setCompany(null);
-      }
-    };
-    fetchActiveCompany();
+      );
+      return () => unsubscribe();
+    } else {
+      setCompany(null);
+    }
   }, [activeCompanyId]);
 
   useEffect(() => {

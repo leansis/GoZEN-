@@ -172,7 +172,9 @@ service cloud.firestore {
              data.name is string && data.createdAt is string &&
              (!('settings' in data) || (
                data.settings is map &&
-               (!('forumVirtualHorizonMonths' in data.settings) || data.settings.forumVirtualHorizonMonths is number)
+               (!('forumVirtualHorizonMonths' in data.settings) || data.settings.forumVirtualHorizonMonths is number) &&
+               (!('maxEscalationLevels' in data.settings) || data.settings.maxEscalationLevels is number) &&
+               (!('actionPlanMultipleAssigneeMode' in data.settings) || data.settings.actionPlanMultipleAssigneeMode is string)
              ));
     }
 
@@ -416,7 +418,8 @@ service cloud.firestore {
 
     match /companies/{companyId} {
       allow read: if isAuthenticated();
-      allow create, update: if isGlobalAdmin() && isValidCompany(request.resource.data);
+      allow create: if isGlobalAdmin() && isValidCompany(request.resource.data);
+      allow update: if (isGlobalAdmin() || (isAdmin() && belongsToCompany(companyId))) && isValidCompany(request.resource.data);
       allow delete: if isGlobalAdmin();
     }
 

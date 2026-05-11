@@ -11,7 +11,9 @@
         "settings": {
           "type": "object",
           "properties": {
-            "forumVirtualHorizonMonths": { "type": "number" }
+            "forumVirtualHorizonMonths": { "type": "number" },
+            "maxEscalationLevels": { "type": "number" },
+            "actionPlanMultipleAssigneeMode": { "type": "string", "enum": ["multiple", "split"] }
           }
         }
       },
@@ -219,10 +221,10 @@
         "assignedTo": { "type": "array", "items": { "type": "string" } },
         "assignedToNames": { "type": "array", "items": { "type": "string" } },
         "status": { "type": "string", "enum": ["pendiente", "en_progreso", "finalizada", "bloqueada", "cancelada", "retrasada"] },
-        "priority": { "type": "string", "enum": ["baja", "media", "alta", "critica"] },
         "targetDate": { "type": "string" },
         "dateChangeCount": { "type": "number" },
         "notes": { "type": "string" },
+        "customFields": { "type": "object" },
         "companyId": { "type": "string" },
         "createdAt": { "type": "string" },
         "updatedAt": { "type": "string" },
@@ -233,7 +235,7 @@
         "escalatedAt": { "type": "string" },
         "originForumId": { "type": "string" }
       },
-      "required": ["title", "createdBy", "status", "priority", "targetDate", "companyId", "createdAt", "updatedAt"]
+      "required": ["title", "createdBy", "status", "targetDate", "companyId", "createdAt", "updatedAt"]
     },
     "SubAction": {
       "title": "SubAction",
@@ -266,7 +268,9 @@
         "name": { "type": "string" },
         "companyId": { "type": "string" },
         "createdAt": { "type": "string" },
-        "updatedAt": { "type": "string" }
+        "updatedAt": { "type": "string" },
+        "fieldSets": { "type": "array" },
+        "activeFieldSetId": { "type": "string" }
       },
       "required": ["name", "companyId", "createdAt"]
     },

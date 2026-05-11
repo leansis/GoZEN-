@@ -4,6 +4,7 @@ export type Status = 'active' | 'inactive';
 export interface CompanySettings {
   forumVirtualHorizonMonths: number;
   maxEscalationLevels?: number;
+  actionPlanMultipleAssigneeMode?: 'multiple' | 'split';
 }
 
 export interface Company {
@@ -194,6 +195,8 @@ export interface Incident {
   modifiedFields?: string[];
 }
 
+export type Priority = 'baja' | 'media' | 'alta' | 'critica';
+
 export interface ActionPlan {
   id: string;
   title: string;
@@ -206,10 +209,11 @@ export interface ActionPlan {
   assignedTo: string[]; // List of user IDs
   assignedToNames: string[];
   status: ActionStatus;
-  priority: ActionPriority;
+  priority: Priority;
   targetDate: string; // Projected end date
   dateChangeCount?: number;
   notes?: string;
+  customFields?: Record<string, any>;
   companyId: string;
   createdAt: string;
   updatedAt: string;
@@ -248,11 +252,28 @@ export interface SubAction {
   companyId: string;
 }
 
+export interface CustomField {
+  id: string;
+  label: string;
+  type: 'text' | 'number' | 'date' | 'select' | 'boolean';
+  options?: string[]; // For 'select' type
+  required?: boolean;
+}
+
+export interface CustomFieldsSet {
+  id: string;
+  name: string;
+  fields: CustomField[];
+}
+
 export interface ActionCategory {
   id: string;
   name: string;
+  options: string[];
+  active: boolean;
   companyId: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export type ForumFrequency = 'diaria' | 'semanal' | 'mensual' | 'adhoc' | 'periodic';

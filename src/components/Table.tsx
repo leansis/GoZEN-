@@ -31,9 +31,11 @@ interface TableProps<T> {
   onEdit?: (item: T) => void;
   onDelete?: (item: T) => void;
   onFinalize?: (item: T) => void;
+  onRowDoubleClick?: (item: T) => void;
   actions?: (item: T) => React.ReactNode;
   searchable?: boolean;
   onReorder?: (items: T[]) => void;
+  ignoreEscalation?: boolean;
 }
 
 function SortableRow<T extends { id: string }>({ 
@@ -42,16 +44,20 @@ function SortableRow<T extends { id: string }>({
   onEdit, 
   onDelete,
   onFinalize,
+  onRowDoubleClick,
   actions,
-  isDragEnabled
+  isDragEnabled,
+  ignoreEscalation
 }: { 
   item: T; 
   columns: Column<T>[]; 
   onEdit?: (item: T) => void; 
   onDelete?: (item: T) => void;
   onFinalize?: (item: T) => void;
+  onRowDoubleClick?: (item: T) => void;
   actions?: (item: T) => React.ReactNode;
   isDragEnabled: boolean;
+  ignoreEscalation?: boolean;
 }) {
   const {
     attributes,
@@ -69,13 +75,14 @@ function SortableRow<T extends { id: string }>({
     position: isDragging ? 'relative' as const : 'static' as const,
   };
 
-  const isEscalated = (item as any).isEscalated === true;
+  const isEscalated = !ignoreEscalation && (item as any).isEscalated === true;
 
   return (
     <tr 
       ref={setNodeRef} 
       style={style} 
-      className={`bg-white border-b hover:bg-gray-50 transition-colors ${isDragging ? 'shadow-lg bg-gray-50' : ''} ${isEscalated ? 'opacity-50 grayscale-[0.5]' : ''}`}
+      onDoubleClick={() => onRowDoubleClick?.(item)}
+      className={`bg-white border-b hover:bg-gray-50 transition-colors ${isDragging ? 'shadow-lg bg-gray-50' : ''} ${isEscalated ? 'opacity-50 grayscale-[0.5]' : ''} ${onRowDoubleClick ? 'cursor-pointer select-none' : ''}`}
     >
       {isDragEnabled && (
         <td className="px-2 py-4 w-10">
@@ -129,7 +136,7 @@ function SortableRow<T extends { id: string }>({
   );
 }
 
-export default function Table<T extends { id: string }>({ columns, data, onEdit, onDelete, onFinalize, actions, searchable = true, onReorder }: TableProps<T>) {
+export default function Table<T extends { id: string }>({ columns, data, onEdit, onDelete, onFinalize, onRowDoubleClick, actions, searchable = true, onReorder, ignoreEscalation }: TableProps<T>) {
   const [sortConfig, setSortConfig] = useState<{ key: number; direction: 'asc' | 'desc' } | null>(null);
   const [filterText, setFilterText] = useState('');
 
@@ -278,8 +285,10 @@ export default function Table<T extends { id: string }>({ columns, data, onEdit,
                       onEdit={onEdit} 
                       onDelete={onDelete}
                       onFinalize={onFinalize}
+                      onRowDoubleClick={onRowDoubleClick}
                       actions={actions}
                       isDragEnabled={isDragEnabled}
+                      ignoreEscalation={ignoreEscalation}
                     />
                   ))}
                 </SortableContext>

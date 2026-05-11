@@ -140,7 +140,7 @@ export default function Criteria() {
         data={criteria}
         columns={[
           { header: 'Nombre', accessor: 'name', sortable: true },
-          { header: 'Niveles configurados', accessor: (c) => c.levels.length, sortable: true },
+          { header: 'Niveles configurados', accessor: (c) => c.levels?.length || 0, sortable: true },
         ]}
         onEdit={setEditingCriterion}
         onDelete={setCriterionToDelete}

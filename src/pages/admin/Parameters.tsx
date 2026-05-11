@@ -4,11 +4,13 @@ import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { Settings, Save, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-utils';
+import clsx from 'clsx';
 
 export default function Parameters() {
   const { company, activeCompanyId, isAdmin } = useAuth();
   const [horizonMonths, setHorizonMonths] = useState<number>(3);
   const [maxEscalationLevels, setMaxEscalationLevels] = useState<number>(1);
+  const [multipleAssigneeMode, setMultipleAssigneeMode] = useState<'multiple' | 'split'>('multiple');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -20,6 +22,9 @@ export default function Parameters() {
       }
       if (company.settings.maxEscalationLevels !== undefined) {
         setMaxEscalationLevels(company.settings.maxEscalationLevels);
+      }
+      if (company.settings.actionPlanMultipleAssigneeMode) {
+        setMultipleAssigneeMode(company.settings.actionPlanMultipleAssigneeMode);
       }
     }
   }, [company]);
@@ -34,7 +39,8 @@ export default function Parameters() {
     try {
       await updateDoc(doc(db, 'companies', activeCompanyId), {
         'settings.forumVirtualHorizonMonths': horizonMonths,
-        'settings.maxEscalationLevels': maxEscalationLevels
+        'settings.maxEscalationLevels': maxEscalationLevels,
+        'settings.actionPlanMultipleAssigneeMode': multipleAssigneeMode
       });
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
@@ -125,6 +131,46 @@ export default function Parameters() {
               <strong>Nota:</strong> Este parámetro afecta a la visualización de sesiones en el calendario de foros. 
               Por defecto es 3 meses para optimizar el rendimiento. Aumentar este valor puede ralentizar la carga si hay muchos foros.
             </p>
+          </div>
+        </div>
+
+        <div className="p-6 border-b border-gray-100 bg-gray-50 border-t">
+          <h2 className="text-lg font-semibold text-gray-800">Plan de Acción</h2>
+          <p className="text-sm text-gray-500">Configura el comportamiento de las acciones y responsables</p>
+        </div>
+
+        <div className="p-6 space-y-6">
+          <div className="space-y-4">
+            <label className="block text-sm font-medium text-gray-700">
+              Comportamiento con varios responsables
+            </label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <button
+                onClick={() => setMultipleAssigneeMode('multiple')}
+                className={clsx(
+                  "p-4 border-2 rounded-xl text-left transition-all",
+                  multipleAssigneeMode === 'multiple'
+                    ? "border-blue-500 bg-blue-50 ring-2 ring-blue-100"
+                    : "border-gray-100 hover:border-gray-200"
+                )}
+              >
+                <div className="font-bold text-gray-900 mb-1">Permitir varios responsables</div>
+                <p className="text-xs text-gray-500">Una única acción compartida por todos los responsables asignados.</p>
+              </button>
+
+              <button
+                onClick={() => setMultipleAssigneeMode('split')}
+                className={clsx(
+                  "p-4 border-2 rounded-xl text-left transition-all",
+                  multipleAssigneeMode === 'split'
+                    ? "border-blue-500 bg-blue-50 ring-2 ring-blue-100"
+                    : "border-gray-100 hover:border-gray-200"
+                )}
+              >
+                <div className="font-bold text-gray-900 mb-1">Separar en varias acciones</div>
+                <p className="text-xs text-gray-500">Al asignar varios responsables, se crea una copia individual de la acción para cada uno.</p>
+              </button>
+            </div>
           </div>
         </div>
 
