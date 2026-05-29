@@ -10,6 +10,7 @@ import TrainingActions from './pages/TrainingActions';
 import Statistics from './pages/Statistics';
 import OHP from './pages/OHP';
 import AdminTeams from './pages/admin/Teams';
+import AdminForums from './pages/admin/Forums';
 import AdminUsers from './pages/admin/Users';
 import AdminActivities from './pages/admin/Activities';
 import AdminProcesses from './pages/admin/Processes';
@@ -352,6 +353,7 @@ export default function App() {
                 <Route path="ohp" element={<OHP />} />
                 
                 {/* Admin Routes */}
+                <Route path="admin/forums" element={<ProtectedRoute requireAdmin><AdminForums /></ProtectedRoute>} />
                 <Route path="admin/teams" element={<ProtectedRoute requireAdmin><AdminTeams /></ProtectedRoute>} />
                 <Route path="admin/users" element={<ProtectedRoute requireAdmin><AdminUsers /></ProtectedRoute>} />
                 <Route path="admin/activities" element={<ProtectedRoute requireAdmin><AdminActivities /></ProtectedRoute>} />

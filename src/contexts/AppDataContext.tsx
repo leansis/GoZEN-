@@ -3,7 +3,7 @@ import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../AuthContext';
 import { handleFirestoreError, OperationType } from '../lib/firestore-utils';
-import { Team, Process, Task, Criterion, UserTaskLevel, TrainingAction, Activity, Forum, ForumSession, MasterGroup, Indicator, Incident, ActionPlan, ActionCategory } from '../types';
+import { Team, Process, Task, Criterion, UserTaskLevel, TrainingAction, Activity, Forum, ForumSession, MasterGroup, Indicator, Incident, ActionPlan, ActionCategory, CustomHtml } from '../types';
 
 interface AppDataContextType {
   activities: Activity[];
@@ -22,6 +22,7 @@ interface AppDataContextType {
   incidents: Incident[];
   actionPlans: ActionPlan[];
   actionCategories: ActionCategory[];
+  customHtmls: CustomHtml[];
   loading: boolean;
   getTeamParentChain: (teamId: string) => string[];
 }
@@ -47,6 +48,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [actionPlans, setActionPlans] = useState<ActionPlan[]>([]);
   const [actionCategories, setActionCategories] = useState<ActionCategory[]>([]);
+  const [customHtmls, setCustomHtmls] = useState<CustomHtml[]>([]);
   const [loading, setLoading] = useState(true);
 
   const getForumLevel = (forum: Forum, teamsList: Team[]): number => {
@@ -92,6 +94,9 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       setMasterGroups([]);
       setIndicators([]);
       setIncidents([]);
+      setActionPlans([]);
+      setActionCategories([]);
+      setCustomHtmls([]);
       setLoading(false);
       return;
     }
@@ -165,6 +170,10 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       setActionCategories(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ActionCategory)));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'actionCategories'));
 
+    const unsubCustomHtmls = onSnapshot(getQuery('customHtmls'), (snapshot) => {
+      setCustomHtmls(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CustomHtml)));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'customHtmls'));
+
     const unsubForumSessions = onSnapshot(getQuery('forumSessions'), (snapshot) => {
       setForumSessions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ForumSession)));
       setLoading(false);
@@ -189,6 +198,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       unsubIncidents();
       unsubActionPlans();
       unsubActionCategories();
+      unsubCustomHtmls();
       unsubForumSessions();
     };
   }, [activeCompanyId, dbUser?.companyId]);
@@ -213,7 +223,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
 
   return (
     <AppDataContext.Provider value={{
-      activities, teams, processes, tasks, criteria, userTaskLevels, trainingActions, teamTargets, users, forums: computedForums, forumSessions, masterGroups, indicators, incidents, actionPlans, actionCategories, loading,
+      activities, teams, processes, tasks, criteria, userTaskLevels, trainingActions, teamTargets, users, forums: computedForums, forumSessions, masterGroups, indicators, incidents, actionPlans, actionCategories, customHtmls, loading,
       getTeamParentChain: (id) => getTeamParentChain(id, teams)
     }}>
       {children}

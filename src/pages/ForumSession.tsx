@@ -32,6 +32,7 @@ import {
   LayoutDashboard,
   List as ListIcon,
   ArrowUp,
+  ExternalLink,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { useAuth } from "../AuthContext";
@@ -255,7 +256,7 @@ export default function ForumSession() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
   const { dbUser, company, activeCompanyId } = useAuth();
-  const { forums, users, indicators, getTeamParentChain } = useAppData();
+  const { forums, users, indicators, customHtmls, getTeamParentChain } = useAppData();
 
   const [session, setSession] = useState<ForumSessionType | null>(null);
   const [forum, setForum] = useState<Forum | null>(null);
@@ -1797,6 +1798,7 @@ export default function ForumSession() {
                             <button
                               onClick={() => {
                                 setEditingAction({
+                                  type: "incidencia",
                                   assignedTo: [],
                                   assignedToNames: [],
                                   status: "pendiente",
@@ -1828,7 +1830,8 @@ export default function ForumSession() {
                                     originForumId: incident.forumId,
                                     originForumName: incident.forumName,
                                     companyId: incident.companyId,
-                                    createdAt: incident.createdAt
+                                    createdAt: incident.createdAt,
+                                    type: "incidencia"
                                   } as any);
                                   setTempSubActions([]);
                                   setType("incidencia");
@@ -1889,7 +1892,7 @@ export default function ForumSession() {
                                   )}
                                 </div>
                                 <div className="flex items-center gap-2">
-                                  {selectedIndicator.link && (
+                                  {selectedIndicator.htmlSourceType !== 'custom_html' && selectedIndicator.link && (
                                     <a
                                       href={selectedIndicator.link}
                                       target="_blank"
@@ -1900,10 +1903,58 @@ export default function ForumSession() {
                                       <LayoutDashboard size={12} />
                                     </a>
                                   )}
+                                  {selectedIndicator.htmlSourceType === 'custom_html' && selectedIndicator.customHtmlId && (
+                                    <button
+                                      onClick={() => {
+                                        const customHtmlObj = customHtmls?.find(h => h.id === selectedIndicator.customHtmlId);
+                                        if (customHtmlObj) {
+                                          const blob = new Blob([customHtmlObj.html], { type: 'text/html' });
+                                          const url = URL.createObjectURL(blob);
+                                          const a = document.createElement('a');
+                                          a.href = url;
+                                          a.download = `${customHtmlObj.name || 'indicador'}.html`;
+                                          document.body.appendChild(a);
+                                          a.click();
+                                          document.body.removeChild(a);
+                                          URL.revokeObjectURL(url);
+                                        }
+                                      }}
+                                      className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-all text-[9px] font-black border border-emerald-100 cursor-pointer"
+                                    >
+                                      DESCARGAR HTML{" "}
+                                      <ExternalLink size={12} />
+                                    </button>
+                                  )}
                                 </div>
                               </div>
                               <div className="flex-1 w-full bg-gray-50 relative">
-                                {selectedIndicator.link ? (
+                                {selectedIndicator.htmlSourceType === 'custom_html' && selectedIndicator.customHtmlId ? (
+                                  (() => {
+                                    const customHtmlObj = customHtmls?.find(h => h.id === selectedIndicator.customHtmlId);
+                                    return customHtmlObj ? (
+                                      <iframe
+                                        srcDoc={customHtmlObj.html}
+                                        className="w-full h-full border-none"
+                                        title={selectedIndicator.name}
+                                        sandbox="allow-scripts allow-popups allow-downloads allow-forms allow-modals"
+                                      />
+                                    ) : (
+                                      <div className="w-full h-full flex items-center justify-center text-center p-12">
+                                        <div className="max-w-xs space-y-4">
+                                          <div className="w-16 h-16 bg-white rounded-2xl border border-gray-100 flex items-center justify-center mx-auto text-red-400">
+                                            <BarChart3 size={32} />
+                                          </div>
+                                          <h4 className="font-bold text-gray-800 text-sm">
+                                            Archivo HTML no encontrado
+                                          </h4>
+                                          <p className="text-xs text-gray-400">
+                                            El archivo HTML asociado con este indicador no existe en la base de datos.
+                                          </p>
+                                        </div>
+                                      </div>
+                                    );
+                                  })()
+                                ) : selectedIndicator.link ? (
                                   <iframe
                                     src={selectedIndicator.link}
                                     className="w-full h-full border-none"
@@ -1920,7 +1971,7 @@ export default function ForumSession() {
                                       </h4>
                                       <p className="text-xs text-gray-400">
                                         Este indicador no tiene un enlace de
-                                        visualización configurado.
+                                        visualización o archivo HTML configurado.
                                       </p>
                                     </div>
                                   </div>
@@ -1982,6 +2033,7 @@ export default function ForumSession() {
                           <button
                             onClick={() => {
                               setEditingAction({
+                                type: "accion",
                                 assignedTo: [],
                                 assignedToNames: [],
                                 status: "pendiente",
@@ -2110,7 +2162,7 @@ export default function ForumSession() {
                                         }}
                                         onDragEnd={() => setDragOverId(null)}
                                         onClick={() => {
-                                          setEditingAction({ ...incident } as any);
+                                          setEditingAction({ ...incident, type: "incidencia" } as any);
                                           setTempSubActions([]);
                                           setType("incidencia");
                                           setIsEscalated(false);
@@ -2392,7 +2444,10 @@ export default function ForumSession() {
               <div className="flex p-0.5 bg-gray-100 rounded-lg border border-gray-200 h-[32px] w-[200px]">
                 <button
                   type="button"
-                  onClick={() => setType('accion')}
+                  onClick={() => {
+                    setType('accion');
+                    setEditingAction(prev => prev ? { ...prev, type: 'accion' } : null);
+                  }}
                   className={clsx(
                     "flex-1 rounded-md text-[10px] font-black uppercase tracking-tighter transition-all",
                     type === 'accion' ? "bg-white text-blue-600 shadow-sm" : "text-gray-400 hover:text-gray-600"
@@ -2402,7 +2457,10 @@ export default function ForumSession() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setType('incidencia')}
+                  onClick={() => {
+                    setType('incidencia');
+                    setEditingAction(prev => prev ? { ...prev, type: 'incidencia' } : null);
+                  }}
                   className={clsx(
                     "flex-1 rounded-md text-[10px] font-black uppercase tracking-tighter transition-all",
                     type === 'incidencia' ? "bg-white text-orange-600 shadow-sm" : "text-gray-400 hover:text-gray-600"

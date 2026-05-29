@@ -52,6 +52,7 @@ export default function Layout() {
   ];
 
   const adminItems = [
+    { name: 'Foros', path: '/admin/forums', icon: MessagesSquare },
     { name: 'Equipos', path: '/admin/teams', icon: Users },
     { name: 'Grupos', path: '/admin/master-groups', icon: ListChecks },
     { name: 'Usuarios', path: '/admin/users', icon: UserCog },

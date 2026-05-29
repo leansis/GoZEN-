@@ -1037,7 +1037,7 @@ export default function ActionPlanPage() {
 
   const openEditModal = (action: ActionPlan) => {
     setType('accion');
-    setEditingAction({ ...action });
+    setEditingAction({ ...action, type: 'accion' });
     setTempSubActions(subActions.filter(s => s.actionId === action.id));
   };
 
@@ -1551,7 +1551,7 @@ export default function ActionPlanPage() {
           </div>
           <button 
             onClick={() => { 
-              setEditingAction({ assignedTo: [], assignedToNames: [], priority: 'media' }); 
+              setEditingAction({ type: 'accion', assignedTo: [], assignedToNames: [], priority: 'media' }); 
               setTempSubActions([]); 
             }}
             className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl hover:bg-blue-700 transition duration-200"
@@ -1736,7 +1736,10 @@ export default function ActionPlanPage() {
               <div className="flex p-0.5 bg-gray-100 rounded-lg border border-gray-200 h-[32px] w-[200px]">
                 <button
                   type="button"
-                  onClick={() => setType('accion')}
+                  onClick={() => {
+                    setType('accion');
+                    setEditingAction(prev => prev ? { ...prev, type: 'accion' } : null);
+                  }}
                   className={clsx(
                     "flex-1 rounded-md text-[10px] font-black uppercase tracking-tighter transition-all",
                     type === 'accion' ? "bg-white text-blue-600 shadow-sm" : "text-gray-400 hover:text-gray-600"
@@ -1746,7 +1749,10 @@ export default function ActionPlanPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setType('incidencia')}
+                  onClick={() => {
+                    setType('incidencia');
+                    setEditingAction(prev => prev ? { ...prev, type: 'incidencia' } : null);
+                  }}
                   className={clsx(
                     "flex-1 rounded-md text-[10px] font-black uppercase tracking-tighter transition-all",
                     type === 'incidencia' ? "bg-white text-orange-600 shadow-sm" : "text-gray-400 hover:text-gray-600"
@@ -2083,7 +2089,7 @@ export default function ActionPlanPage() {
                           <select 
                             value={(editingAction as any)?.priority || 'media'}
                             disabled={isReadOnly}
-                            onChange={(e) => editingAction && setEditingAction({ ...editingAction, priority: e.target.value as Priority })}
+                            onChange={(e) => editingAction && setEditingAction({ ...editingAction, priority: e.target.value as ActionPriority })}
                             className={clsx(
                               "w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all bg-white text-sm",
                               isReadOnly && "bg-gray-50 opacity-75 cursor-not-allowed"

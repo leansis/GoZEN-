@@ -440,7 +440,9 @@ export default function Forums() {
   };
 
   const handleSaveForum = async (e: React.FormEvent) => {
-    if (!activeCompanyId || !dbUser || isSaving) return;
+    if (e && e.preventDefault) e.preventDefault();
+    const targetCompanyId = activeCompanyId || dbUser?.companyId;
+    if (!targetCompanyId || !dbUser || isSaving) return;
 
     setIsSaving(true);
     try {
@@ -448,7 +450,7 @@ export default function Forums() {
       
       const forumData: any = {
         ...dataToSave,
-        companyId: activeCompanyId,
+        companyId: targetCompanyId,
         createdBy: dbUser.uid,
         createdAt: dataToSave.createdAt || new Date().toISOString(),
         sections: dataToSave.sections || []
@@ -485,6 +487,17 @@ export default function Forums() {
       handleFirestoreError(err, OperationType.WRITE, 'forums');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleDeleteForum = async (forum: Forum) => {
+    if (window.confirm('¿Estás seguro de eliminar este foro? Se eliminará su definición maestra.')) {
+      try {
+        await deleteDoc(doc(db, 'forums', forum.id));
+      } catch (err: any) {
+        console.error("Error deleting forum:", err);
+        handleFirestoreError(err, OperationType.DELETE, `forums/${forum.id}`);
+      }
     }
   };
 
@@ -638,7 +651,7 @@ export default function Forums() {
               Definiciones
             </button>
           </div>
-          {(isAdmin || isSupervisor) && (
+          {isAdmin && (
             <button
               onClick={() => {
                 setEditingForum({ 
@@ -651,9 +664,9 @@ export default function Forums() {
                 setShowRecurrence(false);
                 setIsForumModalOpen(true);
               }}
-              className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all font-bold text-sm"
+              className="flex items-center gap-2 px-4 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all font-bold text-xs"
             >
-              <Plus size={18} />
+              <Plus size={16} />
               Nuevo Foro
             </button>
           )}
@@ -698,16 +711,12 @@ export default function Forums() {
           <Table
             columns={forumColumns}
             data={filteredForums}
-            onEdit={(f) => {
+            onEdit={isAdmin ? (f) => {
               setEditingForum(f);
               setShowRecurrence(f.frequency === 'periodic');
               setIsForumModalOpen(true);
-            }}
-            onDelete={async (f) => {
-              if (window.confirm('¿Estás seguro de eliminar este foro?')) {
-                await deleteDoc(doc(db, 'forums', f.id));
-              }
-            }}
+            } : undefined}
+            onDelete={isAdmin ? handleDeleteForum : undefined}
             actions={(f: Forum) => (
               <button
                 onClick={() => {

@@ -581,6 +581,12 @@ service cloud.firestore {
       allow delete: if isAdmin() && belongsToCompany(resource.data.companyId);
     }
 
+    match /customHtmls/{htmlId} {
+      allow read: if isAuthenticated() && belongsToCompany(resource.data.companyId);
+      allow create, update: if isAdmin() && belongsToCompany(request.resource.data.companyId);
+      allow delete: if isAdmin() && belongsToCompany(resource.data.companyId);
+    }
+
     match /incidents/{incidentId} {
       allow read: if isAuthenticated() && belongsToCompany(resource.data.companyId);
       allow create: if isAuthenticated() && belongsToCompany(request.resource.data.companyId) && isValidIncident(request.resource.data);

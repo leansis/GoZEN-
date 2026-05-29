@@ -338,6 +338,16 @@ export interface ForumSession {
   createdBy: string;
 }
 
+export interface CustomHtml {
+  id: string;
+  name: string;
+  html: string;
+  companyId: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
 export interface Indicator {
   id: string;
   name: string;
@@ -346,6 +356,8 @@ export interface Indicator {
   scopeIds: string[];
   scopeNames: string[];
   link?: string;
+  htmlSourceType?: 'url' | 'custom_html';
+  customHtmlId?: string;
   typology?: 'calidad' | 'coste' | 'plazo' | 'personas';
   companyId: string;
   createdAt: string;
