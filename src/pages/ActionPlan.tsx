@@ -2022,7 +2022,7 @@ export default function ActionPlanPage() {
                            )}
                          >
                            <option value="">Ninguno</option>
-                           {indicators.map(i => (
+                           {indicators.filter(ind => { const activeForumId = editingAction?.originForumId || filterForumId; return activeForumId ? ind.scopeIds?.includes(activeForumId) : true; }).map(i => (
                              <option key={i.id} value={i.id}>{i.name} ({i.typology})</option>
                            ))}
                          </select>

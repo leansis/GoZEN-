@@ -3115,11 +3115,17 @@ export default function ForumSession() {
                       )}
                     >
                       <option value="">Seleccionar indicador...</option>
-                      {indicators.map((i: any) => (
-                        <option key={i.id} value={i.id}>
-                          {i.name}
-                        </option>
-                      ))}
+                      {(() => {
+                        const activeForumId = editingAction?.originForumId || forum?.id;
+                        const filtered = activeForumId 
+                          ? indicators.filter((i: any) => i.scopeIds?.includes(activeForumId))
+                          : indicators;
+                        return filtered.map((i: any) => (
+                          <option key={i.id} value={i.id}>
+                            {i.name}
+                          </option>
+                        ));
+                      })()}
                     </select>
                   </div>
                 )}
