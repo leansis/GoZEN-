@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../AuthContext';
 import { useAppData } from '../contexts/AppDataContext';
 import { Activity, Process, Task, Team, UserTaskLevel } from '../types';
-import { ChevronDown, ChevronRight, Users, Target, X, Paperclip, ExternalLink } from 'lucide-react';
+import { ChevronDown, ChevronRight, User, Users, Target, X, Paperclip, ExternalLink } from 'lucide-react';
 import clsx from 'clsx';
 import ReactMarkdown from 'react-markdown';
 
@@ -106,6 +106,21 @@ export default function ProcessMap() {
     return ranking;
   };
 
+  const getTaskUserCount = (taskId: string) => {
+    let teamsToConsider = teams;
+    if (selectedTeamId !== 'all') {
+      teamsToConsider = teams.filter(t => t.id === selectedTeamId);
+    }
+    const members = new Set<string>();
+    teamsToConsider.forEach(team => {
+      team.members?.forEach(m => members.add(m.uid));
+    });
+
+    return userTaskLevels.filter(
+      l => l.taskId === taskId && members.has(l.userId) && (l.currentLevel || 0) >= 1
+    ).length;
+  };
+
   if (loading) {
     return <div className="flex items-center justify-center h-64">Cargando mapa de procesos...</div>;
   }
@@ -201,19 +216,37 @@ export default function ProcessMap() {
                       {/* Tasks Dropdown */}
                       {isExpanded && processTasks.length > 0 && (
                         <div className="border-t border-gray-200/60 bg-white/50 p-3 flex flex-col gap-2 rounded-b-lg">
-                          {processTasks.map(task => (
-                            <div 
-                              key={task.id} 
-                              className="text-sm text-gray-700 bg-white p-2 rounded border border-gray-100 shadow-sm flex items-start gap-2 cursor-pointer hover:bg-blue-50 hover:border-blue-200 transition-colors"
-                              onClick={() => {
-                                setSelectedTask(task);
-                                setModalTab('ranking');
-                              }}
-                            >
-                              <div className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-1.5 flex-shrink-0"></div>
-                              <span>{task.name}</span>
-                            </div>
-                          ))}
+                          {processTasks.map(task => {
+                            const userCount = getTaskUserCount(task.id);
+                            const hasAttachments = task.attachments && task.attachments.length > 0;
+                            
+                            return (
+                              <div 
+                                key={task.id} 
+                                className="text-sm bg-white p-2.5 rounded-lg border border-gray-100 shadow-sm flex items-center justify-between gap-3 cursor-pointer hover:bg-blue-50 hover:border-blue-200 transition-all duration-200"
+                                onClick={() => {
+                                  setSelectedTask(task);
+                                  setModalTab('ranking');
+                                }}
+                              >
+                                <div className="flex items-start gap-2 min-w-0 flex-1">
+                                  <div className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-2 flex-shrink-0"></div>
+                                  <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+                                    <span className="text-gray-700 font-medium leading-tight">{task.name}</span>
+                                    {hasAttachments && (
+                                      <span title="Contiene documentos">
+                                        <Paperclip className="w-3.5 h-3.5 text-gray-400 flex-shrink-0 inline" />
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-1 text-[11px] text-gray-500 bg-gray-50 px-2 py-0.5 rounded-full border border-gray-200 flex-shrink-0" title={`${userCount} personas con nivel >= 1`}>
+                                  <User className="w-3 h-3 text-gray-400" />
+                                  <span className="font-semibold">{userCount}</span>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
                     </div>
