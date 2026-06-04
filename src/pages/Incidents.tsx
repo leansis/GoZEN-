@@ -452,50 +452,110 @@ export default function Incidents() {
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Título</label>
-                    <p className="text-lg font-bold text-gray-900">{selectedIncident.title}</p>
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Título</label>
+                      <p className="text-lg font-bold text-gray-900">{selectedIncident.title}</p>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Descripción</label>
+                      <p className="text-sm text-gray-600 leading-relaxed bg-gray-50 p-3 rounded-xl border border-gray-100">
+                        {selectedIncident.description}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Descripción</label>
-                    <p className="text-sm text-gray-600 leading-relaxed bg-gray-50 p-3 rounded-xl border border-gray-100">
-                      {selectedIncident.description}
-                    </p>
+
+                  <div className="space-y-4">
+                    <div className="p-4 bg-gray-50 rounded-xl border border-gray-100 space-y-3">
+                      <div className="flex items-center gap-3">
+                        <MessagesSquare className="text-gray-400" size={18} />
+                        <div>
+                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none">Foro Origen</p>
+                          <p className="text-sm font-semibold">{selectedIncident.forumName}</p>
+                        </div>
+                      </div>
+
+                      {selectedIncident.indicatorName && (
+                        <div className="flex items-center gap-3">
+                          <ArrowUpRight className="text-gray-400" size={18} />
+                          <div>
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none">Indicador</p>
+                            <p className="text-sm font-semibold">{selectedIncident.indicatorName}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex items-center gap-3">
+                        <Calendar className="text-gray-400" size={18} />
+                        <div>
+                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none">Creada el</p>
+                          <p className="text-sm font-semibold">
+                            {format(new Date(selectedIncident.createdAt), "d 'de' MMMM, yyyy", { locale: es })}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                <div className="space-y-4">
-                  <div className="p-4 bg-gray-50 rounded-xl border border-gray-100 space-y-3">
-                    <div className="flex items-center gap-3">
-                      <MessagesSquare className="text-gray-400" size={18} />
-                      <div>
-                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none">Foro Origen</p>
-                        <p className="text-sm font-semibold">{selectedIncident.forumName}</p>
-                      </div>
-                    </div>
-
-                    {selectedIncident.indicatorName && (
-                      <div className="flex items-center gap-3">
-                        <ArrowUpRight className="text-gray-400" size={18} />
-                        <div>
-                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none">Indicador</p>
-                          <p className="text-sm font-semibold">{selectedIncident.indicatorName}</p>
+                {/* Listado de acciones asociadas */}
+                <div className="pt-4 border-t border-gray-150">
+                  <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <ClipboardList size={16} className="text-blue-500" />
+                    <span>Acciones Asociadas ({linkedActions.length})</span>
+                  </h4>
+                  {linkedActions.length > 0 ? (
+                    <div className="space-y-2 max-h-[220px] overflow-y-auto">
+                      {linkedActions.map((action) => (
+                        <div 
+                          key={action.id}
+                          onClick={() => setEditingActionInTraceability(action)}
+                          className="flex items-center justify-between p-3 bg-gray-50 hover:bg-blue-50/50 rounded-xl border border-gray-200/60 hover:border-blue-200 transition-all cursor-pointer group"
+                        >
+                          <div className="flex-1 min-w-0 pr-4">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-gray-800 text-sm group-hover:text-blue-600 transition-colors truncate">
+                                {action.title}
+                              </span>
+                              <span className={clsx(
+                                "px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider border",
+                                action.priority === 'alta' || action.priority === 'critica' ? "bg-red-50 text-red-600 border-red-100" :
+                                action.priority === 'media' ? "bg-blue-50 text-blue-600 border-blue-100" :
+                                "bg-gray-50 text-gray-500 border-gray-100"
+                              )}>
+                                {action.priority || 'media'}
+                              </span>
+                            </div>
+                            <p className="text-xs text-gray-500 line-clamp-1 mt-0.5">{action.description}</p>
+                          </div>
+                          
+                          <div className="flex items-center gap-3 shrink-0">
+                            {action.targetDate && (
+                              <span className="text-[10px] text-gray-405 text-gray-500 font-semibold font-mono">
+                                Límite: {format(new Date(action.targetDate), 'dd MMM yyyy', { locale: es })}
+                              </span>
+                            )}
+                            <span className={clsx(
+                              "px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider border",
+                              action.status === 'finalizada' ? "bg-green-50 text-green-700 border-green-200" :
+                              action.status === 'en_progreso' ? "bg-blue-50 text-blue-700 border-blue-200" :
+                              action.status === 'pendiente' ? "bg-orange-50 text-orange-700 border-orange-200" :
+                              "bg-gray-100 text-gray-650 border-gray-200"
+                            )}>
+                              {action.status}
+                            </span>
+                            <ChevronRight size={16} className="text-gray-400 group-hover:text-blue-500 transition-colors" />
+                          </div>
                         </div>
-                      </div>
-                    )}
-
-                    <div className="flex items-center gap-3">
-                      <Calendar className="text-gray-400" size={18} />
-                      <div>
-                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none">Creada el</p>
-                        <p className="text-sm font-semibold">
-                          {format(new Date(selectedIncident.createdAt), "d 'de' MMMM, yyyy", { locale: es })}
-                        </p>
-                      </div>
+                      ))}
                     </div>
-                  </div>
+                  ) : (
+                    <div className="text-xs text-gray-400 italic bg-gray-50/50 rounded-xl p-4 text-center border border-dashed border-gray-200">
+                      No hay acciones asociadas a esta incidencia aún.
+                    </div>
+                  )}
                 </div>
               </div>
             )}

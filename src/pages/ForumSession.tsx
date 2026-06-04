@@ -33,6 +33,7 @@ import {
   List as ListIcon,
   ArrowUp,
   ExternalLink,
+  ClipboardList,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { useAuth } from "../AuthContext";
@@ -289,6 +290,8 @@ export default function ForumSession() {
   const [incidentSearchQuery, setIncidentSearchQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [backToActionId, setBackToActionId] = useState<string | null>(null);
+  const [backToIncidentId, setBackToIncidentId] = useState<string | null>(null);
+  const [incidentPage, setIncidentPage] = useState<number>(1);
   const isAdmin = dbUser?.role === "admin";
 
   const [selectedIndicatorId, setSelectedIndicatorId] = useState<string | null>(
@@ -501,6 +504,29 @@ export default function ForumSession() {
     );
   }, [incidents, forum]);
 
+  const sortedIndicatorIncidents = useMemo(() => {
+    if (!selectedIndicatorId) return [];
+    return [...incidents]
+      .filter((i) => i.indicatorId === selectedIndicatorId)
+      .sort((a, b) => {
+        const dateA = new Date(a.createdAt || 0).getTime();
+        const dateB = new Date(b.createdAt || 0).getTime();
+        return dateB - dateA; // Latest first
+      });
+  }, [incidents, selectedIndicatorId]);
+
+  const ITEMS_PER_PAGE = 4;
+  const totalIncidentPages = Math.ceil(sortedIndicatorIncidents.length / ITEMS_PER_PAGE);
+
+  const paginatedIndicatorIncidents = useMemo(() => {
+    const startIndex = (incidentPage - 1) * ITEMS_PER_PAGE;
+    return sortedIndicatorIncidents.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [sortedIndicatorIncidents, incidentPage]);
+
+  useEffect(() => {
+    setIncidentPage(1);
+  }, [selectedIndicatorId]);
+
   const effectiveSectionIndex =
     localSectionIndex ?? session?.currentSectionIndex ?? 0;
 
@@ -580,7 +606,7 @@ export default function ForumSession() {
               forumId: forum?.id || "",
               companyId: forum?.companyId || incident.companyId || dbUser?.companyId || '',
               incidentId: incident.id,
-              type: 'incidencia',
+              type: 'accion',
               isEscalated: incident.isEscalated || false,
               escalatedToForumId: incident.escalatedToForumId || "",
               escalationHistory: incident.escalationHistory || []
@@ -679,11 +705,21 @@ export default function ForumSession() {
         return;
       }
     }
+    if (type === 'accion' && backToIncidentId) {
+      const prevIncident = incidents.find(i => i.id === backToIncidentId);
+      if (prevIncident) {
+        setEditingAction({ ...prevIncident, type: 'incidencia' } as any);
+        setType('incidencia');
+        setBackToIncidentId(null);
+        return;
+      }
+    }
     setEditingAction(null);
     setTempSubActions([]);
     setShowUserSelector(false);
     setUserSearchQuery("");
     setBackToActionId(null);
+    setBackToIncidentId(null);
   };
 
   const handleFinalizeAction = async () => {
@@ -1099,6 +1135,17 @@ export default function ForumSession() {
               });
             }
           }
+        }
+      }
+
+      if (type === 'accion' && backToIncidentId) {
+        const prevIncident = incidents.find(i => i.id === backToIncidentId);
+        if (prevIncident) {
+          setEditingAction({ ...prevIncident, type: 'incidencia' } as any);
+          setType('incidencia');
+          setBackToIncidentId(null);
+          setIsSaving(false);
+          return;
         }
       }
 
@@ -1806,6 +1853,8 @@ export default function ForumSession() {
                                   targetDate: format(new Date(), "yyyy-MM-dd"),
                                   originForumId: forum.id,
                                   originForumName: forum.name,
+                                  indicatorId: selectedIndicatorId || "",
+                                  indicatorName: indicators.find(i => i.id === selectedIndicatorId)?.name || "",
                                 });
                                 setTempSubActions([]);
                                 setType("incidencia");
@@ -1818,7 +1867,7 @@ export default function ForumSession() {
                             </button>
                           </div>
                           <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50/20 text-left">
-                            {forumIncidents.map((incident) => (
+                            {paginatedIndicatorIncidents.map((incident) => (
                               <div
                                 key={incident.id}
                                 onClick={() => {
@@ -1831,20 +1880,31 @@ export default function ForumSession() {
                                     originForumName: incident.forumName,
                                     companyId: incident.companyId,
                                     createdAt: incident.createdAt,
-                                    type: "incidencia"
+                                    indicatorId: incident.indicatorId || "",
+                                    indicatorName: incident.indicatorName || "",
+                                    type: "incidencia",
+                                    status: incident.status || "pendiente"
                                   } as any);
                                   setTempSubActions([]);
                                   setType("incidencia");
                                   setIsEscalated(false);
                                   setEscalatedToForumId("");
                                 }}
-                                className="bg-white p-3 rounded-2xl border border-gray-100 transition-all cursor-pointer group"
+                                className="bg-white p-3 rounded-2xl border border-gray-100 transition-all hover:border-red-200 hover:shadow-sm cursor-pointer group"
                               >
                                 <div className="flex justify-between items-start gap-2 mb-2">
                                   <h5 className="font-bold text-gray-800 text-[11px] leading-tight group-hover:text-red-600 transition-colors">
                                     {incident.title}
                                   </h5>
-                                  <div className="w-2 h-2 rounded-full shrink-0 bg-red-400" />
+                                  {incident.status === 'en_accion' ? (
+                                    <span className="px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100 text-[8px] font-extrabold uppercase shrink-0">
+                                      Acción
+                                    </span>
+                                  ) : (
+                                    <span className="px-1.5 py-0.5 rounded-full bg-red-50 text-red-600 border border-red-100 text-[8px] font-extrabold uppercase shrink-0">
+                                      Abierta
+                                    </span>
+                                  )}
                                 </div>
                                 <div className="flex items-center justify-between text-[9px] font-black uppercase tracking-widest text-gray-400">
                                   <div className="flex items-center gap-1">
@@ -1865,15 +1925,44 @@ export default function ForumSession() {
                                 </div>
                               </div>
                             ))}
-                            {forumIncidents.length === 0 && (
+                            {sortedIndicatorIncidents.length === 0 && (
                               <div className="flex flex-col items-center justify-center py-12 text-center text-gray-400 opacity-40">
                                 <CheckCircle2 size={32} className="mb-2" />
                                 <p className="text-[10px] font-black uppercase tracking-widest">
-                                  Sin incidencias activas
+                                  Sin incidencias para este indicador
                                 </p>
                               </div>
                             )}
                           </div>
+
+                          {/* Pagination Footer */}
+                          {totalIncidentPages > 1 && (
+                            <div className="p-3 border-t border-gray-150 flex items-center justify-between bg-white text-xs select-none">
+                              <button
+                                disabled={incidentPage === 1}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setIncidentPage(p => Math.max(1, p - 1));
+                                }}
+                                className="px-2 py-1 rounded bg-gray-50 text-gray-650 disabled:opacity-40 hover:bg-gray-100 font-bold uppercase text-[9px] tracking-wider transition-all border border-gray-100 cursor-pointer"
+                              >
+                                Anterior
+                              </button>
+                              <span className="text-gray-500 font-black text-[10px] uppercase tracking-wider">
+                                {incidentPage} de {totalIncidentPages}
+                              </span>
+                              <button
+                                disabled={incidentPage === totalIncidentPages}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setIncidentPage(p => Math.min(totalIncidentPages, p + 1));
+                                }}
+                                className="px-2 py-1 rounded bg-gray-50 text-gray-650 disabled:opacity-40 hover:bg-gray-100 font-bold uppercase text-[9px] tracking-wider transition-all border border-gray-100 cursor-pointer"
+                              >
+                                Siguiente
+                              </button>
+                            </div>
+                          )}
                         </div>
 
                         {/* Central Content Panel */}
@@ -2662,7 +2751,7 @@ export default function ForumSession() {
                           if (editingAction.id) {
                             setBackToActionId(editingAction.id);
                           }
-                          setEditingAction(inc as any);
+                          setEditingAction({ ...inc, type: 'incidencia' } as any);
                           setType('incidencia');
                         }
                       }}
@@ -2758,6 +2847,72 @@ export default function ForumSession() {
                     placeholder="Detalles adicionales..."
                   />
                 </div>
+
+                {type === "incidencia" && (
+                  <div className="pt-4 border-t border-gray-150 space-y-3">
+                    <h4 className="text-xs font-bold text-gray-700 uppercase tracking-widest mb-1 flex items-center gap-2">
+                      <ClipboardList size={16} className="text-blue-500" />
+                      <span>Acciones Asociadas ({actions.filter(a => a.incidentId === editingAction.id).length})</span>
+                    </h4>
+                    {actions.filter(a => a.incidentId === editingAction.id).length > 0 ? (
+                      <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+                        {actions.filter(a => a.incidentId === editingAction.id).map((action) => (
+                          <div 
+                            key={action.id}
+                            onClick={() => {
+                              setBackToIncidentId(editingAction.id);
+                              setEditingAction({ ...action, type: 'accion' } as any);
+                              setType('accion');
+                            }}
+                            className="flex items-center justify-between p-3 bg-gray-50 hover:bg-blue-50/50 rounded-xl border border-gray-200/60 hover:border-blue-200 transition-all cursor-pointer group text-left"
+                          >
+                            <div className="flex-1 min-w-0 pr-4">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-gray-800 text-[11px] group-hover:text-blue-600 transition-colors truncate">
+                                  {action.title}
+                                </span>
+                                <span className={clsx(
+                                  "px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border shrink-0",
+                                  action.priority === 'alta' || action.priority === 'critica' ? "bg-red-50 text-red-600 border-red-100" :
+                                  action.priority === 'media' ? "bg-blue-50 text-blue-600 border-blue-100" :
+                                  "bg-gray-50 text-gray-500 border-gray-100"
+                                )}>
+                                  {action.priority || 'media'}
+                                </span>
+                              </div>
+                              <p className="text-[10px] text-gray-500 line-clamp-1 mt-0.5">{action.description || 'Sin descripción'}</p>
+                            </div>
+                            
+                            <div className="flex items-center gap-2 shrink-0">
+                              {action.targetDate && (
+                                <span className="text-[9px] text-gray-500 font-semibold font-mono">
+                                  {(() => {
+                                    const d = new Date(action.targetDate);
+                                    return !isNaN(d.getTime()) ? format(d, 'dd MMM yyyy', { locale: es }) : action.targetDate;
+                                  })()}
+                                </span>
+                              )}
+                              <span className={clsx(
+                                "px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider border shrink-0",
+                                action.status === 'finalizada' ? "bg-green-50 text-green-700 border-green-200" :
+                                action.status === 'en_progreso' ? "bg-blue-50 text-blue-700 border-blue-200" :
+                                action.status === 'pendiente' ? "bg-orange-50 text-orange-700 border-orange-200" :
+                                "bg-gray-100 text-gray-500 border-gray-200"
+                              )}>
+                                {action.status}
+                              </span>
+                              <ChevronRight size={14} className="text-gray-400 group-hover:text-blue-500 transition-colors" />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-[10px] uppercase tracking-widest text-gray-400 font-semibold bg-gray-50/50 rounded-xl p-4 text-center border border-dashed border-gray-200">
+                        No hay acciones asociadas a esta incidencia aún.
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {type !== "incidencia" && (
                   <div>
@@ -2923,7 +3078,7 @@ export default function ForumSession() {
                         className="fixed inset-0 z-20"
                         onClick={() => setShowUserSelector(false)}
                       />
-                      <div className="absolute left-0 right-0 top-full mt-2 bg-white border border-gray-100 rounded-xl z-30 flex flex-col max-h-80">
+                      <div className="absolute left-0 right-0 top-full mt-2 bg-white border border-gray-100 rounded-xl z-30 flex flex-col max-h-80 shadow-lg">
                         <div className="p-2 border-b border-gray-100">
                           <div className="relative">
                             <Search
@@ -2933,6 +3088,8 @@ export default function ForumSession() {
                             <input
                               type="text"
                               autoFocus
+                              autoComplete="off"
+                              spellCheck={false}
                               placeholder="Buscar por nombre..."
                               value={userSearchQuery}
                               onChange={(e) =>
@@ -2942,7 +3099,7 @@ export default function ForumSession() {
                             />
                           </div>
                         </div>
-                        <div className="overflow-y-auto custom-scrollbar p-1">
+                        <div className="overflow-y-auto custom-scrollbar p-1 min-h-[140px]">
                           {users
                             .filter((u) => {
                               const matchesSearch = u.name

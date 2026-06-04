@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../AuthContext';
 import { useAppData } from '../contexts/AppDataContext';
 import { Activity, Process, Task, Team, UserTaskLevel } from '../types';
-import { ChevronDown, ChevronRight, Users, Target, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Users, Target, X, Paperclip, ExternalLink } from 'lucide-react';
 import clsx from 'clsx';
+import ReactMarkdown from 'react-markdown';
 
 export default function ProcessMap() {
   const { dbUser, isAdmin, isSupervisor } = useAuth();
@@ -20,6 +21,7 @@ export default function ProcessMap() {
   const [selectedTeamId, setSelectedTeamId] = useState<string>('all');
   const [expandedProcesses, setExpandedProcesses] = useState<Set<string>>(new Set());
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [modalTab, setModalTab] = useState<'ranking' | 'attachments'>('ranking');
 
   useEffect(() => {
     let fetchedTeams = appData.teams;
@@ -203,7 +205,10 @@ export default function ProcessMap() {
                             <div 
                               key={task.id} 
                               className="text-sm text-gray-700 bg-white p-2 rounded border border-gray-100 shadow-sm flex items-start gap-2 cursor-pointer hover:bg-blue-50 hover:border-blue-200 transition-colors"
-                              onClick={() => setSelectedTask(task)}
+                              onClick={() => {
+                                setSelectedTask(task);
+                                setModalTab('ranking');
+                              }}
                             >
                               <div className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-1.5 flex-shrink-0"></div>
                               <span>{task.name}</span>
@@ -243,38 +248,122 @@ export default function ProcessMap() {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="p-4 overflow-y-auto">
-              {(() => {
-                const ranking = getTaskRanking(selectedTask.id);
-                if (ranking.length === 0) {
-                  return (
-                    <div className="text-center py-8">
-                      <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                        <Users className="w-8 h-8 text-gray-400" />
+
+            {/* Tabs */}
+            <div className="flex border-b border-gray-200 bg-gray-50/50 px-4">
+              <button
+                onClick={() => setModalTab('ranking')}
+                className={clsx(
+                  "flex-1 py-3 text-xs font-bold uppercase tracking-wider border-b-2 text-center transition-all",
+                  modalTab === 'ranking'
+                    ? "border-blue-600 text-blue-600 font-extrabold"
+                    : "border-transparent text-gray-500 hover:text-gray-700"
+                )}
+              >
+                Habilidades
+              </button>
+              <button
+                onClick={() => setModalTab('attachments')}
+                className={clsx(
+                  "flex-1 py-3 text-xs font-bold uppercase tracking-wider border-b-2 text-center transition-all flex items-center justify-center gap-1.5",
+                  modalTab === 'attachments'
+                    ? "border-blue-600 text-blue-600 font-extrabold"
+                    : "border-transparent text-gray-500 hover:text-gray-700"
+                )}
+              >
+                <span>Adjuntos</span>
+                {selectedTask.attachments && selectedTask.attachments.length > 0 && (
+                  <span className={clsx(
+                    "px-2 py-0.5 text-[10px] font-extrabold rounded-full",
+                    modalTab === 'attachments' ? "bg-blue-100 text-blue-700" : "bg-gray-200 text-gray-650"
+                  )}>
+                    {selectedTask.attachments.length}
+                  </span>
+                )}
+              </button>
+            </div>
+
+            <div className="p-4 overflow-y-auto flex-1">
+              {modalTab === 'ranking' ? (
+                (() => {
+                  const ranking = getTaskRanking(selectedTask.id);
+                  if (ranking.length === 0) {
+                    return (
+                      <div className="text-center py-8">
+                        <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                          <Users className="w-8 h-8 text-gray-400" />
+                        </div>
+                        <p className="text-gray-500 font-medium">No hay habilidades validadas</p>
+                        <p className="text-gray-400 text-sm mt-1">Nadie en los equipos seleccionados tiene nivel en esta tarea aún.</p>
                       </div>
-                      <p className="text-gray-500 font-medium">No hay habilidades validadas</p>
-                      <p className="text-gray-400 text-sm mt-1">Nadie en los equipos seleccionados tiene nivel en esta tarea aún.</p>
+                    );
+                  }
+                  return (
+                    <div className="space-y-3">
+                      {ranking.map((user, idx) => (
+                        <div key={user.userId} className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-100 shadow-sm hover:border-blue-200 transition-colors">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm shadow-sm bg-blue-50 text-blue-700 border border-blue-100">
+                              {idx + 1}
+                            </div>
+                            <span className="font-medium text-gray-800">{user.name}</span>
+                          </div>
+                          <div className="flex items-center gap-1 bg-blue-50 px-2.5 py-1 rounded-full border border-blue-100 text-blue-700 font-semibold text-sm">
+                            <span>Nivel {user.level}</span>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   );
-                }
-                return (
-                  <div className="space-y-3">
-                    {ranking.map((user, idx) => (
-                      <div key={user.userId} className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-100 shadow-sm hover:border-blue-200 transition-colors">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm shadow-sm bg-blue-50 text-blue-700 border border-blue-100">
-                            {idx + 1}
-                          </div>
-                          <span className="font-medium text-gray-800">{user.name}</span>
-                        </div>
-                        <div className="flex items-center gap-1 bg-blue-50 px-2.5 py-1 rounded-full border border-blue-100 text-blue-700 font-semibold text-sm">
-                          <span>Nivel {user.level}</span>
-                        </div>
+                })()
+              ) : (
+                <div className="space-y-4">
+                  {selectedTask.description && (
+                    <div className="space-y-1.5">
+                      <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Descripción de la tarea</h4>
+                      <div className="markdown-body text-xs text-gray-700 bg-gray-50 border border-gray-200 rounded-xl p-3 max-h-[150px] overflow-y-auto">
+                        <ReactMarkdown>{selectedTask.description}</ReactMarkdown>
                       </div>
-                    ))}
+                    </div>
+                  )}
+                  
+                  <div className="space-y-2">
+                    <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Archivos y Documentación</h4>
+                    {selectedTask.attachments && selectedTask.attachments.length > 0 ? (
+                      <ul className="space-y-2">
+                        {selectedTask.attachments.map((att: any, idx) => {
+                          const url = typeof att === 'string' ? att : att.url;
+                          const name = typeof att === 'string' ? att : att.name;
+                          return (
+                            <li key={idx} className="flex items-center justify-between p-3 bg-white rounded-xl border border-gray-100 hover:border-blue-300 hover:shadow-sm transition-all">
+                              <div className="flex items-center gap-2.5 overflow-hidden pr-2">
+                                <Paperclip size={16} className="text-blue-500 shrink-0" />
+                                <span className="text-xs font-semibold text-gray-800 truncate" title={name}>
+                                  {name}
+                                </span>
+                              </div>
+                              <a 
+                                href={url} 
+                                target="_blank" 
+                                rel="noopener noreferrer" 
+                                className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 hover:text-blue-700 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0"
+                              >
+                                Ver <ExternalLink size={10} />
+                              </a>
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    ) : (
+                      <div className="p-6 bg-gray-50/50 rounded-xl text-center border border-dashed border-gray-200">
+                        <Paperclip size={24} className="text-gray-300 mx-auto mb-2 opacity-30" />
+                        <p className="text-xs text-gray-500 font-medium">No hay documentos adjuntos para esta tarea.</p>
+                        <p className="text-[10px] text-gray-400 mt-1">Los adjuntos se pueden gestionar desde la administración de tareas.</p>
+                      </div>
+                    )}
                   </div>
-                );
-              })()}
+                </div>
+              )}
             </div>
           </div>
         </div>

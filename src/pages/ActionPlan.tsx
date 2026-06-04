@@ -20,7 +20,8 @@ import {
   XCircle,
   X,
   ChevronDown,
-  ArrowUp
+  ArrowUp,
+  ClipboardList
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -125,6 +126,7 @@ export default function ActionPlanPage() {
   const [incidentSearchQuery, setIncidentSearchQuery] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [backToActionId, setBackToActionId] = useState<string | null>(null);
+  const [backToIncidentId, setBackToIncidentId] = useState<string | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
 
   const checkIsReadOnly = (item: any) => {
@@ -506,11 +508,21 @@ export default function ActionPlanPage() {
         return;
       }
     }
+    if (type === 'accion' && backToIncidentId) {
+      const prevIncident = incidents.find(i => i.id === backToIncidentId);
+      if (prevIncident) {
+        setEditingAction({ ...prevIncident, type: 'incidencia' } as any);
+        setType('incidencia');
+        setBackToIncidentId(null);
+        return;
+      }
+    }
     setEditingAction(null); 
     setTempSubActions([]); 
     setShowUserSelector(false);
     setUserSearchQuery('');
     setBackToActionId(null);
+    setBackToIncidentId(null);
   };
 
   const checkAndResolveIncident = async (incidentId: string, currentActionId?: string, isCompleting?: boolean) => {
@@ -953,6 +965,16 @@ export default function ActionPlanPage() {
         }
       }
 
+      if (type === 'accion' && backToIncidentId) {
+        const prevIncident = incidents.find(i => i.id === backToIncidentId);
+        if (prevIncident) {
+          setEditingAction({ ...prevIncident, type: 'incidencia' } as any);
+          setType('incidencia');
+          setBackToIncidentId(null);
+          return;
+        }
+      }
+
       setEditingAction(null);
       setTempSubActions([]);
       setError(null);
@@ -1144,7 +1166,7 @@ export default function ActionPlanPage() {
         const actionPayload: any = {
           title: incident.title,
           description: incident.description || '',
-          type: 'incidencia',
+          type: 'accion',
           status: 'pendiente',
           priority: 'media',
           targetDate: targetDate,
@@ -1526,7 +1548,7 @@ export default function ActionPlanPage() {
   ];
 
   return (
-    <div className="space-y-6 pb-20 md:pb-0" style={{ zoom: '0.75' }}>
+    <div className="space-y-6 pb-20 md:pb-0" style={{ zoom: '0.95' }}>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Plan de Acciones</h1>
@@ -1929,7 +1951,7 @@ export default function ActionPlanPage() {
                           if (editingAction.id) {
                             setBackToActionId(editingAction.id);
                           }
-                          setEditingAction(inc as any);
+                          setEditingAction({ ...inc, type: 'incidencia' } as any);
                           setType('incidencia');
                         }
                       }}
@@ -2118,6 +2140,72 @@ export default function ActionPlanPage() {
                    </div>
                 </div>
 
+                {type === "incidencia" && (
+                  <div className="pt-4 border-t border-gray-150 space-y-3">
+                    <h4 className="text-xs font-bold text-gray-700 uppercase tracking-widest mb-1 flex items-center gap-2">
+                      <ClipboardList size={16} className="text-blue-500" />
+                      <span>Acciones Asociadas ({actions.filter(a => a.incidentId === editingAction.id).length})</span>
+                    </h4>
+                    {actions.filter(a => a.incidentId === editingAction.id).length > 0 ? (
+                      <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+                        {actions.filter(a => a.incidentId === editingAction.id).map((action) => (
+                          <div 
+                            key={action.id}
+                            onClick={() => {
+                              setBackToIncidentId(editingAction.id);
+                              setEditingAction({ ...action, type: 'accion' } as any);
+                              setType('accion');
+                            }}
+                            className="flex items-center justify-between p-3 bg-gray-50 hover:bg-blue-50/50 rounded-xl border border-gray-200/60 hover:border-blue-200 transition-all cursor-pointer group text-left"
+                          >
+                            <div className="flex-1 min-w-0 pr-4">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-gray-800 text-[11px] group-hover:text-blue-600 transition-colors truncate">
+                                  {action.title}
+                                </span>
+                                <span className={clsx(
+                                  "px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border shrink-0",
+                                  action.priority === 'alta' || action.priority === 'critica' ? "bg-red-50 text-red-600 border-red-100" :
+                                  action.priority === 'media' ? "bg-blue-50 text-blue-600 border-blue-100" :
+                                  "bg-gray-50 text-gray-500 border-gray-100"
+                                )}>
+                                  {action.priority || 'media'}
+                                </span>
+                              </div>
+                              <p className="text-[10px] text-gray-500 line-clamp-1 mt-0.5">{action.description || 'Sin descripción'}</p>
+                            </div>
+                            
+                            <div className="flex items-center gap-2 shrink-0">
+                              {action.targetDate && (
+                                <span className="text-[9px] text-gray-500 font-semibold font-mono">
+                                  {(() => {
+                                    const d = new Date(action.targetDate);
+                                    return !isNaN(d.getTime()) ? format(d, 'dd MMM yyyy', { locale: es }) : action.targetDate;
+                                  })()}
+                                </span>
+                              )}
+                              <span className={clsx(
+                                "px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider border shrink-0",
+                                action.status === 'finalizada' ? "bg-green-50 text-green-700 border-green-200" :
+                                action.status === 'en_progreso' ? "bg-blue-50 text-blue-700 border-blue-200" :
+                                action.status === 'pendiente' ? "bg-orange-50 text-orange-700 border-orange-200" :
+                                "bg-gray-100 text-gray-500 border-gray-200"
+                              )}>
+                                {action.status}
+                              </span>
+                              <ChevronRight size={14} className="text-gray-400 group-hover:text-blue-500 transition-colors" />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-[10px] uppercase tracking-widest text-gray-400 font-semibold bg-gray-50/50 rounded-xl p-4 text-center border border-dashed border-gray-200">
+                        No hay acciones asociadas a esta incidencia aún.
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {type !== 'incidencia' && (
                   <>
                     <div className="relative">
@@ -2175,13 +2263,15 @@ export default function ActionPlanPage() {
                                 className="fixed inset-0 z-20" 
                                 onClick={() => setShowUserSelector(false)}
                               />
-                              <div className="absolute left-0 right-0 top-full mt-2 bg-white border border-gray-100 rounded-xl z-30 flex flex-col max-h-80">
+                              <div className="absolute left-0 right-0 top-full mt-2 bg-white border border-gray-100 rounded-xl z-30 flex flex-col max-h-80 shadow-lg">
                                 <div className="p-2 border-b border-gray-100">
                                   <div className="relative">
                                     <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                                     <input
                                       type="text"
                                       autoFocus
+                                      autoComplete="off"
+                                      spellCheck={false}
                                       placeholder="Buscar por nombre..."
                                       value={userSearchQuery}
                                       onChange={(e) => setUserSearchQuery(e.target.value)}
@@ -2189,8 +2279,8 @@ export default function ActionPlanPage() {
                                     />
                                   </div>
                                 </div>
-                                <div className="p-2 space-y-1 overflow-y-auto custom-scrollbar flex-1">
-                                  {assignableUsers
+                                <div className="p-2 space-y-1 overflow-y-auto custom-scrollbar flex-1 min-h-[140px]">
+                                  {users
                                     .filter(u => {
                                       const matchesSearch = u.name.toLowerCase().includes(userSearchQuery.toLowerCase());
                                       
@@ -2217,7 +2307,7 @@ export default function ActionPlanPage() {
                                         }
                                       }
                                       
-                                      return matchesSearch;
+                                      return matchesSearch && assignableUsers.some(au => au.uid === u.uid);
                                     })
                                     .map(user => {
                                       const isAssigned = editingAction?.assignedTo?.includes(user.uid);

@@ -143,7 +143,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'teamTargets'));
 
     const unsubUsers = onSnapshot(getQuery('users'), (snapshot) => {
-      setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setUsers(snapshot.docs.map(doc => ({ id: doc.id, uid: doc.id, ...doc.data() })));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'users'));
 
     const unsubForums = onSnapshot(getQuery('forums'), (snapshot) => {
