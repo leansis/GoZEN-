@@ -5,7 +5,7 @@ import { ZoomIn, ZoomOut, RotateCcw, HelpCircle } from 'lucide-react';
 import clsx from 'clsx';
 
 interface D3GraphViewProps {
-  standards: Standard[];
+  standards: (Standard & { isGreyedOut?: boolean })[];
   selectedNode: Standard | null;
   onSelectNode: (standard: Standard) => void;
 }
@@ -14,7 +14,7 @@ interface GraphNode extends d3.SimulationNodeDatum {
   id: string;
   name: string;
   relationType: 'activity' | 'process' | 'task';
-  standard: Standard;
+  standard: Standard & { isGreyedOut?: boolean };
 }
 
 interface GraphLink extends d3.SimulationLinkDatum<GraphNode> {
@@ -107,7 +107,7 @@ export default function D3GraphView({ standards, selectedNode, onSelectNode }: D
     svg.call(zoom as any);
 
     // Initial center fit
-    svg.call(zoom.transform as any, d3.zoomIdentity.translate(width / 2, height / 2).scale(0.8));
+    svg.call(zoom.transform as any, d3.zoomIdentity.translate(width / 2, height / 2).scale(1.2));
 
     // Force simulation with fine-tuned parameters for Obsidian-like fluid inertial movement
     const simulation = d3.forceSimulation<GraphNode>(nodes)
@@ -182,11 +182,13 @@ export default function D3GraphView({ standards, selectedNode, onSelectNode }: D
       .attr('r', d => Math.max(9, 7 + (degreeMap.get(d.id) || 1) * 1.2))
       .attr('class', 'node-circle')
       .attr('fill', d => {
+        if (d.standard.isGreyedOut) return '#cbd5e1'; // Slate-300 grey for greyed out
         if (d.relationType === 'activity') return '#f59e0b'; // Amber
         if (d.relationType === 'process') return '#8b5cf6'; // Purple
         return '#3b82f6'; // Blue
       })
       .attr('stroke', d => {
+        if (d.standard.isGreyedOut) return '#94a3b8'; // Slate-400 grey stroke
         if (d.relationType === 'activity') return '#b45309';
         if (d.relationType === 'process') return '#6d28d9';
         return '#1d4ed8';
@@ -197,7 +199,7 @@ export default function D3GraphView({ standards, selectedNode, onSelectNode }: D
     node.append('text')
       .attr('text-anchor', 'middle')
       .attr('dy', '.3em')
-      .attr('fill', '#ffffff')
+      .attr('fill', d => d.standard.isGreyedOut ? '#64748b' : '#ffffff')
       .attr('font-size', d => Math.max(8, 7 + (degreeMap.get(d.id) || 1) * 0.4) + 'px')
       .attr('font-weight', 'bold')
       .style('pointer-events', 'none')
@@ -210,7 +212,7 @@ export default function D3GraphView({ standards, selectedNode, onSelectNode }: D
       .attr('font-family', 'sans-serif')
       .attr('font-size', '11px')
       .attr('font-weight', '600')
-      .attr('fill', '#1e293b')
+      .attr('fill', d => d.standard.isGreyedOut ? '#94a3b8' : '#1e293b')
       .attr('class', 'node-label')
       .style('pointer-events', 'none')
       .style('opacity', 0) // Hidden by default
@@ -223,14 +225,17 @@ export default function D3GraphView({ standards, selectedNode, onSelectNode }: D
         const allowed = connectionMap.get(activeId) || new Set<string>();
         
         // Dim un-connected nodes and links
-        circle.style('opacity', d => allowed.has(d.id) ? 1.0 : 0.15);
+        circle.style('opacity', d => {
+          if (!allowed.has(d.id)) return 0.15;
+          return d.standard.isGreyedOut ? 0.4 : 1.0;
+        });
         node.selectAll('text').style('opacity', function(d: any) {
-          // If this is the label element, only show it for allowed nodes
-          if (d3.select(this as any).classed('node-label')) {
-            return d.id === activeId || allowed.has(d.id) ? 1.0 : 0.0;
+          const isLabel = d3.select(this as any).classed('node-label');
+          if (isLabel) {
+            return d.id === activeId || allowed.has(d.id) ? (d.standard.isGreyedOut ? 0.5 : 1.0) : 0.0;
           }
-          // Inside letters are always visible but respect circle opacity
-          return allowed.has(d.id) ? 1.0 : 0.15;
+          if (!allowed.has(d.id)) return 0.15;
+          return d.standard.isGreyedOut ? 0.5 : 1.0;
         });
         
         halo.style('stroke-opacity', d => d.id === activeId ? 0.6 : 0);
@@ -238,7 +243,15 @@ export default function D3GraphView({ standards, selectedNode, onSelectNode }: D
           .attr('stroke-opacity', d => {
             const srcId = typeof d.source === 'object' ? d.source.id : (d.source as string);
             const dstId = typeof d.target === 'object' ? d.target.id : (d.target as string);
-            return (srcId === activeId || dstId === activeId) ? 0.95 : 0.05;
+            const isRelated = srcId === activeId || dstId === activeId;
+            if (!isRelated) return 0.05;
+            
+            const src = typeof d.source === 'object' ? d.source : nodes.find(n => n.id === d.source);
+            const dst = typeof d.target === 'object' ? d.target : nodes.find(n => n.id === d.target);
+            if (src?.standard?.isGreyedOut || dst?.standard?.isGreyedOut) {
+              return 0.4;
+            }
+            return 0.95;
           })
           .attr('stroke', d => {
             const srcId = typeof d.source === 'object' ? d.source.id : (d.source as string);
@@ -252,16 +265,23 @@ export default function D3GraphView({ standards, selectedNode, onSelectNode }: D
           });
       } else {
         // Reset state
-        circle.style('opacity', 1.0);
+        circle.style('opacity', d => d.standard.isGreyedOut ? 0.4 : 1.0);
         node.selectAll('text').style('opacity', function(d: any) {
           if (d3.select(this as any).classed('node-label')) {
-            return selectedNode?.id === d.id ? 1.0 : 0.0;
+            return selectedNode?.id === d.id ? (d.standard.isGreyedOut ? 0.5 : 1.0) : 0.0;
           }
-          return 1.0;
+          return d.standard.isGreyedOut ? 0.5 : 1.0;
         });
         halo.style('stroke-opacity', d => selectedNode?.id === d.id ? 0.6 : 0);
         link
-          .attr('stroke-opacity', 0.75)
+          .attr('stroke-opacity', d => {
+            const src = typeof d.source === 'object' ? d.source : nodes.find(n => n.id === d.source);
+            const dst = typeof d.target === 'object' ? d.target : nodes.find(n => n.id === d.target);
+            if (src?.standard?.isGreyedOut || dst?.standard?.isGreyedOut) {
+              return 0.25;
+            }
+            return 0.75;
+          })
           .attr('stroke', '#94a3b8')
           .attr('stroke-width', 1.5);
       }
@@ -348,7 +368,7 @@ export default function D3GraphView({ standards, selectedNode, onSelectNode }: D
       const height = containerRef.current.clientHeight || 500;
       d3.select(svgRef.current).transition().duration(350).call(
         zoomBehaviorRef.current.transform, 
-        d3.zoomIdentity.translate(width / 2, height / 2).scale(0.8)
+        d3.zoomIdentity.translate(width / 2, height / 2).scale(1.2)
       );
     }
   };

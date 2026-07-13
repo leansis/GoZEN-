@@ -10,7 +10,7 @@ import ConfirmModal from '../components/ConfirmModal';
 import { handleFirestoreError, OperationType } from '../lib/firestore-utils';
 
 export default function Home() {
-  const { user, dbUser, isAdmin, isLeanPromotor, logout, setActiveCompanyId, company, isGlobalAdmin } = useAuth();
+  const { user, dbUser, isAdmin, isLeanPromotor, logout, activeCompanyId, setActiveCompanyId, company, isGlobalAdmin } = useAuth();
   const navigate = useNavigate();
   const [companies, setCompanies] = React.useState<Company[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -18,6 +18,12 @@ export default function Home() {
   const [newCompanyName, setNewCompanyName] = React.useState('');
   const [companyToDelete, setCompanyToDelete] = React.useState<Company | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (!loading && activeCompanyId) {
+      navigate('/inicio');
+    }
+  }, [loading, activeCompanyId, navigate]);
 
   React.useEffect(() => {
     if (isAdmin) {
@@ -42,7 +48,7 @@ export default function Home() {
 
   const handleAccessCompany = (id: string) => {
     setActiveCompanyId(id);
-    navigate('/matrix');
+    navigate('/inicio');
   };
 
   const handleAddCompany = async (e: React.FormEvent) => {

@@ -33,7 +33,7 @@ export default function Standards() {
   const loading = appData.loading;
 
   // View tabs
-  const [activeTab, setActiveTab] = useState<'map' | 'list' | 'graph'>('map');
+  const [activeTab, setActiveTab] = useState<'map' | 'list' | 'graph'>('graph');
 
   // Filters
   const [globalSearch, setGlobalSearch] = useState('');
@@ -183,6 +183,60 @@ export default function Standards() {
     });
   }, [standards, globalSearch, selectedAreaId, selectedProcessId, selectedTaskId, activities, processes, tasks]);
 
+  // Check if any filter is active
+  const isFilterApplied = useMemo(() => {
+    return globalSearch !== '' || selectedAreaId !== 'all' || selectedProcessId !== 'all' || selectedTaskId !== 'all';
+  }, [globalSearch, selectedAreaId, selectedProcessId, selectedTaskId]);
+
+  // Compute standards for graph including related standards when a filter is applied
+  const standardsForGraph = useMemo(() => {
+    if (!isFilterApplied) {
+      return standards.map(std => ({
+        ...std,
+        isGreyedOut: false
+      }));
+    }
+
+    const matchingIds = new Set(filteredStandards.map(std => std.id));
+    const relatedIds = new Set<string>();
+
+    filteredStandards.forEach(std => {
+      if (std.relatedStandardIds) {
+        std.relatedStandardIds.forEach(id => {
+          if (!matchingIds.has(id)) {
+            relatedIds.add(id);
+          }
+        });
+      }
+    });
+
+    standards.forEach(std => {
+      if (std.relatedStandardIds) {
+        const hasMatchingRelation = std.relatedStandardIds.some(id => matchingIds.has(id));
+        if (hasMatchingRelation && !matchingIds.has(std.id)) {
+          relatedIds.add(std.id);
+        }
+      }
+    });
+
+    const result: (Standard & { isGreyedOut: boolean })[] = [];
+    standards.forEach(std => {
+      if (matchingIds.has(std.id)) {
+        result.push({
+          ...std,
+          isGreyedOut: false
+        });
+      } else if (relatedIds.has(std.id)) {
+        result.push({
+          ...std,
+          isGreyedOut: true
+        });
+      }
+    });
+
+    return result;
+  }, [standards, filteredStandards, isFilterApplied]);
+
   // Available options for the filtered dropdowns
   const availableProcesses = useMemo(() => {
     if (selectedAreaId === 'all') return processes;
@@ -242,6 +296,16 @@ export default function Standards() {
         {/* View Toggle tabs */}
         <div className="flex bg-gray-100 p-1 rounded-xl border border-gray-200">
           <button
+            onClick={() => setActiveTab('graph')}
+            className={clsx(
+              "flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all cursor-pointer",
+              activeTab === 'graph' ? "bg-white text-blue-700 shadow-sm" : "text-gray-600 hover:text-gray-900"
+            )}
+          >
+            <Network className="w-4 h-4" />
+            <span>Grafo</span>
+          </button>
+          <button
             onClick={() => setActiveTab('map')}
             className={clsx(
               "flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all cursor-pointer",
@@ -260,16 +324,6 @@ export default function Standards() {
           >
             <List className="w-4 h-4" />
             <span>Listado</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('graph')}
-            className={clsx(
-              "flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all cursor-pointer",
-              activeTab === 'graph' ? "bg-white text-blue-700 shadow-sm" : "text-gray-600 hover:text-gray-900"
-            )}
-          >
-            <Network className="w-4 h-4" />
-            <span>Grafo</span>
           </button>
         </div>
       </div>
@@ -535,7 +589,7 @@ export default function Standards() {
           {/* Main SVG Graph Panel */}
           <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col p-4">
             <D3GraphView 
-              standards={filteredStandards}
+              standards={standardsForGraph}
               selectedNode={selectedGraphNode}
               onSelectNode={setSelectedGraphNode}
             />

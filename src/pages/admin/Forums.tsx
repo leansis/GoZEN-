@@ -25,6 +25,7 @@ import Modal from '../../components/Modal';
 import Table from '../../components/Table';
 import clsx from 'clsx';
 import { format, addMonths } from 'date-fns';
+import { toast } from 'react-hot-toast';
 
 const DAYS_OF_WEEK = [
   { id: 1, label: 'L' },
@@ -69,8 +70,13 @@ export default function AdminForums() {
   }, [companyForums, searchQuery]);
 
   const handleSaveForum = async (e: React.FormEvent) => {
+    if (e && e.preventDefault) e.preventDefault();
     const targetCompanyId = activeCompanyId || dbUser?.companyId;
-    if (!targetCompanyId || !dbUser || isSaving) return;
+    if (!targetCompanyId || !dbUser) {
+      toast.error('Error de autenticación: No se pudo identificar la empresa activa o el usuario.');
+      return;
+    }
+    if (isSaving) return;
 
     setIsSaving(true);
     try {
@@ -99,18 +105,54 @@ export default function AdminForums() {
         };
       }
 
+      // Local validation before sending to Firestore
+      if (!forumData.name || forumData.name.trim() === '') {
+        toast.error('El nombre del foro es requerido.');
+        setIsSaving(false);
+        return;
+      }
+
+      if (!forumData.teamId || forumData.teamId.trim() === '') {
+        toast.error('Debe seleccionar un equipo responsable para este foro.');
+        setIsSaving(false);
+        return;
+      }
+
+      // Sanitize fields to prevent sending undefined fields to Firestore
+      const cleanForumData: any = {};
+      Object.keys(forumData).forEach(key => {
+        if (forumData[key] !== undefined && forumData[key] !== null) {
+          cleanForumData[key] = forumData[key];
+        }
+      });
+
       const colRef = collection(db, 'forums');
       if (id) {
         const docRef = doc(db, 'forums', id);
-        await updateDoc(docRef, forumData);
+        await updateDoc(docRef, cleanForumData);
+        toast.success('Foro actualizado correctamente');
       } else {
-        await addDoc(colRef, forumData);
+        await addDoc(colRef, cleanForumData);
+        toast.success('Foro creado correctamente');
       }
       setIsForumModalOpen(false);
       setEditingForum(null);
       setShowRecurrence(false);
     } catch (err: any) {
       console.error("Error saving forum:", err);
+      
+      let errorMsg = "Error al guardar el foro";
+      if (err?.code === 'permission-denied') {
+        errorMsg = "Error de permisos: No tienes autorización (Admin/Supervisor/Promotor) o los datos no cumplen con las reglas de seguridad de Firestore.";
+      } else if (err?.message?.includes('permission-denied')) {
+        errorMsg = "Error de permisos de Firestore: No tienes autorización o los campos obligatorios no cumplen con el formato de seguridad.";
+      } else if (err?.code) {
+        errorMsg = `Error de Firebase (${err.code}): ${err.message || 'Error desconocido'}`;
+      } else if (err?.message) {
+        errorMsg = `Error al guardar: ${err.message}`;
+      }
+      
+      toast.error(errorMsg, { duration: 6000 });
       handleFirestoreError(err, OperationType.WRITE, 'forums');
     } finally {
       setIsSaving(false);

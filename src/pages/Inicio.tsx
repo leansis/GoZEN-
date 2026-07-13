@@ -19,7 +19,8 @@ import {
   Check, 
   MessageSquare,
   TrendingUp,
-  ExternalLink
+  ExternalLink,
+  Users
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
@@ -54,6 +55,134 @@ export default function Inicio() {
   // Stats Detail list states
   const [activeStatList, setActiveStatList] = useState<'pending' | 'overdue' | 'training' | null>(null);
   const [listSearchQuery, setListSearchQuery] = useState('');
+
+  // Dashboard view mode and selected team
+  const [dashboardMode, setDashboardMode] = useState<'personal' | 'teams'>('personal');
+  const [selectedTeamId, setSelectedTeamId] = useState<string>('all');
+
+  // Teams that depend on me (supervised teams)
+  const mySupervisedTeams = useMemo(() => {
+    if (!dbUser) return [];
+    const userEmail = dbUser.email?.toLowerCase().trim();
+    const userName = dbUser.name?.toLowerCase().trim();
+
+    return teams.filter(t => 
+      t.supervisorId === dbUser.uid || 
+      t.supervisorId?.toLowerCase().trim() === userEmail ||
+      t.supervisorName?.toLowerCase().trim() === userName
+    );
+  }, [teams, dbUser]);
+
+  // Selected teams for indicators
+  const selectedTeams = useMemo(() => {
+    if (dashboardMode === 'personal') return [];
+    if (selectedTeamId === 'all') return mySupervisedTeams;
+    return mySupervisedTeams.filter(t => t.id === selectedTeamId);
+  }, [dashboardMode, selectedTeamId, mySupervisedTeams]);
+
+  // Compute team metrics
+  const teamMetrics = useMemo(() => {
+    if (selectedTeams.length === 0) {
+      return {
+        pendingActionsCount: 0,
+        overdueActionsCount: 0,
+        trainingInProgressCount: 0,
+        polyvalencePct: 0,
+        attendancePct: 0,
+        pendingActionsList: [],
+        overdueActionsList: [],
+        trainingInProgressList: [],
+        attendanceExpected: 0,
+        attendanceAttended: 0,
+        polyvalenceCurrent: 0,
+        polyvalenceTarget: 0
+      };
+    }
+
+    const teamMemberUids = new Set(selectedTeams.flatMap(t => t.members?.map(m => m.uid) || []));
+    const teamForums = forums.filter(f => selectedTeams.some(t => t.id === f.teamId));
+    const teamForumIds = new Set(teamForums.map(f => f.id));
+
+    // 1. Pending Actions for the team
+    const teamPendingActions = actionPlans.filter(a => {
+      const isPending = a.status !== 'finalizada' && a.status !== 'cancelada';
+      if (!isPending) return false;
+      const isAssigned = a.assignedTo?.some(uid => teamMemberUids.has(uid));
+      const isFromForum = a.originForumId && teamForumIds.has(a.originForumId);
+      return isAssigned || isFromForum;
+    });
+
+    // 2. Overdue Actions for the team
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const teamOverdueActions = teamPendingActions.filter(a => {
+      if (!a.targetDate) return false;
+      const target = new Date(a.targetDate);
+      return target < today;
+    });
+
+    // 3. Training Actions in progress for the team
+    const teamTrainingInProgress = trainingActions.filter(t => 
+      teamMemberUids.has(t.userId) && 
+      (t.status === 'planificada' || t.status === 'retrasada')
+    );
+
+    // 4. Polyvalence for the team
+    const teamLevels = userTaskLevels.filter(l => teamMemberUids.has(l.userId));
+    let currentSum = 0;
+    let targetSum = 0;
+    teamLevels.forEach(l => {
+      currentSum += l.currentLevel || 0;
+      targetSum += l.targetLevel || 0;
+    });
+    const polyvalencePct = targetSum > 0 ? Math.round((Math.min(currentSum, targetSum) / targetSum) * 100) : 0;
+
+    // 5. Attendance for the team completed sessions
+    const teamSessions = forumSessions.filter(s => s.status === 'completed' && teamForumIds.has(s.forumId));
+    let attendanceExpected = 0;
+    let attendanceAttended = 0;
+    teamSessions.forEach(s => {
+      const expectedMembers = s.attendees?.filter(a => teamMemberUids.has(a.uid)) || [];
+      if (expectedMembers.length > 0) {
+        attendanceExpected += expectedMembers.length;
+        attendanceAttended += expectedMembers.filter(a => a.present).length;
+      } else {
+        attendanceExpected += s.attendees?.length || 0;
+        attendanceAttended += s.attendees?.filter(a => a.present).length || 0;
+      }
+    });
+    const attendancePct = attendanceExpected > 0 ? Math.round((attendanceAttended / attendanceExpected) * 100) : 0;
+
+    return {
+      pendingActionsCount: teamPendingActions.length,
+      overdueActionsCount: teamOverdueActions.length,
+      trainingInProgressCount: teamTrainingInProgress.length,
+      polyvalencePct,
+      attendancePct,
+      pendingActionsList: teamPendingActions,
+      overdueActionsList: teamOverdueActions,
+      trainingInProgressList: teamTrainingInProgress,
+      attendanceExpected,
+      attendanceAttended,
+      polyvalenceCurrent: currentSum,
+      polyvalenceTarget: targetSum
+    };
+  }, [selectedTeams, actionPlans, trainingActions, userTaskLevels, forums, forumSessions]);
+
+  // Personal attendance stats
+  const personalAttendanceStats = useMemo(() => {
+    if (!dbUser) return { expected: 0, attended: 0, pct: 0 };
+
+    const completedSessions = forumSessions.filter(s => s.status === 'completed');
+    const expectedSessions = completedSessions.filter(s => s.attendees?.some(a => a.uid === dbUser.uid));
+    const attendedSessions = expectedSessions.filter(s => s.attendees?.some(a => a.uid === dbUser.uid && a.present));
+
+    const expected = expectedSessions.length;
+    const attended = attendedSessions.length;
+    const pct = expected > 0 ? Math.round((attended / expected) * 100) : 0;
+
+    return { expected, attended, pct };
+  }, [forumSessions, dbUser]);
 
   // 1. Filter Action Plans assigned to this user
   const myActions = useMemo(() => {
@@ -251,11 +380,11 @@ export default function Inicio() {
   const filteredStatItems = useMemo(() => {
     let baseList: any[] = [];
     if (activeStatList === 'pending') {
-      baseList = pendingActions;
+      baseList = dashboardMode === 'personal' ? pendingActions : teamMetrics.pendingActionsList;
     } else if (activeStatList === 'overdue') {
-      baseList = overdueActions;
+      baseList = dashboardMode === 'personal' ? overdueActions : teamMetrics.overdueActionsList;
     } else if (activeStatList === 'training') {
-      baseList = myTrainingInProgress;
+      baseList = dashboardMode === 'personal' ? myTrainingInProgress : teamMetrics.trainingInProgressList;
     }
 
     if (!listSearchQuery) return baseList;
@@ -264,7 +393,7 @@ export default function Inicio() {
       const name = item.title || item.name || '';
       return name.toLowerCase().includes(listSearchQuery.toLowerCase());
     });
-  }, [activeStatList, pendingActions, overdueActions, myTrainingInProgress, listSearchQuery]);
+  }, [activeStatList, dashboardMode, pendingActions, overdueActions, myTrainingInProgress, teamMetrics, listSearchQuery]);
 
   if (loading) {
     return (
@@ -279,25 +408,85 @@ export default function Inicio() {
     <div className="space-y-8 max-w-7xl mx-auto pb-12">
       
       {/* Top Welcome Banner */}
-      <div className="bg-gradient-to-r from-blue-700 to-indigo-800 text-white rounded-3xl p-8 shadow-md relative overflow-hidden">
+      <div className="bg-gradient-to-r from-blue-700 to-indigo-800 text-white rounded-3xl py-5 px-6 shadow-md relative overflow-hidden">
         <div className="absolute right-0 bottom-0 opacity-10 translate-x-12 translate-y-12">
-          <TrendingUp size={280} />
+          <TrendingUp size={200} />
         </div>
         <div className="relative z-10 max-w-xl">
-          <span className="bg-blue-600/55 text-blue-100 text-xs px-3 py-1 rounded-full font-bold uppercase tracking-wider">
+          <span className="bg-blue-600/55 text-blue-100 text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider">
             Mi Panel Principal
           </span>
-          <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight mt-3">
+          <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight mt-1.5">
             {welcomeMessage}, {dbUser?.name}
           </h1>
-          <p className="text-blue-100 text-sm mt-2 leading-relaxed">
+          <p className="text-blue-100 text-xs mt-1 leading-relaxed">
             Aquí tienes el resumen ejecutivo de tu actividad para hoy. Monitorea tus acciones, objetivos de polivalencia y reuniones programadas.
           </p>
         </div>
       </div>
 
+      {/* Selector: Personal vs Teams */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-3xl border border-gray-200 shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-blue-50 text-blue-700 rounded-2xl">
+            <Users size={20} />
+          </div>
+          <div className="space-y-0.5">
+            <h2 className="text-sm font-extrabold text-gray-900">Modo de Visualización</h2>
+            <p className="text-xs text-gray-500">Alterna entre tus indicadores personales y los de tus equipos a cargo.</p>
+          </div>
+        </div>
+        
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="inline-flex bg-slate-100 p-1 rounded-2xl border border-slate-200">
+            <button
+              onClick={() => {
+                setDashboardMode('personal');
+                setSelectedTeamId('all');
+              }}
+              className={clsx(
+                "px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer",
+                dashboardMode === 'personal' ? "bg-white text-blue-700 shadow-sm" : "text-gray-500 hover:text-gray-850"
+              )}
+            >
+              Mi Actividad
+            </button>
+            <button
+              onClick={() => setDashboardMode('teams')}
+              className={clsx(
+                "px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5",
+                dashboardMode === 'teams' ? "bg-white text-blue-700 shadow-sm" : "text-gray-500 hover:text-gray-850",
+                mySupervisedTeams.length === 0 && "opacity-55 cursor-not-allowed"
+              )}
+              disabled={mySupervisedTeams.length === 0}
+              title={mySupervisedTeams.length === 0 ? "No lideras ningún equipo" : "Ver indicadores de tus equipos"}
+            >
+              Mis Equipos
+              {mySupervisedTeams.length > 0 && (
+                <span className="bg-blue-100 text-blue-800 text-[10px] px-1.5 py-0.5 rounded-full font-extrabold">
+                  {mySupervisedTeams.length}
+                </span>
+              )}
+            </button>
+          </div>
+
+          {dashboardMode === 'teams' && mySupervisedTeams.length > 0 && (
+            <select
+              value={selectedTeamId}
+              onChange={(e) => setSelectedTeamId(e.target.value)}
+              className="text-xs font-bold bg-white border border-gray-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer text-gray-700 shadow-sm animate-fade-in"
+            >
+              <option value="all">Todos mis equipos (Agregado)</option>
+              {mySupervisedTeams.map(t => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
+            </select>
+          )}
+        </div>
+      </div>
+
       {/* Dynamic Grid of Main Metrics (Interactive Bento Box) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
         
         {/* Metric 1: Pending Actions */}
         <div 
@@ -305,21 +494,21 @@ export default function Inicio() {
             setActiveStatList('pending');
             setListSearchQuery('');
           }}
-          className="bg-white border border-gray-150 p-6 rounded-2xl shadow-sm hover:shadow-md hover:border-blue-300 transition-all cursor-pointer group relative overflow-hidden"
+          className="bg-white border border-gray-200 p-6 rounded-2xl shadow-sm hover:shadow-md hover:border-blue-300 transition-all cursor-pointer group relative overflow-hidden"
         >
           <div className="flex justify-between items-start">
             <div className="p-3 bg-blue-50 text-blue-600 rounded-xl group-hover:bg-blue-100 transition-all">
               <ClipboardList size={22} />
             </div>
             <span className="text-[10px] font-bold text-gray-400 group-hover:text-blue-600 transition-colors uppercase tracking-wider">
-              Acciones
+              {dashboardMode === 'personal' ? 'Acciones' : 'Acciones Eq.'}
             </span>
           </div>
           <div className="mt-4">
             <h3 className="text-4xl font-black text-gray-900 tracking-tight">
-              {pendingActions.length}
+              {dashboardMode === 'personal' ? pendingActions.length : teamMetrics.pendingActionsCount}
             </h3>
-            <p className="text-sm text-gray-500 font-medium mt-1">Acciones pendientes</p>
+            <p className="text-sm text-gray-500 font-medium mt-1">Pendientes</p>
           </div>
           <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between text-xs font-semibold text-blue-600">
             <span>Ver listado</span>
@@ -333,15 +522,17 @@ export default function Inicio() {
             setActiveStatList('overdue');
             setListSearchQuery('');
           }}
-          className="bg-white border border-gray-150 p-6 rounded-2xl shadow-sm hover:shadow-md hover:border-red-300 transition-all cursor-pointer group relative overflow-hidden"
+          className="bg-white border border-gray-200 p-6 rounded-2xl shadow-sm hover:shadow-md hover:border-red-300 transition-all cursor-pointer group relative overflow-hidden"
         >
-          {overdueActions.length > 0 && (
+          {((dashboardMode === 'personal' ? overdueActions.length : teamMetrics.overdueActionsCount) > 0) && (
             <div className="absolute top-0 left-0 right-0 h-1 bg-red-500" />
           )}
           <div className="flex justify-between items-start">
             <div className={clsx(
               "p-3 rounded-xl transition-all",
-              overdueActions.length > 0 ? "bg-red-50 text-red-600 group-hover:bg-red-100" : "bg-gray-50 text-gray-400"
+              (dashboardMode === 'personal' ? overdueActions.length : teamMetrics.overdueActionsCount) > 0 
+                ? "bg-red-50 text-red-600 group-hover:bg-red-100" 
+                : "bg-gray-50 text-gray-400"
             )}>
               <AlertTriangle size={22} />
             </div>
@@ -352,11 +543,11 @@ export default function Inicio() {
           <div className="mt-4">
             <h3 className={clsx(
               "text-4xl font-black tracking-tight",
-              overdueActions.length > 0 ? "text-red-600" : "text-gray-900"
+              (dashboardMode === 'personal' ? overdueActions.length : teamMetrics.overdueActionsCount) > 0 ? "text-red-600" : "text-gray-900"
             )}>
-              {overdueActions.length}
+              {dashboardMode === 'personal' ? overdueActions.length : teamMetrics.overdueActionsCount}
             </h3>
-            <p className="text-sm text-gray-500 font-medium mt-1">Acciones fuera de plazo</p>
+            <p className="text-sm text-gray-500 font-medium mt-1">Fuera de plazo</p>
           </div>
           <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between text-xs font-semibold text-red-600">
             <span>Ver críticas</span>
@@ -370,30 +561,30 @@ export default function Inicio() {
             setActiveStatList('training');
             setListSearchQuery('');
           }}
-          className="bg-white border border-gray-150 p-6 rounded-2xl shadow-sm hover:shadow-md hover:border-violet-300 transition-all cursor-pointer group relative overflow-hidden"
+          className="bg-white border border-gray-200 p-6 rounded-2xl shadow-sm hover:shadow-md hover:border-violet-300 transition-all cursor-pointer group relative overflow-hidden"
         >
           <div className="flex justify-between items-start">
             <div className="p-3 bg-violet-50 text-violet-600 rounded-xl group-hover:bg-violet-100 transition-all">
               <GraduationCap size={22} />
             </div>
             <span className="text-[10px] font-bold text-gray-400 group-hover:text-violet-600 transition-colors uppercase tracking-wider">
-              Formación
+              {dashboardMode === 'personal' ? 'Formación' : 'Formación Eq.'}
             </span>
           </div>
           <div className="mt-4">
             <h3 className="text-4xl font-black text-gray-900 tracking-tight">
-              {myTrainingInProgress.length}
+              {dashboardMode === 'personal' ? myTrainingInProgress.length : teamMetrics.trainingInProgressCount}
             </h3>
-            <p className="text-sm text-gray-500 font-medium mt-1">Formación en curso</p>
+            <p className="text-sm text-gray-500 font-medium mt-1">En curso</p>
           </div>
           <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between text-xs font-semibold text-violet-600">
-            <span>Mis formaciones</span>
+            <span>{dashboardMode === 'personal' ? 'Mis formaciones' : 'Formaciones Eq.'}</span>
             <ArrowRight size={14} className="transform group-hover:translate-x-1 transition-transform" />
           </div>
         </div>
 
         {/* Metric 4: Polyvalence compliance percentage */}
-        <div className="bg-white border border-gray-150 p-6 rounded-2xl shadow-sm hover:shadow-sm transition-all relative overflow-hidden">
+        <div className="bg-white border border-gray-200 p-6 rounded-2xl shadow-sm hover:shadow-sm transition-all relative overflow-hidden">
           <div className="flex justify-between items-start">
             <div className="p-3 bg-green-50 text-green-600 rounded-xl">
               <Award size={22} />
@@ -404,9 +595,9 @@ export default function Inicio() {
           </div>
           <div className="mt-4">
             <h3 className="text-4xl font-black text-gray-900 tracking-tight">
-              {polyvalenceStats.pct}%
+              {dashboardMode === 'personal' ? polyvalenceStats.pct : teamMetrics.polyvalencePct}%
             </h3>
-            <p className="text-sm text-gray-500 font-medium mt-1">Cumplimiento objetivo</p>
+            <p className="text-sm text-gray-500 font-medium mt-1">Cumplimiento</p>
           </div>
           
           {/* Small progress line */}
@@ -414,12 +605,53 @@ export default function Inicio() {
             <div className="w-full bg-gray-100 h-1.5 rounded-full overflow-hidden">
               <div 
                 className="bg-green-500 h-full rounded-full transition-all duration-1000"
-                style={{ width: `${polyvalenceStats.pct}%` }}
+                style={{ width: `${dashboardMode === 'personal' ? polyvalenceStats.pct : teamMetrics.polyvalencePct}%` }}
               />
             </div>
             <div className="flex justify-between text-[9px] text-gray-400 font-bold uppercase mt-1.5">
-              <span>Nivel: {polyvalenceStats.currentSum} pts</span>
-              <span>Meta: {polyvalenceStats.targetSum} pts</span>
+              <span>Nivel: {dashboardMode === 'personal' ? polyvalenceStats.currentSum : teamMetrics.polyvalenceCurrent} pts</span>
+              <span>Meta: {dashboardMode === 'personal' ? polyvalenceStats.targetSum : teamMetrics.polyvalenceTarget} pts</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Metric 5: Meeting Attendance Rate */}
+        <div className="bg-white border border-gray-200 p-6 rounded-2xl shadow-sm hover:shadow-sm transition-all relative overflow-hidden">
+          <div className="flex justify-between items-start">
+            <div className="p-3 bg-amber-50 text-amber-600 rounded-xl">
+              <Calendar size={22} />
+            </div>
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              Asistencia
+            </span>
+          </div>
+          <div className="mt-4">
+            <h3 className="text-4xl font-black text-gray-900 tracking-tight">
+              {dashboardMode === 'personal' ? personalAttendanceStats.pct : teamMetrics.attendancePct}%
+            </h3>
+            <p className="text-sm text-gray-500 font-medium mt-1">Asistencia Foros</p>
+          </div>
+          
+          {/* Small progress line */}
+          <div className="mt-5">
+            <div className="w-full bg-gray-100 h-1.5 rounded-full overflow-hidden">
+              <div 
+                className="bg-amber-500 h-full rounded-full transition-all duration-1000"
+                style={{ width: `${dashboardMode === 'personal' ? personalAttendanceStats.pct : teamMetrics.attendancePct}%` }}
+              />
+            </div>
+            <div className="flex justify-between text-[9px] text-gray-400 font-bold uppercase mt-1.5">
+              {dashboardMode === 'personal' ? (
+                <>
+                  <span>Asistido: {personalAttendanceStats.attended}</span>
+                  <span>Total: {personalAttendanceStats.expected}</span>
+                </>
+              ) : (
+                <>
+                  <span>Asistido: {teamMetrics.attendanceAttended}</span>
+                  <span>Total: {teamMetrics.attendanceExpected}</span>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -427,13 +659,13 @@ export default function Inicio() {
       </div>
 
       {/* Main Core View Area */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         
-        {/* Left Side: Forums and Standards (Col span 1) */}
-        <div className="space-y-6">
+        {/* Left Side: Forums and Standards (Col span 2) */}
+        <div className="lg:col-span-2 space-y-6">
           
           {/* Card: Meetings Today */}
-          <div className="bg-white rounded-2xl border border-gray-150 p-6 shadow-sm flex flex-col">
+          <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm flex flex-col">
             <div className="flex justify-between items-center pb-4 border-b border-gray-100">
               <div className="flex items-center gap-2">
                 <Calendar className="text-blue-600" size={18} />
@@ -461,7 +693,7 @@ export default function Inicio() {
                   </div>
                   <span className={clsx(
                     "text-[9px] font-bold uppercase px-2 py-0.5 rounded-full",
-                    meet.status === 'in_progress' ? 'bg-green-100 text-green-800 animate-pulse' : 'bg-gray-150 text-gray-600'
+                    meet.status === 'in_progress' ? 'bg-green-100 text-green-800 animate-pulse' : 'bg-gray-200 text-gray-600'
                   )}>
                     {meet.status === 'in_progress' ? 'En Vivo' : 'Programado'}
                   </span>
@@ -478,7 +710,7 @@ export default function Inicio() {
           </div>
 
           {/* Card: My Associated Standards */}
-          <div className="bg-white rounded-2xl border border-gray-150 p-6 shadow-sm">
+          <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
             <div className="flex justify-between items-center pb-4 border-b border-gray-100">
               <div className="flex items-center gap-2">
                 <FileText className="text-violet-600" size={18} />
@@ -528,17 +760,19 @@ export default function Inicio() {
 
         </div>
 
-        {/* Right Side: Quick Action Plan Manager (Col span 2) */}
-        <div className="lg:col-span-2 space-y-6">
+        {/* Right Side: Quick Action Plan Manager (Col span 3) */}
+        <div className="lg:col-span-3 space-y-6">
           
-          <div className="bg-white rounded-2xl border border-gray-150 p-6 shadow-sm">
+          <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
             <div className="flex justify-between items-center pb-4 border-b border-gray-100 mb-4">
               <div className="flex items-center gap-2">
                 <ClipboardList className="text-blue-600" size={18} />
-                <h2 className="text-sm font-bold text-gray-800">Mi Lista de Acciones</h2>
+                <h2 className="text-sm font-bold text-gray-800">
+                  {dashboardMode === 'personal' ? 'Mi Lista de Acciones' : 'Acciones de mis Equipos'}
+                </h2>
               </div>
-              <span className="bg-blue-50 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                {pendingActions.length} en proceso
+              <span className="bg-blue-50 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse-subtle">
+                {(dashboardMode === 'personal' ? pendingActions : teamMetrics.pendingActionsList).length} en proceso
               </span>
             </div>
 
@@ -555,7 +789,7 @@ export default function Inicio() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50 font-medium">
-                  {pendingActions.slice(0, 8).map((act) => (
+                  {(dashboardMode === 'personal' ? pendingActions : teamMetrics.pendingActionsList).slice(0, 8).map((act) => (
                     <tr 
                       key={act.id} 
                       className="group/row hover:bg-slate-50/50 transition-colors"
@@ -617,10 +851,12 @@ export default function Inicio() {
                     </tr>
                   ))}
 
-                  {pendingActions.length === 0 && (
+                  {(dashboardMode === 'personal' ? pendingActions : teamMetrics.pendingActionsList).length === 0 && (
                     <tr>
                       <td colSpan={5} className="py-8 text-center text-gray-400">
-                        <p className="font-semibold">¡Felicidades! No tienes acciones pendientes.</p>
+                        <p className="font-semibold">
+                          {dashboardMode === 'personal' ? '¡Felicidades! No tienes acciones pendientes.' : 'No hay acciones pendientes para los equipos seleccionados.'}
+                        </p>
                       </td>
                     </tr>
                   )}
@@ -628,9 +864,9 @@ export default function Inicio() {
               </table>
             </div>
 
-            {pendingActions.length > 8 && (
+            {(dashboardMode === 'personal' ? pendingActions : teamMetrics.pendingActionsList).length > 8 && (
               <p className="text-[10px] text-gray-400 font-bold uppercase mt-3.5 text-center">
-                Mostrando las primeras 8 de {pendingActions.length} acciones pendientes
+                Mostrando las primeras 8 de {(dashboardMode === 'personal' ? pendingActions : teamMetrics.pendingActionsList).length} acciones pendientes
               </p>
             )}
           </div>
@@ -682,7 +918,7 @@ export default function Inicio() {
                       }}
                       className={clsx(
                         "p-3.5 border rounded-xl flex justify-between items-start transition-all gap-4",
-                        isTraining ? "bg-slate-50/50 border-gray-100" : "bg-white border-gray-150 hover:border-blue-300 hover:shadow-sm cursor-pointer"
+                        isTraining ? "bg-slate-50/50 border-gray-100" : "bg-white border-gray-200 hover:border-blue-300 hover:shadow-sm cursor-pointer"
                       )}
                     >
                       <div className="space-y-1">
@@ -893,7 +1129,7 @@ export default function Inicio() {
                       className="w-full p-3 border border-gray-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-medium"
                     />
                   ) : (
-                    <div className="p-4 bg-slate-50/70 border border-dashed border-gray-150 rounded-xl text-xs text-gray-600 leading-relaxed min-h-[100px] whitespace-pre-wrap">
+                    <div className="p-4 bg-slate-50/70 border border-dashed border-gray-200 rounded-xl text-xs text-gray-600 leading-relaxed min-h-[100px] whitespace-pre-wrap">
                       {selectedAction.notes || 'No se han registrado notas de seguimiento para esta acción. Haz clic en "Editar Notas" para añadir tus comentarios.'}
                     </div>
                   )}
