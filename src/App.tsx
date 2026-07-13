@@ -15,6 +15,7 @@ import AdminUsers from './pages/admin/Users';
 import AdminActivities from './pages/admin/Activities';
 import AdminProcesses from './pages/admin/Processes';
 import AdminTasks from './pages/admin/Tasks';
+import AdminStandards from './pages/admin/Standards';
 import AdminCriteria from './pages/admin/Criteria';
 import AdminIndicators from './pages/admin/Indicators';
 import AdminActionCategories from './pages/admin/ActionCategories';
@@ -359,6 +360,7 @@ export default function App() {
                 <Route path="admin/activities" element={<ProtectedRoute requireAdmin><AdminActivities /></ProtectedRoute>} />
                 <Route path="admin/processes" element={<ProtectedRoute requireAdmin><AdminProcesses /></ProtectedRoute>} />
                 <Route path="admin/tasks" element={<ProtectedRoute requireAdmin><AdminTasks /></ProtectedRoute>} />
+                <Route path="admin/standards" element={<ProtectedRoute requireAdmin><AdminStandards /></ProtectedRoute>} />
                 <Route path="admin/criteria" element={<ProtectedRoute requireAdmin><AdminCriteria /></ProtectedRoute>} />
                 <Route path="admin/indicators" element={<ProtectedRoute requireAdmin><AdminIndicators /></ProtectedRoute>} />
                 <Route path="admin/action-categories" element={<ProtectedRoute requireAdmin><AdminActionCategories /></ProtectedRoute>} />

@@ -412,6 +412,30 @@ service cloud.firestore {
              (!('id' in data) || (data.id is string));
     }
 
+    function isValidStandard(data) {
+      return data.keys().hasAll(['name', 'responsibleId', 'relationType', 'contentType', 'companyId', 'createdAt']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 200 &&
+             data.responsibleId is string &&
+             data.relationType in ['activity', 'process', 'task'] &&
+             (!('activityId' in data) || data.activityId is string) &&
+             (!('processId' in data) || data.processId is string) &&
+             (!('taskId' in data) || data.taskId is string) &&
+             data.contentType in ['file', 'link'] &&
+             (!('fileUrl' in data) || data.fileUrl is string) &&
+             (!('fileName' in data) || data.fileName is string) &&
+             (!('externalLink' in data) || data.externalLink is string) &&
+             data.companyId is string &&
+             data.createdAt is string &&
+             (!('lastReviewDate' in data) || data.lastReviewDate is string) &&
+             (!('validityMonths' in data) || data.validityMonths is int) &&
+             (!('nextReviewDate' in data) || data.nextReviewDate is string) &&
+             (!('reviewActionCreated' in data) || data.reviewActionCreated is bool) &&
+             (!('activityIds' in data) || data.activityIds is list) &&
+             (!('processIds' in data) || data.processIds is list) &&
+             (!('taskIds' in data) || data.taskIds is list) &&
+             (!('id' in data) || (data.id is string));
+    }
+
     // ===============================================================
     // Rules
     // ===============================================================
@@ -442,8 +466,9 @@ service cloud.firestore {
                       (isOwner(userId) && uidUnchanged() && 
                         (
                           request.resource.data.role == 'user' || 
-                          (exists(/databases/$(database)/documents/users/$(request.auth.token.email)) && 
-                           get(/databases/$(database)/documents/users/$(request.auth.token.email)).data.role == request.resource.data.role)
+                          (toSafeString(request.auth.token.get('email', '')).lower() != '' &&
+                           exists(/databases/$(database)/documents/users/$(toSafeString(request.auth.token.get('email', '')).lower())) && 
+                           get(/databases/$(database)/documents/users/$(toSafeString(request.auth.token.get('email', '')).lower())).data.role == request.resource.data.role)
                         )
                       ) || 
                       (isAdmin() && !isAssigningPrivilegedRole() && (request.resource.data.get('companyId', '') == '' || belongsToCompany(request.resource.data.get('companyId', ''))))
@@ -592,6 +617,12 @@ service cloud.firestore {
       allow create: if isAuthenticated() && belongsToCompany(request.resource.data.companyId) && isValidIncident(request.resource.data);
       allow update: if isAuthenticated() && belongsToCompany(resource.data.companyId) && isValidIncident(request.resource.data) && (request.auth.uid == resource.data.createdBy || isAdmin());
       allow delete: if isAuthenticated() && belongsToCompany(resource.data.companyId) && (request.auth.uid == resource.data.createdBy || isAdmin());
+    }
+
+    match /standards/{standardId} {
+      allow read: if belongsToCompany(resource.data.get('companyId', ''));
+      allow create, update: if isAdmin() && isValidStandard(request.resource.data) && belongsToCompany(request.resource.data.get('companyId', ''));
+      allow delete: if isAdmin() && belongsToCompany(resource.data.get('companyId', ''));
     }
   }
 }

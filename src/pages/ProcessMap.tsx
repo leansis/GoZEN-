@@ -14,6 +14,12 @@ export default function ProcessMap() {
   const processes = [...appData.processes].sort((a, b) => (a.order || 0) - (b.order || 0));
   const tasks = [...appData.tasks].sort((a, b) => (a.order || 0) - (b.order || 0));
   const userTaskLevels = appData.userTaskLevels;
+
+  const getTaskStandards = (task: Task) => {
+    return (appData.standards || []).filter(std => {
+      return std.relationType === 'task' && (std.taskId === task.id || (std.taskIds && std.taskIds.includes(task.id)));
+    });
+  };
   
   const [teams, setTeams] = useState<Team[]>([]);
   const loading = appData.loading;
@@ -21,6 +27,11 @@ export default function ProcessMap() {
   const [selectedTeamId, setSelectedTeamId] = useState<string>('all');
   const [expandedProcesses, setExpandedProcesses] = useState<Set<string>>(new Set());
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [selectedNodeForStandards, setSelectedNodeForStandards] = useState<{
+    type: 'activity' | 'process';
+    id: string;
+    name: string;
+  } | null>(null);
   const [modalTab, setModalTab] = useState<'ranking' | 'attachments'>('ranking');
 
   useEffect(() => {
@@ -148,11 +159,13 @@ export default function ProcessMap() {
       <div className="flex overflow-x-auto pb-8 pt-4 gap-4 snap-x">
         {activities.map((activity, index) => {
           const activityProcesses = processes.filter(p => p.activityId === activity.id);
+          const activityStandards = (appData.standards || []).filter(std => std.relationType === 'activity' && (std.activityId === activity.id || (std.activityIds && std.activityIds.includes(activity.id))));
+          const hasActivityStandards = activityStandards.length > 0;
           
           return (
             <div key={activity.id} className="flex-shrink-0 w-80 snap-start flex flex-col">
               {/* Chevron Header */}
-              <div className="relative mb-6 drop-shadow-md h-24">
+              <div className="relative mb-6 drop-shadow-md h-24 group">
                 <div 
                   className="bg-blue-800 text-white p-4 font-bold text-center flex items-center justify-center h-full"
                   style={{
@@ -166,14 +179,26 @@ export default function ProcessMap() {
                     {activity.name}
                   </span>
                 </div>
+                {hasActivityStandards && (
+                  <button
+                    onClick={() => setSelectedNodeForStandards({ type: 'activity', id: activity.id, name: activity.name })}
+                    className="absolute top-2 right-4 z-30 p-1 px-2 bg-white/25 hover:bg-white/40 text-white rounded-full transition-all shadow-sm flex items-center gap-1 text-[11px] font-bold backdrop-blur-sm cursor-pointer"
+                    title="Ver estándares asociados a esta actividad"
+                  >
+                    <Paperclip className="w-3.5 h-3.5" />
+                    <span>{activityStandards.length}</span>
+                  </button>
+                )}
               </div>
-
+ 
               {/* Processes List */}
               <div className="flex flex-col gap-3 flex-1">
                 {activityProcesses.map(process => {
                   const stats = getProcessStats(process.id);
                   const isExpanded = expandedProcesses.has(process.id);
                   const processTasks = tasks.filter(t => t.processId === process.id);
+                  const processStandards = (appData.standards || []).filter(std => std.relationType === 'process' && (std.processId === process.id || (std.processIds && std.processIds.includes(process.id))));
+                  const hasProcessStandards = processStandards.length > 0;
                   
                   return (
                     <div 
@@ -197,9 +222,24 @@ export default function ProcessMap() {
                         </div>
                         
                         <div className="flex items-center justify-between mt-2">
-                          <span className="text-xs font-medium text-gray-500 bg-white/60 px-2 py-1 rounded">
-                            {stats.taskCount} tareas
-                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs font-medium text-gray-500 bg-white/60 px-2 py-1 rounded">
+                              {stats.taskCount} tareas
+                            </span>
+                            {hasProcessStandards && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedNodeForStandards({ type: 'process', id: process.id, name: process.name });
+                                }}
+                                className="flex items-center gap-0.5 px-1.5 py-0.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded text-[11px] font-bold transition-colors cursor-pointer"
+                                title="Ver estándares asociados a este proceso"
+                              >
+                                <Paperclip className="w-3 h-3" />
+                                <span>{processStandards.length}</span>
+                              </button>
+                            )}
+                          </div>
                           
                           <div className="flex items-center gap-1.5" title="Cobertura vs Objetivo">
                             <Target className={clsx("w-4 h-4", stats.coverage >= 100 ? "text-green-600" : stats.coverage >= 50 ? "text-yellow-600" : "text-red-500")} />
@@ -218,7 +258,8 @@ export default function ProcessMap() {
                         <div className="border-t border-gray-200/60 bg-white/50 p-3 flex flex-col gap-2 rounded-b-lg">
                           {processTasks.map(task => {
                             const userCount = getTaskUserCount(task.id);
-                            const hasAttachments = task.attachments && task.attachments.length > 0;
+                            const taskStandards = getTaskStandards(task);
+                            const hasAttachments = taskStandards.length > 0;
                             
                             return (
                               <div 
@@ -305,12 +346,12 @@ export default function ProcessMap() {
                 )}
               >
                 <span>Adjuntos</span>
-                {selectedTask.attachments && selectedTask.attachments.length > 0 && (
+                {getTaskStandards(selectedTask).length > 0 && (
                   <span className={clsx(
                     "px-2 py-0.5 text-[10px] font-extrabold rounded-full",
                     modalTab === 'attachments' ? "bg-blue-100 text-blue-700" : "bg-gray-200 text-gray-650"
                   )}>
-                    {selectedTask.attachments.length}
+                    {getTaskStandards(selectedTask).length}
                   </span>
                 )}
               </button>
@@ -361,19 +402,27 @@ export default function ProcessMap() {
                   )}
                   
                   <div className="space-y-2">
-                    <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Archivos y Documentación</h4>
-                    {selectedTask.attachments && selectedTask.attachments.length > 0 ? (
+                    <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Estándares y Documentación</h4>
+                    {getTaskStandards(selectedTask).length > 0 ? (
                       <ul className="space-y-2">
-                        {selectedTask.attachments.map((att: any, idx) => {
-                          const url = typeof att === 'string' ? att : att.url;
-                          const name = typeof att === 'string' ? att : att.name;
+                        {getTaskStandards(selectedTask).map((std, idx) => {
+                          const url = std.contentType === 'file' ? std.fileUrl : std.externalLink;
+                          const name = std.name;
+                          const relationText = std.relationType === 'activity' ? 'Actividad' : std.relationType === 'process' ? 'Proceso' : 'Tarea';
                           return (
-                            <li key={idx} className="flex items-center justify-between p-3 bg-white rounded-xl border border-gray-100 hover:border-blue-300 hover:shadow-sm transition-all">
-                              <div className="flex items-center gap-2.5 overflow-hidden pr-2">
-                                <Paperclip size={16} className="text-blue-500 shrink-0" />
-                                <span className="text-xs font-semibold text-gray-800 truncate" title={name}>
-                                  {name}
-                                </span>
+                            <li key={std.id || idx} className="flex items-center justify-between p-3 bg-white rounded-xl border border-gray-100 hover:border-blue-300 hover:shadow-sm transition-all">
+                              <div className="flex flex-col min-w-0 flex-1 pr-3">
+                                <div className="flex items-center gap-2.5 overflow-hidden">
+                                  <Paperclip size={16} className="text-blue-500 shrink-0" />
+                                  <span className="text-xs font-semibold text-gray-800 truncate" title={name}>
+                                    {name}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2 mt-1 text-[10px] text-gray-400">
+                                  <span>Responsable: {std.responsibleName || 'Desconocido'}</span>
+                                  <span>•</span>
+                                  <span className="bg-gray-100 text-gray-600 px-1.5 py-0.2 rounded-md font-medium text-[9px] uppercase">{relationText}</span>
+                                </div>
                               </div>
                               <a 
                                 href={url} 
@@ -390,8 +439,8 @@ export default function ProcessMap() {
                     ) : (
                       <div className="p-6 bg-gray-50/50 rounded-xl text-center border border-dashed border-gray-200">
                         <Paperclip size={24} className="text-gray-300 mx-auto mb-2 opacity-30" />
-                        <p className="text-xs text-gray-500 font-medium">No hay documentos adjuntos para esta tarea.</p>
-                        <p className="text-[10px] text-gray-400 mt-1">Los adjuntos se pueden gestionar desde la administración de tareas.</p>
+                        <p className="text-xs text-gray-500 font-medium">No hay estándares asociados a esta tarea.</p>
+                        <p className="text-[10px] text-gray-400 mt-1">Los estándares se pueden gestionar desde el menú correspondiente en administración.</p>
                       </div>
                     )}
                   </div>
@@ -401,6 +450,79 @@ export default function ProcessMap() {
           </div>
         </div>
       )}
+
+      {/* Node Standards Modal */}
+      {selectedNodeForStandards && (() => {
+        const selectedNodeStandards = (appData.standards || []).filter(std => std.relationType === selectedNodeForStandards.type && (
+          selectedNodeForStandards.type === 'activity' 
+            ? (std.activityId === selectedNodeForStandards.id || (std.activityIds && std.activityIds.includes(selectedNodeForStandards.id))) 
+            : (std.processId === selectedNodeForStandards.id || (std.processIds && std.processIds.includes(selectedNodeForStandards.id)))
+        ));
+        return (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-xl max-w-md w-full max-h-[80vh] flex flex-col">
+              <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50 rounded-t-xl">
+                <div>
+                  <span className="text-[10px] uppercase tracking-wider font-extrabold px-2 py-0.5 rounded bg-blue-100 text-blue-700">
+                    {selectedNodeForStandards.type === 'activity' ? 'Actividad' : 'Proceso'}
+                  </span>
+                  <h2 className="text-lg font-bold text-gray-800 mt-1 line-clamp-1" title={selectedNodeForStandards.name}>
+                    {selectedNodeForStandards.name}
+                  </h2>
+                </div>
+                <button 
+                  onClick={() => setSelectedNodeForStandards(null)}
+                  className="text-gray-500 hover:text-gray-700 bg-white p-1 rounded-full hover:bg-gray-200 transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-4 overflow-y-auto flex-1 space-y-4">
+                <div className="space-y-2">
+                  <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Estándares y Documentación</h4>
+                  {selectedNodeStandards.length > 0 ? (
+                    <ul className="space-y-2">
+                      {selectedNodeStandards.map((std, idx) => {
+                        const url = std.contentType === 'file' ? std.fileUrl : std.externalLink;
+                        const name = std.name;
+                        return (
+                          <li key={std.id || idx} className="flex items-center justify-between p-3 bg-white rounded-xl border border-gray-100 hover:border-blue-300 hover:shadow-sm transition-all">
+                            <div className="flex flex-col min-w-0 flex-1 pr-3">
+                              <div className="flex items-center gap-2.5 overflow-hidden">
+                                <Paperclip size={16} className="text-blue-500 shrink-0" />
+                                <span className="text-xs font-semibold text-gray-800 truncate" title={name}>
+                                  {name}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 mt-1 text-[10px] text-gray-400">
+                                <span>Responsable: {std.responsibleName || 'Desconocido'}</span>
+                              </div>
+                            </div>
+                            <a 
+                              href={url} 
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 hover:text-blue-700 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0"
+                            >
+                              Ver <ExternalLink size={10} />
+                            </a>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  ) : (
+                    <div className="p-6 bg-gray-50/50 rounded-xl text-center border border-dashed border-gray-200">
+                      <Paperclip size={24} className="text-gray-300 mx-auto mb-2 opacity-30" />
+                      <p className="text-xs text-gray-500 font-medium">No hay estándares asociados a este {selectedNodeForStandards.type === 'activity' ? 'actividad' : 'proceso'}.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

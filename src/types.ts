@@ -5,6 +5,7 @@ export interface CompanySettings {
   forumVirtualHorizonMonths: number;
   maxEscalationLevels?: number;
   actionPlanMultipleAssigneeMode?: 'multiple' | 'split';
+  standardReviewNoticeDays?: number;
 }
 
 export interface Company {
@@ -363,3 +364,28 @@ export interface Indicator {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface Standard {
+  id: string;
+  name: string;
+  responsibleId: string;
+  responsibleName?: string;
+  relationType: 'activity' | 'process' | 'task';
+  activityId?: string;
+  activityIds?: string[];
+  processId?: string;
+  processIds?: string[];
+  taskId?: string;
+  taskIds?: string[];
+  contentType: 'file' | 'link';
+  fileUrl?: string;
+  fileName?: string;
+  externalLink?: string;
+  companyId: string;
+  createdAt: string;
+  lastReviewDate?: string;
+  validityMonths?: number;
+  nextReviewDate?: string;
+  reviewActionCreated?: boolean;
+}
+

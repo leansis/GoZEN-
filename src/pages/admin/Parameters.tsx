@@ -11,6 +11,7 @@ export default function Parameters() {
   const [horizonMonths, setHorizonMonths] = useState<number>(3);
   const [maxEscalationLevels, setMaxEscalationLevels] = useState<number>(1);
   const [multipleAssigneeMode, setMultipleAssigneeMode] = useState<'multiple' | 'split'>('multiple');
+  const [standardReviewNoticeDays, setStandardReviewNoticeDays] = useState<number>(15);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -26,6 +27,9 @@ export default function Parameters() {
       if (company.settings.actionPlanMultipleAssigneeMode) {
         setMultipleAssigneeMode(company.settings.actionPlanMultipleAssigneeMode);
       }
+      if (company.settings.standardReviewNoticeDays !== undefined) {
+        setStandardReviewNoticeDays(company.settings.standardReviewNoticeDays);
+      }
     }
   }, [company]);
 
@@ -40,7 +44,8 @@ export default function Parameters() {
       await updateDoc(doc(db, 'companies', activeCompanyId), {
         'settings.forumVirtualHorizonMonths': horizonMonths,
         'settings.maxEscalationLevels': maxEscalationLevels,
-        'settings.actionPlanMultipleAssigneeMode': multipleAssigneeMode
+        'settings.actionPlanMultipleAssigneeMode': multipleAssigneeMode,
+        'settings.standardReviewNoticeDays': standardReviewNoticeDays
       });
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
@@ -170,6 +175,34 @@ export default function Parameters() {
                 <div className="font-bold text-gray-900 mb-1">Separar en varias acciones</div>
                 <p className="text-xs text-gray-500">Al asignar varios responsables, se crea una copia individual de la acción para cada uno.</p>
               </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-6 border-b border-gray-100 bg-gray-50 border-t">
+          <h2 className="text-lg font-semibold text-gray-800">Estándares</h2>
+          <p className="text-sm text-gray-500">Configura los avisos de revisión para la documentación estándar</p>
+        </div>
+
+        <div className="p-6 space-y-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Aviso de próxima revisión (días de antelación)
+              </label>
+              <p className="text-xs text-gray-500 mb-3">
+                Define cuántos días antes de la fecha de vencimiento de un estándar se creará automáticamente una tarea/acción de revisión para el responsable.
+              </p>
+            </div>
+            <div className="w-full md:w-32">
+              <input
+                type="number"
+                min="1"
+                max="180"
+                value={standardReviewNoticeDays}
+                onChange={(e) => setStandardReviewNoticeDays(parseInt(e.target.value) || 15)}
+                className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-center font-semibold"
+              />
             </div>
           </div>
         </div>

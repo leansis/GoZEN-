@@ -22,7 +22,8 @@ import {
   Building2,
   Database,
   PanelLeftOpen,
-  PanelLeftClose
+  PanelLeftClose,
+  FileText
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -59,6 +60,7 @@ export default function Layout() {
     { name: 'Actividades', path: '/admin/activities', icon: Folder },
     { name: 'Procesos', path: '/admin/processes', icon: Settings },
     { name: 'Tareas', path: '/admin/tasks', icon: CheckSquare },
+    { name: 'Estándares', path: '/admin/standards', icon: FileText },
     { name: 'Criterios', path: '/admin/criteria', icon: ListChecks },
     { name: 'Indicadores', path: '/admin/indicators', icon: BarChart3 },
     { name: 'Categorías de Acción', path: '/admin/action-categories', icon: Tag },

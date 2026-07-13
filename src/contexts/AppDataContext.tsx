@@ -1,9 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, addDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../AuthContext';
 import { handleFirestoreError, OperationType } from '../lib/firestore-utils';
-import { Team, Process, Task, Criterion, UserTaskLevel, TrainingAction, Activity, Forum, ForumSession, MasterGroup, Indicator, Incident, ActionPlan, ActionCategory, CustomHtml } from '../types';
+import { Team, Process, Task, Criterion, UserTaskLevel, TrainingAction, Activity, Forum, ForumSession, MasterGroup, Indicator, Incident, ActionPlan, ActionCategory, CustomHtml, Standard } from '../types';
 
 interface AppDataContextType {
   activities: Activity[];
@@ -23,6 +23,7 @@ interface AppDataContextType {
   actionPlans: ActionPlan[];
   actionCategories: ActionCategory[];
   customHtmls: CustomHtml[];
+  standards: Standard[];
   loading: boolean;
   getTeamParentChain: (teamId: string) => string[];
 }
@@ -30,7 +31,7 @@ interface AppDataContextType {
 const AppDataContext = createContext<AppDataContextType | undefined>(undefined);
 
 export function AppDataProvider({ children }: { children: ReactNode }) {
-  const { dbUser, activeCompanyId, isGlobalAdmin } = useAuth();
+  const { dbUser, activeCompanyId, isGlobalAdmin, company } = useAuth();
   
   const [activities, setActivities] = useState<Activity[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
@@ -49,6 +50,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [actionPlans, setActionPlans] = useState<ActionPlan[]>([]);
   const [actionCategories, setActionCategories] = useState<ActionCategory[]>([]);
   const [customHtmls, setCustomHtmls] = useState<CustomHtml[]>([]);
+  const [standards, setStandards] = useState<Standard[]>([]);
   const [loading, setLoading] = useState(true);
 
   const getForumLevel = (forum: Forum, teamsList: Team[]): number => {
@@ -97,6 +99,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       setActionPlans([]);
       setActionCategories([]);
       setCustomHtmls([]);
+      setStandards([]);
       setLoading(false);
       return;
     }
@@ -174,6 +177,10 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       setCustomHtmls(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CustomHtml)));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'customHtmls'));
 
+    const unsubStandards = onSnapshot(getQuery('standards'), (snapshot) => {
+      setStandards(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Standard)));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'standards'));
+
     const unsubForumSessions = onSnapshot(getQuery('forumSessions'), (snapshot) => {
       setForumSessions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ForumSession)));
       setLoading(false);
@@ -199,9 +206,96 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       unsubActionPlans();
       unsubActionCategories();
       unsubCustomHtmls();
+      unsubStandards();
       unsubForumSessions();
     };
   }, [activeCompanyId, dbUser?.companyId]);
+
+  useEffect(() => {
+    // Only run if everything is loaded and we have a logged-in user
+    if (loading || !dbUser || !activeCompanyId || standards.length === 0) return;
+
+    const companyId = activeCompanyId || dbUser.companyId;
+    if (!companyId) return;
+
+    const noticeDays = company?.settings?.standardReviewNoticeDays ?? 15;
+    const now = new Date();
+    // Use midnight of local day to compare dates correctly
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    // Helper to calculate next review date
+    const calculateNextReview = (lastDateStr: string, months: number): string => {
+      if (!lastDateStr) return '';
+      const [year, month, day] = lastDateStr.split('-').map(Number);
+      const d = new Date(year, month - 1, day);
+      d.setMonth(d.getMonth() + months);
+      
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd}`;
+    };
+
+    const checkAndCreateReviewActions = async () => {
+      for (const std of standards) {
+        if (std.reviewActionCreated) continue;
+
+        const nextDateStr = std.nextReviewDate || (std.lastReviewDate ? calculateNextReview(std.lastReviewDate, std.validityMonths ?? 12) : '');
+        if (!nextDateStr) continue;
+
+        const [nyear, nmonth, nday] = nextDateStr.split('-').map(Number);
+        const nextDate = new Date(nyear, nmonth - 1, nday);
+        if (isNaN(nextDate.getTime())) continue;
+
+        // Calculate days difference (ignoring time shift)
+        const timeDiff = nextDate.getTime() - today.getTime();
+        const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+
+        // If the next review is within the notice days (even if overdue)
+        if (daysDiff <= noticeDays) {
+          try {
+            console.log(`Standard ${std.name} is close to review date or overdue (days: ${daysDiff}). Creating review action.`);
+            
+            // 1. Mark standard as action-created FIRST in Firestore to prevent multiple trigger runs
+            const stdRef = doc(db, 'standards', std.id);
+            await updateDoc(stdRef, { reviewActionCreated: true });
+
+            // 2. Create the action plan document (sin foro)
+            const actionPayload = {
+              title: `Revisar estándar: ${std.name}`,
+              description: `El estándar "${std.name}" tiene su próxima revisión planificada para el ${nextDate.toLocaleDateString('es-ES')}. Por favor, realiza la revisión correspondiente y actualiza la fecha en el módulo de estándares.`,
+              type: 'accion',
+              status: 'pendiente',
+              priority: 'media',
+              targetDate: nextDateStr,
+              companyId,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+              createdBy: 'system',
+              createdByName: 'Sistema',
+              assignedTo: [std.responsibleId],
+              assignedToNames: [std.responsibleName || 'Responsable'],
+              originForumId: '',
+              originForumName: '',
+              incidentId: '',
+              indicatorId: '',
+              indicatorName: '',
+              isEscalated: false,
+              escalatedToForumId: '',
+              escalationHistory: []
+            };
+
+            await addDoc(collection(db, 'actionPlans'), actionPayload);
+            console.log(`Review action created successfully for Standard: ${std.name}`);
+          } catch (err) {
+            console.error(`Error creating review action for Standard ${std.id}:`, err);
+          }
+        }
+      }
+    };
+
+    checkAndCreateReviewActions();
+  }, [standards, company, dbUser, activeCompanyId, loading]);
 
   const getTeamParentChain = (teamId: string, teamsList: Team[]): string[] => {
     const chain: string[] = [];
@@ -223,7 +317,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
 
   return (
     <AppDataContext.Provider value={{
-      activities, teams, processes, tasks, criteria, userTaskLevels, trainingActions, teamTargets, users, forums: computedForums, forumSessions, masterGroups, indicators, incidents, actionPlans, actionCategories, customHtmls, loading,
+      activities, teams, processes, tasks, criteria, userTaskLevels, trainingActions, teamTargets, users, forums: computedForums, forumSessions, masterGroups, indicators, incidents, actionPlans, actionCategories, customHtmls, standards, loading,
       getTeamParentChain: (id) => getTeamParentChain(id, teams)
     }}>
       {children}

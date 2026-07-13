@@ -377,6 +377,27 @@
         "actionId": { "type": "string" }
       },
       "required": ["title", "forumId", "companyId", "createdAt", "createdBy"]
+    },
+    "Standard": {
+      "title": "Standard",
+      "description": "A standard containing hierarchical relations and content",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "responsibleId": { "type": "string" },
+        "responsibleName": { "type": "string" },
+        "relationType": { "type": "string", "enum": ["activity", "process", "task"] },
+        "activityId": { "type": "string" },
+        "processId": { "type": "string" },
+        "taskId": { "type": "string" },
+        "contentType": { "type": "string", "enum": ["file", "link"] },
+        "fileUrl": { "type": "string" },
+        "fileName": { "type": "string" },
+        "externalLink": { "type": "string" },
+        "companyId": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["name", "responsibleId", "relationType", "contentType", "companyId", "createdAt"]
     }
   },
   "firestore": {
@@ -447,6 +468,10 @@
     "/incidents/{incidentId}": {
       "schema": { "$ref": "#/entities/Incident" },
       "description": "Incidents"
+    },
+    "/standards/{standardId}": {
+      "schema": { "$ref": "#/entities/Standard" },
+      "description": "Standards"
     }
   }
 }

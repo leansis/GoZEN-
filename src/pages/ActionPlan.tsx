@@ -1548,7 +1548,7 @@ export default function ActionPlanPage() {
   ];
 
   return (
-    <div className="space-y-6 pb-20 md:pb-0" style={{ zoom: '0.95' }}>
+    <div className="space-y-6 pb-20 md:pb-0" style={{ zoom: '1.15' }}>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Plan de Acciones</h1>

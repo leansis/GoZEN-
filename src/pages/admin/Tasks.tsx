@@ -69,10 +69,6 @@ export default function Tasks() {
         description: editingTask.description || '',
         processId: editingTask.processId,
         criteriaId: editingTask.criteriaId,
-        attachments: (editingTask.attachments || []).filter(att => {
-          const url = typeof att === 'string' ? att : att.url;
-          return url && url.trim() !== '';
-        }),
         companyId: companyId || ''
       };
 
@@ -324,7 +320,6 @@ export default function Tasks() {
                           sortable: false,
                           sortAccessor: (t) => criteria.find(c => c.id === t.criteriaId)?.name || ''
                         },
-                        { header: 'Adjuntos', accessor: (t) => t.attachments?.length || 0 },
                       ]}
                       onEdit={setEditingTask}
                       onDelete={setTaskToDelete}
@@ -373,7 +368,6 @@ export default function Tasks() {
                   sortable: false,
                   sortAccessor: (t) => criteria.find(c => c.id === t.criteriaId)?.name || ''
                 },
-                { header: 'Adjuntos', accessor: (t) => t.attachments?.length || 0 },
               ]}
               onEdit={setEditingTask}
               onDelete={setTaskToDelete}
@@ -461,93 +455,6 @@ export default function Tasks() {
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Documentos Adjuntos</label>
-              <div className="space-y-2">
-                {(editingTask.attachments || []).map((att, index) => {
-                  // Handle legacy string attachments
-                  const url = typeof att === 'string' ? att : att.url;
-                  const name = typeof att === 'string' ? att : att.name;
-                  
-                  return (
-                  <div key={index} className="flex gap-2">
-                    <input
-                      type="text"
-                      value={name}
-                      onChange={(e) => {
-                        const newAtts = [...(editingTask.attachments || [])];
-                        newAtts[index] = { name: e.target.value, url };
-                        setEditingTask({ ...editingTask, attachments: newAtts });
-                      }}
-                      className="w-1/3 rounded-md border-gray-300 shadow-sm p-2 border focus:border-blue-500 focus:ring-blue-500"
-                      placeholder="Nombre (ej: Manual)"
-                    />
-                    <input
-                      type="url"
-                      value={url}
-                      onChange={(e) => {
-                        const newAtts = [...(editingTask.attachments || [])];
-                        newAtts[index] = { name, url: e.target.value };
-                        setEditingTask({ ...editingTask, attachments: newAtts });
-                      }}
-                      className="flex-1 rounded-md border-gray-300 shadow-sm p-2 border focus:border-blue-500 focus:ring-blue-500"
-                      placeholder="https://ejemplo.com/doc.pdf"
-                    />
-                    <div className="relative flex items-center">
-                      <input
-                        type="file"
-                        className="hidden"
-                        id={`file-upload-${index}`}
-                        onChange={(e) => handleFileUpload(e, index)}
-                        disabled={uploadingIndex === index}
-                      />
-                      <label
-                        htmlFor={`file-upload-${index}`}
-                        className={`p-2 rounded-md cursor-pointer flex items-center justify-center transition-colors ${
-                          uploadingIndex === index 
-                            ? 'bg-gray-100 text-gray-400' 
-                            : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
-                        }`}
-                        title="Subir archivo"
-                      >
-                        {uploadingIndex === index ? (
-                          <Loader2 className="w-5 h-5 animate-spin" />
-                        ) : (
-                          <Upload className="w-5 h-5" />
-                        )}
-                      </label>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const newAtts = [...(editingTask.attachments || [])];
-                        newAtts.splice(index, 1);
-                        setEditingTask({ ...editingTask, attachments: newAtts });
-                      }}
-                      className="p-2 text-red-600 hover:bg-red-50 rounded-md"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
-                  </div>
-                )})}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEditingTask({ 
-                      ...editingTask, 
-                      attachments: [...(editingTask.attachments || []), { name: '', url: '' }] 
-                    });
-                  }}
-                  className="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center mt-2"
-                >
-                  <Plus className="w-4 h-4 mr-1" />
-                  Añadir adjunto
-                </button>
-              </div>
             </div>
             
             <div className="flex justify-end pt-4">
