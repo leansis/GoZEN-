@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   format, 
   addMonths, 
   subMonths, 
+  addWeeks,
+  subWeeks,
   startOfMonth, 
   endOfMonth, 
   startOfWeek, 
@@ -29,20 +31,44 @@ interface ForumCalendarProps {
 
 export default function ForumCalendar({ sessions, onVirtualSessionClick, onReschedule, canReschedule }: ForumCalendarProps) {
   const navigate = useNavigate();
+  const [view, setView] = useState<'month' | 'week'>('month');
   const [currentDate, setCurrentDate] = useState(new Date());
 
-  const monthStart = startOfMonth(currentDate);
-  const monthEnd = endOfMonth(monthStart);
-  const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 });
-  const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
+  const days = useMemo(() => {
+    if (view === 'month') {
+      const monthStart = startOfMonth(currentDate);
+      const monthEnd = endOfMonth(monthStart);
+      const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 });
+      const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
+      return eachDayOfInterval({
+        start: calendarStart,
+        end: calendarEnd,
+      });
+    } else {
+      const calendarStart = startOfWeek(currentDate, { weekStartsOn: 1 });
+      const calendarEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
+      return eachDayOfInterval({
+        start: calendarStart,
+        end: calendarEnd,
+      });
+    }
+  }, [currentDate, view]);
 
-  const days = eachDayOfInterval({
-    start: calendarStart,
-    end: calendarEnd,
-  });
+  const nextPeriod = () => {
+    if (view === 'month') {
+      setCurrentDate(addMonths(currentDate, 1));
+    } else {
+      setCurrentDate(addWeeks(currentDate, 1));
+    }
+  };
 
-  const nextMonth = () => setCurrentDate(addMonths(currentDate, 1));
-  const prevMonth = () => setCurrentDate(subMonths(currentDate, 1));
+  const prevPeriod = () => {
+    if (view === 'month') {
+      setCurrentDate(subMonths(currentDate, 1));
+    } else {
+      setCurrentDate(subWeeks(currentDate, 1));
+    }
+  };
 
   const getSessionsForDay = (day: Date) => {
     return sessions.filter(session => {
@@ -84,11 +110,14 @@ export default function ForumCalendar({ sessions, onVirtualSessionClick, onResch
       <div className="p-6 border-b border-gray-50 flex items-center justify-between bg-white z-10">
         <div className="flex items-center gap-4">
           <h2 className="text-xl font-bold text-gray-800 first-letter:uppercase">
-            {format(currentDate, 'MMMM yyyy', { locale: es })}
+            {view === 'month' 
+              ? format(currentDate, 'MMMM yyyy', { locale: es })
+              : `${format(startOfWeek(currentDate, { weekStartsOn: 1 }), 'd MMM', { locale: es })} - ${format(endOfWeek(currentDate, { weekStartsOn: 1 }), 'd MMM yyyy', { locale: es })}`
+            }
           </h2>
           <div className="flex items-center bg-gray-50 rounded-xl p-1">
             <button
-              onClick={prevMonth}
+              onClick={prevPeriod}
               className="p-1.5 hover:bg-white hover:shadow-sm rounded-lg transition-all text-gray-500"
             >
               <ChevronLeft size={20} />
@@ -100,10 +129,35 @@ export default function ForumCalendar({ sessions, onVirtualSessionClick, onResch
               Hoy
             </button>
             <button
-              onClick={nextMonth}
+              onClick={nextPeriod}
               className="p-1.5 hover:bg-white hover:shadow-sm rounded-lg transition-all text-gray-500"
             >
               <ChevronRight size={20} />
+            </button>
+          </div>
+
+          <div className="flex bg-gray-50 rounded-xl p-1">
+            <button
+              onClick={() => setView('month')}
+              className={clsx(
+                "px-3 py-1.5 text-xs font-bold rounded-lg transition-all",
+                view === 'month' 
+                  ? "bg-white text-blue-600 shadow-sm" 
+                  : "text-gray-500 hover:text-gray-800"
+              )}
+            >
+              Mes
+            </button>
+            <button
+              onClick={() => setView('week')}
+              className={clsx(
+                "px-3 py-1.5 text-xs font-bold rounded-lg transition-all",
+                view === 'week' 
+                  ? "bg-white text-blue-600 shadow-sm" 
+                  : "text-gray-500 hover:text-gray-800"
+              )}
+            >
+              Semana
             </button>
           </div>
         </div>
@@ -142,7 +196,7 @@ export default function ForumCalendar({ sessions, onVirtualSessionClick, onResch
         <div className="grid grid-cols-7 h-full min-h-[600px] border-l border-t border-gray-50">
           {days.map((day, idx) => {
             const daySessions = getSessionsForDay(day);
-            const isCurrentMonth = isSameMonth(day, monthStart);
+            const isCurrentMonth = view === 'week' || isSameMonth(day, currentDate);
             const isTodayDate = isToday(day);
 
             return (

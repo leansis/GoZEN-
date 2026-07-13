@@ -32,8 +32,10 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db } from './firebase';
 
 import Home from './pages/Home';
+import Inicio from './pages/Inicio';
 
 import ProcessMap from './pages/ProcessMap';
+import Standards from './pages/Standards';
 
 const ProtectedRoute = ({ children, requireAdmin = false, requireSupervisor = false, requireGlobalAdmin = false }: { children: React.ReactNode, requireAdmin?: boolean, requireSupervisor?: boolean, requireGlobalAdmin?: boolean }) => {
   const { user, dbUser, loading, isAdmin, isSupervisor, isGlobalAdmin } = useAuth();
@@ -343,8 +345,10 @@ export default function App() {
               
               {/* Application Layout (With Sidebar) */}
               <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+                <Route path="inicio" element={<Inicio />} />
                 <Route path="matrix" element={<Matrix />} />
                 <Route path="process-map" element={<ProcessMap />} />
+                <Route path="standards" element={<Standards />} />
                 <Route path="incidents" element={<Incidents />} />
                 <Route path="training" element={<TrainingActions />} />
                 <Route path="action-plan" element={<ActionPlan />} />

@@ -387,5 +387,6 @@ export interface Standard {
   validityMonths?: number;
   nextReviewDate?: string;
   reviewActionCreated?: boolean;
+  relatedStandardIds?: string[];
 }
 

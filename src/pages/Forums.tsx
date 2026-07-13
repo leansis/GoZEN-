@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import toast from 'react-hot-toast';
 import { 
   Plus, 
   MessagesSquare, 
@@ -178,9 +179,10 @@ export default function Forums() {
 
     // For the calendar or today's sessions, we also want to see the PLANNED sessions from recurring forums
     const virtual: ForumSession[] = [];
-    const visibleForums = visibleTeamIds 
+    const visibleForums = (visibleTeamIds 
       ? forums.filter(f => visibleTeamIds.has(f.teamId))
-      : forums;
+      : forums
+    ).filter(f => f.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
     const now = new Date();
     // In sessions mode, we only care about today. In calendar, use the company setting.
@@ -476,14 +478,17 @@ export default function Forums() {
       if (id) {
         const docRef = doc(db, 'forums', id);
         await updateDoc(docRef, forumData);
+        toast.success('Foro actualizado correctamente');
       } else {
         await addDoc(colRef, forumData);
+        toast.success('Foro creado correctamente');
       }
       setIsForumModalOpen(false);
       setEditingForum(null);
       setShowRecurrence(false);
     } catch (err: any) {
       console.error("Error saving forum:", err);
+      toast.error(`Error al guardar el foro: ${err.message || String(err)}`);
       handleFirestoreError(err, OperationType.WRITE, 'forums');
     } finally {
       setIsSaving(false);
@@ -494,8 +499,10 @@ export default function Forums() {
     if (window.confirm('¿Estás seguro de eliminar este foro? Se eliminará su definición maestra.')) {
       try {
         await deleteDoc(doc(db, 'forums', forum.id));
+        toast.success('Foro eliminado correctamente');
       } catch (err: any) {
         console.error("Error deleting forum:", err);
+        toast.error(`Error al eliminar el foro: ${err.message || String(err)}`);
         handleFirestoreError(err, OperationType.DELETE, `forums/${forum.id}`);
       }
     }
@@ -556,10 +563,12 @@ export default function Forums() {
       };
 
       await addDoc(collection(db, 'forumSessions'), sessionData);
+      toast.success('Sesión de foro programada correctamente');
       setIsSessionModalOpen(false);
       setSelectedForumForSession(null);
     } catch (err: any) {
       console.error("Error creating session:", err);
+      toast.error(`Error al programar la sesión de foro: ${err.message || String(err)}`);
       handleFirestoreError(err, OperationType.WRITE, 'forumSessions');
     } finally {
       setIsSaving(false);
@@ -651,7 +660,7 @@ export default function Forums() {
               Definiciones
             </button>
           </div>
-          {isAdmin && (
+          {(isAdmin || isLeanPromotor || isGlobalAdmin) && (
             <button
               onClick={() => {
                 setEditingForum({ 
@@ -711,12 +720,12 @@ export default function Forums() {
           <Table
             columns={forumColumns}
             data={filteredForums}
-            onEdit={isAdmin ? (f) => {
+            onEdit={(isAdmin || isLeanPromotor || isGlobalAdmin) ? (f) => {
               setEditingForum(f);
               setShowRecurrence(f.frequency === 'periodic');
               setIsForumModalOpen(true);
             } : undefined}
-            onDelete={isAdmin ? handleDeleteForum : undefined}
+            onDelete={(isAdmin || isLeanPromotor || isGlobalAdmin) ? handleDeleteForum : undefined}
             actions={(f: Forum) => (
               <button
                 onClick={() => {

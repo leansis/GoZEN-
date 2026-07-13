@@ -23,7 +23,8 @@ import {
   Database,
   PanelLeftOpen,
   PanelLeftClose,
-  FileText
+  FileText,
+  Home
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -46,7 +47,9 @@ export default function Layout() {
   ];
 
   const topLevelItems = [
+    { name: 'Inicio', path: '/inicio', icon: Home, roles: ['admin', 'supervisor', 'user', 'lean_promotor'] },
     { name: 'OHP', path: '/ohp', icon: Network, roles: ['admin', 'supervisor', 'user', 'lean_promotor'] },
+    { name: 'Estándares', path: '/standards', icon: FileText, roles: ['admin', 'supervisor', 'user', 'lean_promotor'] },
     { name: 'Incidencias', path: '/incidents', icon: AlertCircle, roles: ['admin', 'supervisor', 'user', 'lean_promotor'] },
     { name: 'Plan de acciones', path: '/action-plan', icon: ClipboardList, roles: ['admin', 'supervisor', 'user', 'lean_promotor'] },
     { name: 'Foros', path: '/forums', icon: MessagesSquare, roles: ['admin', 'supervisor', 'user', 'lean_promotor'] },

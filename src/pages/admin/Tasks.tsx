@@ -69,7 +69,8 @@ export default function Tasks() {
         description: editingTask.description || '',
         processId: editingTask.processId,
         criteriaId: editingTask.criteriaId,
-        companyId: companyId || ''
+        companyId: companyId || '',
+        attachments: editingTask.attachments || []
       };
 
       if (editingTask.id) {

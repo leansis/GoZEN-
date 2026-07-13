@@ -119,7 +119,7 @@
         "companyId": { "type": "string" },
         "order": { "type": "number" }
       },
-      "required": ["name", "processId", "criteriaId", "attachments", "companyId"]
+      "required": ["name", "processId", "criteriaId", "companyId"]
     },
     "Criterion": {
       "title": "Criterion",
