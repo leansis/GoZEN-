@@ -29,7 +29,7 @@ import {
 import clsx from 'clsx';
 
 export default function Layout() {
-  const { dbUser, logout, company, isAdmin } = useAuth();
+  const { dbUser, logout, company, isAdmin, setActiveCompanyId } = useAuth();
   const location = useLocation();
 
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -98,6 +98,11 @@ export default function Layout() {
           {/* Main Menu Link */}
           <Link
             to="/"
+            onClick={() => {
+              if (setActiveCompanyId) {
+                setActiveCompanyId(null);
+              }
+            }}
             title={isCollapsed ? "Menú Principal" : ""}
             className={clsx(
               'flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-colors mb-4 group/item',
