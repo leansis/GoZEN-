@@ -6,6 +6,7 @@ export interface CompanySettings {
   maxEscalationLevels?: number;
   actionPlanMultipleAssigneeMode?: 'multiple' | 'split';
   standardReviewNoticeDays?: number;
+  showSectionHeaders?: boolean;
 }
 
 export interface Company {
@@ -24,6 +25,7 @@ export interface User {
   status: Status;
   photoURL?: string;
   companyId?: string;
+  companyIds?: string[];
 }
 
 export interface TeamMember {
@@ -388,5 +390,109 @@ export interface Standard {
   nextReviewDate?: string;
   reviewActionCreated?: boolean;
   relatedStandardIds?: string[];
+}
+
+export type RoutineStatus = 'draft' | 'active' | 'inactive';
+export type RoutineActivationMode = 'scheduled' | 'event';
+export type RoutineControlType = 'ok_nok' | 'capture_value';
+export type RoutineCommentMode = 'allowed' | 'required' | 'none';
+export type RoutineReactionType = 'none' | 'instruction' | 'rule' | 'incident' | 'action' | 'both';
+
+export interface RoutineSchedule {
+  startDate: string;
+  repeatEvery: number;
+  repeatUnit: 'day' | 'week' | 'month';
+  daysOfWeek?: number[]; // 1-7 (Monday-Sunday)
+  endDate?: string;
+  endTime?: string; // Limit hour, optional
+}
+
+export interface CaptureValueConfig {
+  id: string;
+  name: string;
+  unit: string; // e.g. 'kg', 'units', '°C', 'bar', 'mm', 'percentage', etc.
+  min?: number;
+  max?: number;
+  decimals: number;
+  required: boolean;
+}
+
+export interface RoutineControl {
+  id: string;
+  title: string;
+  description: string;
+  imageUrl?: string;
+  type: RoutineControlType;
+  required: boolean;
+  commentMode: RoutineCommentMode;
+  reactionType: RoutineReactionType;
+  reactionConfig?: {
+    instructionText?: string;
+    ruleId?: string;
+    forumId?: string;
+    forumName?: string;
+    responsibleId?: string;
+    responsibleName?: string;
+    automatic?: boolean; // automatic or confirmed by user
+  };
+  values?: CaptureValueConfig[];
+}
+
+export interface Routine {
+  id: string;
+  title: string;
+  description: string; // Markdown
+  responsibleId: string;
+  responsibleName?: string;
+  activationMode: RoutineActivationMode;
+  schedule?: RoutineSchedule;
+  controls: RoutineControl[];
+  status: RoutineStatus;
+  companyId: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export type RoutineExecutionStatus = 'planned' | 'pending' | 'in_progress' | 'completed' | 'delayed' | 'cancelled';
+
+export interface RoutineControlResponse {
+  controlId: string;
+  title: string;
+  type: RoutineControlType;
+  required: boolean;
+  result?: 'ok' | 'nok' | 'out_of_range' | 'in_range';
+  comment?: string;
+  evidenceUrl?: string;
+  capturedValues?: { [valueId: string]: string | number }; // captured value per config id
+  completedBy?: string;
+  completedByName?: string;
+  completedAt?: string;
+  generatedIncidentId?: string;
+  generatedActionId?: string;
+}
+
+export interface RoutineExecution {
+  id: string;
+  routineId: string;
+  routineTitle: string;
+  responsibleId: string;
+  responsibleName?: string;
+  plannedDate: string; // yyyy-MM-dd
+  plannedTime?: string; // HH:mm
+  startedAt?: string;
+  completedAt?: string;
+  status: RoutineExecutionStatus;
+  completionDelay?: 'in_time' | 'out_of_time'; // inside or outside of deadline
+  controls: RoutineControlResponse[];
+  globalResult?: 'compliant' | 'deviations' | 'not_evaluable'; // conforme, con desviaciones, no evaluable
+  context?: {
+    workOrder?: string;
+    machine?: string;
+    product?: string;
+    shift?: string;
+    eventDateTime?: string;
+  };
+  companyId: string;
+  createdAt: string;
 }
 

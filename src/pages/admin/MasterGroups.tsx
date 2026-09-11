@@ -56,7 +56,7 @@ export default function MasterGroups() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Grupos</h1>
-          <p className="text-sm text-gray-500">Gestión global de nombres de grupos para equipos</p>
+          <p className="text-sm text-gray-500 mt-1">Gestión global de nombres de grupos para equipos</p>
         </div>
         <button
           onClick={() => {

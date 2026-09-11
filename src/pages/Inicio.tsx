@@ -30,10 +30,11 @@ import Modal from '../components/Modal';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
 import { format, isSameDay, parseISO } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { useLanguage } from '../i18n/LanguageContext';
 
 export default function Inicio() {
   const { dbUser } = useAuth();
+  const { t, dateLocale, language } = useLanguage();
   const { 
     actionPlans, 
     trainingActions, 
@@ -371,10 +372,15 @@ export default function Inicio() {
   // Welcome message based on time of day
   const welcomeMessage = useMemo(() => {
     const hours = new Date().getHours();
+    if (language === 'de') {
+      if (hours < 12) return 'Guten Morgen';
+      if (hours < 18) return 'Guten Tag';
+      return 'Guten Abend';
+    }
     if (hours < 12) return '¡Buenos días!';
     if (hours < 20) return '¡Buenas tardes!';
     return '¡Buenas noches!';
-  }, []);
+  }, [language]);
 
   // Filtered stats list items
   const filteredStatItems = useMemo(() => {
@@ -414,13 +420,13 @@ export default function Inicio() {
         </div>
         <div className="relative z-10 max-w-xl">
           <span className="bg-blue-600/55 text-blue-100 text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider">
-            Mi Panel Principal
+            {t('inicio.mainDashboard', 'Mi Panel Principal')}
           </span>
           <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight mt-1.5">
             {welcomeMessage}, {dbUser?.name}
           </h1>
           <p className="text-blue-100 text-xs mt-1 leading-relaxed">
-            Aquí tienes el resumen ejecutivo de tu actividad para hoy. Monitorea tus acciones, objetivos de polivalencia y reuniones programadas.
+            {t('inicio.welcomeSubtitle', 'Aquí tienes el resumen ejecutivo de tu actividad para hoy. Monitorea tus acciones, objetivos de polivalencia y reuniones programadas.')}
           </p>
         </div>
       </div>
@@ -432,8 +438,8 @@ export default function Inicio() {
             <Users size={20} />
           </div>
           <div className="space-y-0.5">
-            <h2 className="text-sm font-extrabold text-gray-900">Modo de Visualización</h2>
-            <p className="text-xs text-gray-500">Alterna entre tus indicadores personales y los de tus equipos a cargo.</p>
+            <h2 className="text-sm font-extrabold text-gray-900">{t('inicio.viewMode', 'Modo de Visualización')}</h2>
+            <p className="text-xs text-gray-500">{t('inicio.viewModeSubtitle', 'Alterna entre tus indicadores personales y los de tus equipos a cargo.')}</p>
           </div>
         </div>
         
@@ -449,7 +455,7 @@ export default function Inicio() {
                 dashboardMode === 'personal' ? "bg-white text-blue-700 shadow-sm" : "text-gray-500 hover:text-gray-850"
               )}
             >
-              Mi Actividad
+              {t('inicio.myActivity', 'Mi Actividad')}
             </button>
             <button
               onClick={() => setDashboardMode('teams')}
@@ -459,9 +465,9 @@ export default function Inicio() {
                 mySupervisedTeams.length === 0 && "opacity-55 cursor-not-allowed"
               )}
               disabled={mySupervisedTeams.length === 0}
-              title={mySupervisedTeams.length === 0 ? "No lideras ningún equipo" : "Ver indicadores de tus equipos"}
+              title={mySupervisedTeams.length === 0 ? t('inicio.noTeams', 'No lideras ningún equipo') : t('inicio.viewTeamMetrics', 'Ver indicadores de tus equipos')}
             >
-              Mis Equipos
+              {t('inicio.myTeams', 'Mis Equipos')}
               {mySupervisedTeams.length > 0 && (
                 <span className="bg-blue-100 text-blue-800 text-[10px] px-1.5 py-0.5 rounded-full font-extrabold">
                   {mySupervisedTeams.length}
@@ -476,7 +482,7 @@ export default function Inicio() {
               onChange={(e) => setSelectedTeamId(e.target.value)}
               className="text-xs font-bold bg-white border border-gray-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer text-gray-700 shadow-sm animate-fade-in"
             >
-              <option value="all">Todos mis equipos (Agregado)</option>
+              <option value="all">{t('inicio.allTeams', 'Todos mis equipos (Agregado)')}</option>
               {mySupervisedTeams.map(t => (
                 <option key={t.id} value={t.id}>{t.name}</option>
               ))}
@@ -501,17 +507,17 @@ export default function Inicio() {
               <ClipboardList size={22} />
             </div>
             <span className="text-[10px] font-bold text-gray-400 group-hover:text-blue-600 transition-colors uppercase tracking-wider">
-              {dashboardMode === 'personal' ? 'Acciones' : 'Acciones Eq.'}
+              {dashboardMode === 'personal' ? t('inicio.actions', 'Acciones') : t('inicio.teamActions', 'Acciones Eq.')}
             </span>
           </div>
           <div className="mt-4">
             <h3 className="text-4xl font-black text-gray-900 tracking-tight">
               {dashboardMode === 'personal' ? pendingActions.length : teamMetrics.pendingActionsCount}
             </h3>
-            <p className="text-sm text-gray-500 font-medium mt-1">Pendientes</p>
+            <p className="text-sm text-gray-500 font-medium mt-1">{t('common.pending', 'Pendientes')}</p>
           </div>
           <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between text-xs font-semibold text-blue-600">
-            <span>Ver listado</span>
+            <span>{t('common.viewDetails', 'Ver listado')}</span>
             <ArrowRight size={14} className="transform group-hover:translate-x-1 transition-transform" />
           </div>
         </div>
@@ -537,7 +543,7 @@ export default function Inicio() {
               <AlertTriangle size={22} />
             </div>
             <span className="text-[10px] font-bold text-gray-400 group-hover:text-red-600 transition-colors uppercase tracking-wider">
-              Vencidas
+              {t('common.overdue', 'Vencidas')}
             </span>
           </div>
           <div className="mt-4">
@@ -547,10 +553,10 @@ export default function Inicio() {
             )}>
               {dashboardMode === 'personal' ? overdueActions.length : teamMetrics.overdueActionsCount}
             </h3>
-            <p className="text-sm text-gray-500 font-medium mt-1">Fuera de plazo</p>
+            <p className="text-sm text-gray-500 font-medium mt-1">{t('inicio.outOfDate', 'Fuera de plazo')}</p>
           </div>
           <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between text-xs font-semibold text-red-600">
-            <span>Ver críticas</span>
+            <span>{t('inicio.viewCritical', 'Ver críticas')}</span>
             <ArrowRight size={14} className="transform group-hover:translate-x-1 transition-transform" />
           </div>
         </div>
@@ -568,17 +574,17 @@ export default function Inicio() {
               <GraduationCap size={22} />
             </div>
             <span className="text-[10px] font-bold text-gray-400 group-hover:text-violet-600 transition-colors uppercase tracking-wider">
-              {dashboardMode === 'personal' ? 'Formación' : 'Formación Eq.'}
+              {dashboardMode === 'personal' ? t('inicio.training', 'Formación') : t('inicio.teamTraining', 'Formación Eq.')}
             </span>
           </div>
           <div className="mt-4">
             <h3 className="text-4xl font-black text-gray-900 tracking-tight">
               {dashboardMode === 'personal' ? myTrainingInProgress.length : teamMetrics.trainingInProgressCount}
             </h3>
-            <p className="text-sm text-gray-500 font-medium mt-1">En curso</p>
+            <p className="text-sm text-gray-500 font-medium mt-1">{t('common.inProgress', 'En curso')}</p>
           </div>
           <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between text-xs font-semibold text-violet-600">
-            <span>{dashboardMode === 'personal' ? 'Mis formaciones' : 'Formaciones Eq.'}</span>
+            <span>{dashboardMode === 'personal' ? t('inicio.myTrainings', 'Mis formaciones') : t('inicio.teamTrainings', 'Formaciones Eq.')}</span>
             <ArrowRight size={14} className="transform group-hover:translate-x-1 transition-transform" />
           </div>
         </div>
@@ -590,14 +596,14 @@ export default function Inicio() {
               <Award size={22} />
             </div>
             <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-              Polivalencia
+              {t('nav.polyvalence', 'Polivalencia')}
             </span>
           </div>
           <div className="mt-4">
             <h3 className="text-4xl font-black text-gray-900 tracking-tight">
               {dashboardMode === 'personal' ? polyvalenceStats.pct : teamMetrics.polyvalencePct}%
             </h3>
-            <p className="text-sm text-gray-500 font-medium mt-1">Cumplimiento</p>
+            <p className="text-sm text-gray-500 font-medium mt-1">{t('inicio.compliance', 'Cumplimiento')}</p>
           </div>
           
           {/* Small progress line */}
@@ -609,8 +615,8 @@ export default function Inicio() {
               />
             </div>
             <div className="flex justify-between text-[9px] text-gray-400 font-bold uppercase mt-1.5">
-              <span>Nivel: {dashboardMode === 'personal' ? polyvalenceStats.currentSum : teamMetrics.polyvalenceCurrent} pts</span>
-              <span>Meta: {dashboardMode === 'personal' ? polyvalenceStats.targetSum : teamMetrics.polyvalenceTarget} pts</span>
+              <span>{t('inicio.level', 'Nivel')}: {dashboardMode === 'personal' ? polyvalenceStats.currentSum : teamMetrics.polyvalenceCurrent} {language === 'de' ? 'Pkt.' : 'pts'}</span>
+              <span>{t('inicio.target', 'Meta')}: {dashboardMode === 'personal' ? polyvalenceStats.targetSum : teamMetrics.polyvalenceTarget} {language === 'de' ? 'Pkt.' : 'pts'}</span>
             </div>
           </div>
         </div>
@@ -622,14 +628,14 @@ export default function Inicio() {
               <Calendar size={22} />
             </div>
             <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-              Asistencia
+              {t('inicio.attendance', 'Asistencia')}
             </span>
           </div>
           <div className="mt-4">
             <h3 className="text-4xl font-black text-gray-900 tracking-tight">
               {dashboardMode === 'personal' ? personalAttendanceStats.pct : teamMetrics.attendancePct}%
             </h3>
-            <p className="text-sm text-gray-500 font-medium mt-1">Asistencia Foros</p>
+            <p className="text-sm text-gray-500 font-medium mt-1">{t('inicio.forumAttendance', 'Asistencia Foros')}</p>
           </div>
           
           {/* Small progress line */}
@@ -643,13 +649,13 @@ export default function Inicio() {
             <div className="flex justify-between text-[9px] text-gray-400 font-bold uppercase mt-1.5">
               {dashboardMode === 'personal' ? (
                 <>
-                  <span>Asistido: {personalAttendanceStats.attended}</span>
-                  <span>Total: {personalAttendanceStats.expected}</span>
+                  <span>{t('inicio.attended', 'Asistido')}: {personalAttendanceStats.attended}</span>
+                  <span>{t('common.total', 'Total')}: {personalAttendanceStats.expected}</span>
                 </>
               ) : (
                 <>
-                  <span>Asistido: {teamMetrics.attendanceAttended}</span>
-                  <span>Total: {teamMetrics.attendanceExpected}</span>
+                  <span>{t('inicio.attended', 'Asistido')}: {teamMetrics.attendanceAttended}</span>
+                  <span>{t('common.total', 'Total')}: {teamMetrics.attendanceExpected}</span>
                 </>
               )}
             </div>
@@ -669,10 +675,10 @@ export default function Inicio() {
             <div className="flex justify-between items-center pb-4 border-b border-gray-100">
               <div className="flex items-center gap-2">
                 <Calendar className="text-blue-600" size={18} />
-                <h2 className="text-sm font-bold text-gray-800">Reuniones para Hoy</h2>
+                <h2 className="text-sm font-bold text-gray-800">{t('inicio.todayMeetings', 'Reuniones para Hoy')}</h2>
               </div>
               <span className="bg-blue-50 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                {todayMeetings.length} programadas
+                {todayMeetings.length} {t('inicio.scheduledCount', 'programadas')}
               </span>
             </div>
 
@@ -695,15 +701,15 @@ export default function Inicio() {
                     "text-[9px] font-bold uppercase px-2 py-0.5 rounded-full",
                     meet.status === 'in_progress' ? 'bg-green-100 text-green-800 animate-pulse' : 'bg-gray-200 text-gray-600'
                   )}>
-                    {meet.status === 'in_progress' ? 'En Vivo' : 'Programado'}
+                    {meet.status === 'in_progress' ? t('inicio.live', 'En Vivo') : t('inicio.scheduled', 'Programado')}
                   </span>
                 </div>
               ))}
 
               {todayMeetings.length === 0 && (
                 <div className="py-6 text-center text-gray-400 text-xs">
-                  <p className="font-semibold text-gray-500">No tienes foros programados para hoy</p>
-                  <p className="text-[10px] mt-0.5">¡Buen día para avanzar en tus estándares!</p>
+                  <p className="font-semibold text-gray-500">{t('inicio.noMeetingsToday', 'No tienes foros programados para hoy')}</p>
+                  <p className="text-[10px] mt-0.5">{t('inicio.goodDayForStandards', '¡Buen día para avanzar en tus estándares!')}</p>
                 </div>
               )}
             </div>
@@ -714,10 +720,12 @@ export default function Inicio() {
             <div className="flex justify-between items-center pb-4 border-b border-gray-100">
               <div className="flex items-center gap-2">
                 <FileText className="text-violet-600" size={18} />
-                <h2 className="text-sm font-bold text-gray-800">Mis Estándares</h2>
+                <h2 className="text-sm font-bold text-gray-800">
+                  {dashboardMode === 'personal' ? t('inicio.myStandardsTitle', 'Mis Estándares') : t('inicio.teamStandardsTitle', 'Estándares')}
+                </h2>
               </div>
               <span className="bg-violet-50 text-violet-700 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                {myStandards.length} asignados
+                {myStandards.length} {t('inicio.assignedCount', 'asignados')}
               </span>
             </div>
 
@@ -732,18 +740,18 @@ export default function Inicio() {
                       {std.name}
                     </p>
                     <span className="text-[8px] font-black tracking-wider uppercase px-1.5 py-0.5 bg-gray-200 text-gray-600 rounded">
-                      {std.relationType === 'activity' ? 'ÁREA' : std.relationType === 'process' ? 'PROCESO' : 'TAREA'}
+                      {std.relationType === 'activity' ? (language === 'de' ? 'BEREICH' : 'ÁREA') : std.relationType === 'process' ? (language === 'de' ? 'PROZESS' : 'PROCESO') : (language === 'de' ? 'AUFGABE' : 'TAREA')}
                     </span>
                   </div>
                   
                   {std.nextReviewDate && (
                     <div className="flex justify-between items-center text-[10px] text-gray-500 font-semibold mt-1">
-                      <span>Próxima revisión:</span>
+                      <span>{t('inicio.nextReview', 'Próxima revisión')}:</span>
                       <span className={clsx(
                         "font-bold",
                         new Date(std.nextReviewDate) < new Date() ? "text-red-600" : "text-gray-700"
                       )}>
-                        {new Date(std.nextReviewDate).toLocaleDateString('es-ES')}
+                        {new Date(std.nextReviewDate).toLocaleDateString(language === 'de' ? 'de-DE' : 'es-ES')}
                       </span>
                     </div>
                   )}
@@ -752,7 +760,7 @@ export default function Inicio() {
 
               {myStandards.length === 0 && (
                 <div className="py-6 text-center text-gray-400 text-xs">
-                  <p className="font-semibold text-gray-500">No tienes estándares asignados</p>
+                  <p className="font-semibold text-gray-500">{t('inicio.noStandardsAssigned', 'No tienes estándares asignados')}</p>
                 </div>
               )}
             </div>
@@ -768,11 +776,11 @@ export default function Inicio() {
               <div className="flex items-center gap-2">
                 <ClipboardList className="text-blue-600" size={18} />
                 <h2 className="text-sm font-bold text-gray-800">
-                  {dashboardMode === 'personal' ? 'Mi Lista de Acciones' : 'Acciones de mis Equipos'}
+                  {dashboardMode === 'personal' ? t('inicio.myActionList', 'Mi Lista de Acciones') : t('inicio.teamActionList', 'Acciones de mis Equipos')}
                 </h2>
               </div>
               <span className="bg-blue-50 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse-subtle">
-                {(dashboardMode === 'personal' ? pendingActions : teamMetrics.pendingActionsList).length} en proceso
+                {(dashboardMode === 'personal' ? pendingActions : teamMetrics.pendingActionsList).length} {t('inicio.inProcessCount', 'en proceso')}
               </span>
             </div>
 
@@ -781,11 +789,11 @@ export default function Inicio() {
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className="border-b border-gray-100 text-gray-400 font-bold uppercase text-[9px] tracking-wider">
-                    <th className="pb-3 font-semibold">Acción</th>
-                    <th className="pb-3 font-semibold">Prioridad</th>
-                    <th className="pb-3 font-semibold">Fecha Límite</th>
-                    <th className="pb-3 font-semibold">Estado</th>
-                    <th className="pb-3 text-right font-semibold">Acción</th>
+                    <th className="pb-3 font-semibold">{t('actionPlan.action', 'Acción')}</th>
+                    <th className="pb-3 font-semibold">{t('common.priority', 'Prioridad')}</th>
+                    <th className="pb-3 font-semibold">{t('inicio.deadline', 'Fecha Límite')}</th>
+                    <th className="pb-3 font-semibold">{t('common.status', 'Estado')}</th>
+                    <th className="pb-3 text-right font-semibold">{t('common.actions', 'Acción')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50 font-medium">
@@ -799,7 +807,7 @@ export default function Inicio() {
                           {act.title}
                         </p>
                         <p className="text-[10px] text-gray-400 mt-0.5 truncate">
-                          {act.description || 'Sin descripción adicional'}
+                          {act.description || t('common.noDescription', 'Sin descripción adicional')}
                         </p>
                       </td>
                       <td className="py-3.5">
@@ -810,11 +818,15 @@ export default function Inicio() {
                           act.priority === 'media' && "bg-yellow-100 text-yellow-800",
                           act.priority === 'baja' && "bg-blue-100 text-blue-700"
                         )}>
-                          {act.priority.toUpperCase()}
+                          {language === 'de' ? (
+                            act.priority === 'critica' ? 'KRITISCH' :
+                            act.priority === 'alta' ? 'HOCH' :
+                            act.priority === 'media' ? 'MITTEL' : 'NIEDRIG'
+                          ) : act.priority.toUpperCase()}
                         </span>
                       </td>
                       <td className="py-3.5 text-gray-600 text-[11px]">
-                        {act.targetDate ? new Date(act.targetDate).toLocaleDateString('es-ES') : '-'}
+                        {act.targetDate ? new Date(act.targetDate).toLocaleDateString(language === 'de' ? 'de-DE' : 'es-ES') : '-'}
                       </td>
                       <td className="py-3.5">
                         <select
@@ -828,11 +840,11 @@ export default function Inicio() {
                             act.status === 'bloqueada' && "bg-orange-50 text-orange-600 border-orange-150"
                           )}
                         >
-                          <option value="pendiente">Pendiente</option>
-                          <option value="en_progreso">En Curso</option>
-                          <option value="bloqueada">Bloqueada</option>
-                          <option value="retrasada">Retrasada</option>
-                          <option value="finalizada">Finalizada</option>
+                          <option value="pendiente">{t('common.pending', 'Pendiente')}</option>
+                          <option value="en_progreso">{t('common.inProgress', 'En Curso')}</option>
+                          <option value="bloqueada">{t('common.blocked', 'Bloqueada')}</option>
+                          <option value="retrasada">{t('common.delayed', 'Retrasada')}</option>
+                          <option value="finalizada">{t('common.completed', 'Finalizada')}</option>
                         </select>
                       </td>
                       <td className="py-3.5 text-right">
@@ -842,8 +854,8 @@ export default function Inicio() {
                             setEditedNotes(act.notes || '');
                             setIsEditingNotes(false);
                           }}
-                          className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-all"
-                          title="Ver detalle"
+                          className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-all cursor-pointer"
+                          title={t('common.viewDetails', 'Ver detalle')}
                         >
                           <ArrowRight size={15} />
                         </button>
@@ -855,7 +867,7 @@ export default function Inicio() {
                     <tr>
                       <td colSpan={5} className="py-8 text-center text-gray-400">
                         <p className="font-semibold">
-                          {dashboardMode === 'personal' ? '¡Felicidades! No tienes acciones pendientes.' : 'No hay acciones pendientes para los equipos seleccionados.'}
+                          {dashboardMode === 'personal' ? t('inicio.noPendingActions', '¡Felicidades! No tienes acciones pendientes.') : t('inicio.noTeamPendingActions', 'No hay acciones pendientes para los equipos seleccionados.')}
                         </p>
                       </td>
                     </tr>
@@ -866,7 +878,7 @@ export default function Inicio() {
 
             {(dashboardMode === 'personal' ? pendingActions : teamMetrics.pendingActionsList).length > 8 && (
               <p className="text-[10px] text-gray-400 font-bold uppercase mt-3.5 text-center">
-                Mostrando las primeras 8 de {(dashboardMode === 'personal' ? pendingActions : teamMetrics.pendingActionsList).length} acciones pendientes
+                {t('inicio.showingFirstActions', 'Mostrando las primeras 8 de')} {(dashboardMode === 'personal' ? pendingActions : teamMetrics.pendingActionsList).length} {t('inicio.pendingActionsSuffix', 'acciones pendientes')}
               </p>
             )}
           </div>
@@ -882,9 +894,9 @@ export default function Inicio() {
             isOpen={true}
             onClose={() => setActiveStatList(null)}
             title={
-              activeStatList === 'pending' ? 'Acciones Pendientes' :
-              activeStatList === 'overdue' ? 'Acciones Fuera de Plazo (Vencidas)' :
-              'Formaciones en Curso'
+              activeStatList === 'pending' ? t('inicio.modalPending', 'Acciones Pendientes') :
+              activeStatList === 'overdue' ? t('inicio.modalOverdue', 'Acciones Fuera de Plazo (Vencidas)') :
+              t('inicio.modalTrainings', 'Formaciones en Curso')
             }
           >
             <div className="space-y-4">
@@ -893,7 +905,7 @@ export default function Inicio() {
                 <Search size={16} className="absolute left-3 top-2.5 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Buscar por nombre..."
+                  placeholder={t('common.searchByName', 'Buscar por nombre...')}
                   value={listSearchQuery}
                   onChange={(e) => setListSearchQuery(e.target.value)}
                   className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -929,18 +941,18 @@ export default function Inicio() {
                         {isTraining ? (
                           <div className="flex flex-wrap items-center gap-2 text-[10px] text-gray-500 font-semibold mt-1">
                             <span className="bg-violet-50 text-violet-700 px-1.5 py-0.5 rounded">
-                              Objetivo: Nivel {item.targetLevel}
+                              {t('inicio.targetLevel', 'Objetivo: Nivel')} {item.targetLevel}
                             </span>
                             {item.trainerName && (
-                              <span>Formador: {item.trainerName}</span>
+                              <span>{t('inicio.trainer', 'Formador')}: {item.trainerName}</span>
                             )}
                             {item.plannedDate && (
-                              <span>Fecha: {new Date(item.plannedDate).toLocaleDateString('es-ES')}</span>
+                              <span>{t('common.date', 'Fecha')}: {new Date(item.plannedDate).toLocaleDateString(language === 'de' ? 'de-DE' : 'es-ES')}</span>
                             )}
                           </div>
                         ) : (
                           <p className="text-[10px] text-gray-400 line-clamp-1">
-                            {item.description || 'Sin descripción'}
+                            {item.description || t('common.noDescription', 'Sin descripción adicional')}
                           </p>
                         )}
                       </div>
@@ -952,11 +964,15 @@ export default function Inicio() {
                             "text-[8px] font-black uppercase px-1.5 py-0.5 rounded",
                             item.priority === 'critica' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'
                           )}>
-                            {item.priority}
+                            {language === 'de' ? (
+                              item.priority === 'critica' ? 'KRITISCH' :
+                              item.priority === 'alta' ? 'HOCH' :
+                              item.priority === 'media' ? 'MITTEL' : 'NIEDRIG'
+                            ) : (item.priority || '').toUpperCase()}
                           </span>
                           {item.targetDate && (
                             <span className="text-[9px] text-gray-400 font-bold">
-                              {new Date(item.targetDate).toLocaleDateString('es-ES')}
+                              {new Date(item.targetDate).toLocaleDateString(language === 'de' ? 'de-DE' : 'es-ES')}
                             </span>
                           )}
                         </div>
@@ -964,7 +980,7 @@ export default function Inicio() {
 
                       {isTraining && (
                         <span className="bg-amber-50 border border-amber-200 text-amber-800 text-[8px] font-bold px-1.5 py-0.5 rounded shrink-0">
-                          {item.status.toUpperCase()}
+                          {language === 'de' ? (item.status === 'en_curso' ? 'IN BEARBEITUNG' : item.status.toUpperCase()) : item.status.toUpperCase()}
                         </span>
                       )}
                     </div>
@@ -973,7 +989,7 @@ export default function Inicio() {
 
                 {filteredStatItems.length === 0 && (
                   <div className="py-12 text-center text-gray-400 text-xs">
-                    No se encontraron elementos coincidentes.
+                    {t('common.noMatches', 'No se encontraron elementos coincidentes.')}
                   </div>
                 )}
               </div>
@@ -983,9 +999,9 @@ export default function Inicio() {
                 <button
                   type="button"
                   onClick={() => setActiveStatList(null)}
-                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-semibold"
+                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-semibold cursor-pointer"
                 >
-                  Cerrar
+                  {t('common.close', 'Cerrar')}
                 </button>
               </div>
             </div>
@@ -1018,7 +1034,7 @@ export default function Inicio() {
               <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-slate-50/50">
                 <div className="space-y-1">
                   <span className="bg-blue-100 text-blue-800 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
-                    Detalle de Acción
+                    {t('inicio.actionDetail', 'Detalle de Acción')}
                   </span>
                   <h3 className="text-sm font-bold text-gray-800 mt-1">
                     {selectedAction.title}
@@ -1026,7 +1042,7 @@ export default function Inicio() {
                 </div>
                 <button
                   onClick={() => setSelectedAction(null)}
-                  className="p-1.5 hover:bg-gray-200 text-gray-400 hover:text-gray-600 rounded-full transition-all"
+                  className="p-1.5 hover:bg-gray-200 text-gray-400 hover:text-gray-600 rounded-full transition-all cursor-pointer"
                 >
                   <X size={18} />
                 </button>
@@ -1037,22 +1053,28 @@ export default function Inicio() {
                 
                 {/* Description */}
                 <div className="space-y-1.5">
-                  <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Descripción</h4>
+                  <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{t('common.description', 'Descripción')}</h4>
                   <div className="p-4 bg-slate-50 rounded-xl border border-gray-100 text-xs text-gray-700 leading-relaxed font-semibold">
-                    {selectedAction.description || 'Sin descripción adicional disponible.'}
+                    {selectedAction.description || t('common.noDescription', 'Sin descripción adicional disponible.')}
                   </div>
                 </div>
 
                 {/* Priority & Target Date Grid */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="p-3 bg-slate-50/50 border border-gray-100 rounded-xl space-y-1">
-                    <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Prioridad</span>
-                    <p className="text-xs font-bold text-gray-800 capitalize">{selectedAction.priority}</p>
+                    <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">{t('common.priority', 'Prioridad')}</span>
+                    <p className="text-xs font-bold text-gray-800 capitalize">
+                      {language === 'de' ? (
+                        selectedAction.priority === 'critica' ? 'Kritisch' :
+                        selectedAction.priority === 'alta' ? 'Hoch' :
+                        selectedAction.priority === 'media' ? 'Mittel' : 'Niedrig'
+                      ) : selectedAction.priority}
+                    </p>
                   </div>
                   <div className="p-3 bg-slate-50/50 border border-gray-100 rounded-xl space-y-1">
-                    <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Fecha Límite</span>
+                    <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">{t('inicio.deadline', 'Fecha Límite')}</span>
                     <p className="text-xs font-bold text-gray-800">
-                      {selectedAction.targetDate ? new Date(selectedAction.targetDate).toLocaleDateString('es-ES', { dateStyle: 'medium' }) : '-'}
+                      {selectedAction.targetDate ? new Date(selectedAction.targetDate).toLocaleDateString(language === 'de' ? 'de-DE' : 'es-ES', { dateStyle: 'medium' }) : '-'}
                     </p>
                   </div>
                 </div>
@@ -1060,7 +1082,7 @@ export default function Inicio() {
                 {/* Status Dropdown */}
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
-                    Actualizar Estado
+                    {t('inicio.updateStatus', 'Actualizar Estado')}
                   </label>
                   <div className="flex gap-2">
                     {['pendiente', 'en_progreso', 'bloqueada', 'finalizada'].map((st) => (
@@ -1074,9 +1096,9 @@ export default function Inicio() {
                             : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
                         )}
                       >
-                        {st === 'pendiente' ? 'Pendiente' :
-                         st === 'en_progreso' ? 'En Curso' :
-                         st === 'bloqueada' ? 'Bloqueada' : 'Completada'}
+                        {st === 'pendiente' ? t('common.pending', 'Pendiente') :
+                         st === 'en_progreso' ? t('common.inProgress', 'En Curso') :
+                         st === 'bloqueada' ? t('common.blocked', 'Bloqueada') : t('common.completed', 'Completada')}
                       </button>
                     ))}
                   </div>
@@ -1087,7 +1109,7 @@ export default function Inicio() {
                   <div className="flex justify-between items-center">
                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1">
                       <MessageSquare size={13} />
-                      Notas de Seguimiento y Progreso
+                      {t('inicio.trackingNotes', 'Notas de Seguimiento y Progreso')}
                     </label>
                     {!isEditingNotes ? (
                       <button
@@ -1095,7 +1117,7 @@ export default function Inicio() {
                         className="text-xs text-blue-600 hover:text-blue-700 font-bold flex items-center gap-1 cursor-pointer"
                       >
                         <Edit2 size={12} />
-                        Editar Notas
+                        {t('inicio.editNotes', 'Editar Notas')}
                       </button>
                     ) : (
                       <div className="flex gap-2">
@@ -1105,7 +1127,7 @@ export default function Inicio() {
                           className="text-xs text-green-600 hover:text-green-700 font-bold flex items-center gap-1 cursor-pointer"
                         >
                           <Save size={12} />
-                          Guardar
+                          {t('common.save', 'Guardar')}
                         </button>
                         <button
                           onClick={() => {
@@ -1114,7 +1136,7 @@ export default function Inicio() {
                           }}
                           className="text-xs text-gray-400 hover:text-gray-500 font-bold cursor-pointer"
                         >
-                          Cancelar
+                          {t('common.cancel', 'Cancelar')}
                         </button>
                       </div>
                     )}
@@ -1125,12 +1147,12 @@ export default function Inicio() {
                       rows={5}
                       value={editedNotes}
                       onChange={(e) => setEditedNotes(e.target.value)}
-                      placeholder="Escribe detalles del progreso de la acción, obstáculos encontrados, etc..."
+                      placeholder={t('inicio.notesPrompt', 'Escribe detalles del progreso de la acción, obstáculos encontrados, etc...')}
                       className="w-full p-3 border border-gray-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-medium"
                     />
                   ) : (
                     <div className="p-4 bg-slate-50/70 border border-dashed border-gray-200 rounded-xl text-xs text-gray-600 leading-relaxed min-h-[100px] whitespace-pre-wrap">
-                      {selectedAction.notes || 'No se han registrado notas de seguimiento para esta acción. Haz clic en "Editar Notas" para añadir tus comentarios.'}
+                      {selectedAction.notes || t('inicio.noNotesYet', 'No se han registrado notas de seguimiento para esta acción. Haz clic en "Editar Notas" para añadir tus comentarios.')}
                     </div>
                   )}
                 </div>
@@ -1141,15 +1163,15 @@ export default function Inicio() {
               <div className="p-6 border-t border-gray-100 bg-slate-50/30 flex justify-between">
                 {selectedAction.originForumName && (
                   <div className="text-[10px] text-gray-400 font-bold flex flex-col">
-                    <span>Origen de Acción:</span>
+                    <span>{t('inicio.actionOrigin', 'Origen de Acción')}:</span>
                     <span className="text-gray-600 font-extrabold uppercase mt-0.5">{selectedAction.originForumName}</span>
                   </div>
                 )}
                 <button
                   onClick={() => setSelectedAction(null)}
-                  className="px-5 py-2 bg-gray-800 hover:bg-gray-900 text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-gray-200"
+                  className="px-5 py-2 bg-gray-800 hover:bg-gray-900 text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-gray-200 cursor-pointer"
                 >
-                  Listo
+                  {t('common.done', 'Listo')}
                 </button>
               </div>
             </motion.div>

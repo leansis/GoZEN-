@@ -1,6 +1,8 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
+import { useLanguage } from '../i18n/LanguageContext';
+import LanguageSelector from '../components/LanguageSelector';
 import { Building2, Users, ArrowRight, LogOut, Plus, Trash2, LayoutDashboard, ClipboardList, MessagesSquare, AlertCircle } from 'lucide-react';
 import { collection, onSnapshot, query, orderBy, addDoc, deleteDoc, doc, where } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -10,7 +12,8 @@ import ConfirmModal from '../components/ConfirmModal';
 import { handleFirestoreError, OperationType } from '../lib/firestore-utils';
 
 export default function Home() {
-  const { user, dbUser, isAdmin, isLeanPromotor, logout, activeCompanyId, setActiveCompanyId, company, isGlobalAdmin } = useAuth();
+  const { user, dbUser, logout, activeCompanyId, setActiveCompanyId, isGlobalAdmin } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const [companies, setCompanies] = React.useState<Company[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -26,25 +29,47 @@ export default function Home() {
   }, [loading, activeCompanyId, navigate]);
 
   React.useEffect(() => {
-    if (isAdmin) {
-      let q = query(collection(db, 'companies'), orderBy('createdAt', 'desc'));
-      
-      // If lean promotor, only show their company
-      if (isLeanPromotor && dbUser?.companyId) {
-        q = query(collection(db, 'companies'), where('__name__', '==', dbUser.companyId));
-      }
+    if (!user || !dbUser) {
+      setLoading(false);
+      return;
+    }
 
-      const unsubscribe = onSnapshot(q, (snapshot) => {
+    let unsubscribe = () => {};
+
+    if (isGlobalAdmin) {
+      // Global admin sees all companies
+      const q = query(collection(db, 'companies'), orderBy('createdAt', 'desc'));
+      unsubscribe = onSnapshot(q, (snapshot) => {
         setCompanies(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Company)));
         setLoading(false);
-      }, (error) => {
-        handleFirestoreError(error, OperationType.LIST, 'companies');
+      }, (err) => {
+        handleFirestoreError(err, OperationType.LIST, 'companies');
+        setLoading(false);
       });
-      return () => unsubscribe();
     } else {
-      setLoading(false);
+      // Other users only see companies they are associated with (via companyIds or fallback companyId)
+      const userCompanyIds = Array.from(new Set([
+        ...(dbUser.companyIds || []),
+        ...(dbUser.companyId ? [dbUser.companyId] : [])
+      ])).filter(Boolean);
+
+      if (userCompanyIds.length > 0) {
+        const q = query(collection(db, 'companies'), where('__name__', 'in', userCompanyIds));
+        unsubscribe = onSnapshot(q, (snapshot) => {
+          setCompanies(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Company)));
+          setLoading(false);
+        }, (err) => {
+          handleFirestoreError(err, OperationType.LIST, 'companies');
+          setLoading(false);
+        });
+      } else {
+        setCompanies([]);
+        setLoading(false);
+      }
     }
-  }, [isAdmin, isLeanPromotor, dbUser?.companyId]);
+
+    return () => unsubscribe();
+  }, [user, dbUser, isGlobalAdmin]);
 
   const handleAccessCompany = (id: string) => {
     setActiveCompanyId(id);
@@ -86,51 +111,78 @@ export default function Home() {
     );
   }
 
+  // Determine if user has any available companies
+  const hasCompanies = companies.length > 0;
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 px-8 py-4 flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-800">GoZEN</h1>
         <div className="flex items-center gap-4">
+          <LanguageSelector />
+          <div className="h-6 w-px bg-gray-200" />
           <div className="text-right">
             <p className="text-sm font-medium text-gray-900">{dbUser?.name}</p>
-            <p className="text-xs text-gray-500 uppercase">{dbUser?.role}</p>
+            <p className="text-xs text-gray-500 uppercase tracking-wider">
+              {dbUser?.role ? t(`roles.${dbUser.role}`, dbUser.role) : ''}
+            </p>
           </div>
           <button
             onClick={logout}
             className="p-2 text-gray-400 hover:text-red-600 transition-colors"
-            title="Cerrar sesión"
+            title={t('nav.logout', 'Cerrar sesión')}
           >
             <LogOut size={20} />
           </button>
         </div>
       </header>
 
-      <main className="flex-1 p-8 max-w-6xl mx-auto w-full">
-        {isAdmin ? (
-          <div className="space-y-8">
-            <div className="flex justify-between items-center">
-              <h2 className="text-3xl font-bold text-gray-900">Panel de Administración</h2>
-              <div className="flex gap-3">
-                {isGlobalAdmin && (
-                  <>
-                    <button
-                      onClick={() => setIsAddingCompany(true)}
-                      className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
-                    >
-                      <Plus size={20} />
-                      <span>Nueva Empresa</span>
-                    </button>
-                    <button
-                      onClick={() => navigate('/admin/master-users')}
-                      className="flex items-center gap-2 bg-white border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors shadow-sm"
-                    >
-                      <Users size={20} className="text-blue-600" />
-                      <span>Gestión Maestra de Usuarios</span>
-                    </button>
-                  </>
-                )}
+      <main className="flex-1 p-8 max-w-6xl mx-auto w-full flex flex-col justify-center">
+        {!hasCompanies ? (
+          <div className="max-w-md mx-auto text-center py-12 w-full">
+            <div className="bg-white border border-gray-200 rounded-3xl p-8 shadow-sm">
+              <div className="w-16 h-16 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                <AlertCircle size={32} />
               </div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-4">{t('home.restrictedAccess', 'Acceso Restringido')}</h2>
+              <p className="text-gray-500 mb-8 leading-relaxed">
+                {t('home.restrictedAccessDesc', 'Tu cuenta aún no ha sido asignada a ninguna empresa. Por favor, contacta con el administrador del sistema para obtener acceso.')}
+              </p>
+              <button
+                onClick={logout}
+                className="w-full inline-flex items-center justify-center gap-2 bg-gray-900 text-white px-6 py-3 rounded-xl hover:bg-gray-800 transition font-medium shadow-md"
+              >
+                <LogOut size={20} />
+                {t('nav.logout', 'Cerrar Sesión')}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-8 my-auto py-12">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-gray-200 pb-6">
+              <div>
+                <h2 className="text-3xl font-extrabold text-gray-900 tracking-tight">{t('home.selectCompany', 'Seleccionar Empresa')}</h2>
+                <p className="text-gray-500 mt-1">{t('home.selectCompanySubtitle', 'Por favor, selecciona la empresa con la que deseas trabajar hoy.')}</p>
+              </div>
+              {isGlobalAdmin && (
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setIsAddingCompany(true)}
+                    className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors shadow-sm font-medium"
+                  >
+                    <Plus size={20} />
+                    <span>{t('home.newCompany', 'Nueva Empresa')}</span>
+                  </button>
+                  <button
+                    onClick={() => navigate('/admin/master-users')}
+                    className="flex items-center gap-2 bg-white border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors shadow-sm font-medium text-gray-700"
+                  >
+                    <Users size={20} className="text-blue-600" />
+                    <span>{t('home.masterUsers', 'Gestión Maestra de Usuarios')}</span>
+                  </button>
+                </div>
+              )}
             </div>
 
             {error && (
@@ -140,64 +192,57 @@ export default function Home() {
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {companies.map((company) => (
+              {companies.map((comp) => (
                 <div
-                  key={company.id}
-                  className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 hover:shadow-md hover:border-blue-300 transition-all group cursor-pointer relative"
-                  onClick={() => handleAccessCompany(company.id)}
+                  key={comp.id}
+                  className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 hover:shadow-md hover:border-blue-400 transition-all group cursor-pointer relative flex flex-col justify-between"
+                  onClick={() => handleAccessCompany(comp.id)}
                 >
                   {isGlobalAdmin && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        setCompanyToDelete(company);
+                        setCompanyToDelete(comp);
                       }}
-                      className="absolute top-2 right-2 p-2 text-gray-400 hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100 z-10 bg-white rounded-full shadow-sm border border-gray-100"
+                      className="absolute top-4 right-4 p-2 text-gray-400 hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100 z-10 bg-white rounded-full shadow-sm border border-gray-100"
                       title="Eliminar empresa"
                     >
                       <Trash2 size={16} />
                     </button>
                   )}
 
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
-                      <Building2 size={24} />
+                  <div>
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
+                        <Building2 size={24} />
+                      </div>
+                      <div className="text-gray-300 group-hover:text-blue-600 transition-colors pr-2">
+                        <ArrowRight size={20} />
+                      </div>
                     </div>
-                    <div className="text-gray-400 group-hover:text-blue-600 transition-colors pr-6">
-                      <ArrowRight size={20} />
-                    </div>
+                    <h3 className="text-xl font-bold text-gray-900 mb-1 group-hover:text-blue-600 transition-colors">{comp.name}</h3>
+                    <p className="text-xs text-gray-400 font-mono">ID: {comp.id}</p>
                   </div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-1">{company.name}</h3>
-                  <p className="text-sm text-gray-500">ID: {company.id}</p>
                   
-                  <div className="mt-6 pt-6 border-t border-gray-100 flex gap-4">
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleAccessCompany(company.id);
-                      }}
-                      className="text-sm font-medium text-blue-600 hover:text-blue-700"
-                    >
-                      Acceder
-                    </button>
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setActiveCompanyId(company.id);
-                        navigate('/admin/teams');
-                      }}
-                      className="text-sm font-medium text-gray-600 hover:text-gray-700"
-                    >
-                      Configurar
-                    </button>
+                  <div className="mt-6 pt-4 border-t border-gray-100 flex justify-between items-center">
+                    <span className="text-sm font-semibold text-blue-600 group-hover:underline flex items-center gap-1">
+                      Acceder a Inicio <ArrowRight size={14} />
+                    </span>
+                    {isGlobalAdmin && (
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveCompanyId(comp.id);
+                          navigate('/admin/teams');
+                        }}
+                        className="text-xs font-medium text-gray-500 hover:text-gray-800 border border-gray-200 rounded px-2.5 py-1 hover:bg-gray-50 transition"
+                      >
+                        Configurar
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
-              {companies.length === 0 && (
-                <div className="col-span-full py-12 text-center text-gray-500 bg-white rounded-2xl border-2 border-dashed border-gray-200">
-                  No hay empresas registradas. Comienza creando una nueva.
-                </div>
-              )}
             </div>
 
             {/* Add Company Modal */}
@@ -245,63 +290,6 @@ export default function Home() {
               title="Eliminar Empresa"
               message={`¿Estás seguro de que deseas eliminar la empresa "${companyToDelete?.name}"? Esta acción eliminará permanentemente la empresa y todos sus datos asociados. Esta acción no se puede deshacer.`}
             />
-          </div>
-        ) : (
-          <div className="max-w-2xl mx-auto text-center py-12">
-            {!dbUser?.companyId ? (
-              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-8">
-                <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <Users size={32} />
-                </div>
-                <h2 className="text-2xl font-bold text-amber-900 mb-4">Acceso Restringido</h2>
-                <p className="text-amber-700 mb-8">
-                  Tu cuenta aún no ha sido asignada a ninguna empresa. Por favor, contacta con el administrador o lean promotor del sistema para obtener acceso.
-                </p>
-                <button
-                  onClick={logout}
-                  className="inline-flex items-center gap-2 bg-amber-600 text-white px-6 py-2 rounded-lg hover:bg-amber-700 transition"
-                >
-                  <LogOut size={20} />
-                  Cerrar Sesión
-                </button>
-              </div>
-            ) : (
-              <div className="bg-white border border-gray-200 rounded-3xl p-12 shadow-sm">
-                <div className="w-20 h-20 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-8">
-                  <Building2 size={40} />
-                </div>
-                <h2 className="text-3xl font-bold text-gray-900 mb-2">Bienvenido a GoZEN</h2>
-                <p className="text-gray-500 mb-10 text-lg">
-                  Has accedido como miembro de <span className="font-bold text-gray-900">{company?.name || 'tu empresa'}</span>.
-                </p>
-                
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-                  <button
-                    onClick={() => navigate('/matrix')}
-                    className="w-full bg-blue-600 text-white px-6 py-10 rounded-3xl font-bold text-xl hover:bg-blue-700 transition-all shadow-xl shadow-blue-200 flex flex-col items-center justify-center gap-4"
-                  >
-                    <LayoutDashboard size={40} />
-                    <span>Polivalencia</span>
-                  </button>
-                  
-                  <button
-                    onClick={() => navigate('/action-plan')}
-                    className="w-full bg-white border-2 border-blue-50 text-blue-700 px-6 py-10 rounded-3xl font-bold text-xl hover:bg-blue-50 transition-all shadow-sm flex flex-col items-center justify-center gap-4"
-                  >
-                    <ClipboardList size={40} />
-                    <span>Acciones</span>
-                  </button>
-
-                  <button
-                    onClick={() => navigate('/forums')}
-                    className="w-full bg-white border-2 border-green-50 text-green-700 px-6 py-10 rounded-3xl font-bold text-xl hover:bg-green-50 transition-all shadow-sm flex flex-col items-center justify-center gap-4"
-                  >
-                    <MessagesSquare size={40} />
-                    <span>Foros</span>
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
         )}
       </main>

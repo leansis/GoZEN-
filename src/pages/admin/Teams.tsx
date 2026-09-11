@@ -10,7 +10,8 @@ import ConfirmModal from '../../components/ConfirmModal';
 import { Plus, Trash2, Users as UsersIcon, ListChecks } from 'lucide-react';
 
 export default function Teams() {
-  const { dbUser, activeCompanyId } = useAuth();
+  const { dbUser, activeCompanyId, company } = useAuth();
+  const showSectionHeaders = company?.settings?.showSectionHeaders !== false;
   const { masterGroups } = useAppData();
   const [teams, setTeams] = useState<Team[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -182,7 +183,13 @@ export default function Teams() {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Equipos</h1>
+        {showSectionHeaders && (
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">Equipos</h1>
+            <p className="text-sm text-gray-500 mt-1">Gestión, miembros y asignación de procesos para los equipos de la organización.</p>
+          </div>
+        )}
+        {!showSectionHeaders && <div />}
         <button
           onClick={() => setEditingTeam({ members: [], processIds: [] })}
           className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"

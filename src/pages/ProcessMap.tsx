@@ -7,7 +7,8 @@ import clsx from 'clsx';
 import ReactMarkdown from 'react-markdown';
 
 export default function ProcessMap() {
-  const { dbUser, isAdmin, isSupervisor } = useAuth();
+  const { dbUser, isAdmin, isSupervisor, company } = useAuth();
+  const showSectionHeaders = company?.settings?.showSectionHeaders !== false;
   const appData = useAppData();
   
   const activities = [...appData.activities].sort((a, b) => (a.order || 0) - (b.order || 0));
@@ -139,7 +140,15 @@ export default function ProcessMap() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-800">Mapa de Procesos</h1>
+        {showSectionHeaders && (
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">Mapa de Procesos</h1>
+            <p className="text-sm text-gray-500 mt-1">
+              Visualización estructurada de las actividades, procesos y estándares de los equipos.
+            </p>
+          </div>
+        )}
+        {!showSectionHeaders && <div />}
         
         <div className="flex items-center gap-2 bg-white p-2 rounded-lg shadow-sm border border-gray-200">
           <Users className="w-5 h-5 text-gray-500" />

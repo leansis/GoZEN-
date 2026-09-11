@@ -29,7 +29,8 @@
         "email": { "type": "string", "format": "email" },
         "role": { "type": "string", "enum": ["admin", "supervisor", "user", "lean_promotor"] },
         "status": { "type": "string", "enum": ["active", "inactive"] },
-        "companyId": { "type": "string" }
+        "companyId": { "type": "string" },
+        "companyIds": { "type": "array", "items": { "type": "string" } }
       },
       "required": ["uid", "name", "email", "role", "status"]
     },

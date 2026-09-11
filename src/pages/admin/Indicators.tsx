@@ -347,7 +347,7 @@ export default function Indicators() {
             <BarChart3 className="w-6 h-6 text-blue-600" />
             Panel de Indicadores
           </h1>
-          <p className="text-gray-500 mt-1">Gestión de indicadores de desempeño y repositorio de visualizaciones custom HTML.</p>
+          <p className="text-sm text-gray-500 mt-1">Gestión de indicadores de desempeño y repositorio de visualizaciones custom HTML.</p>
         </div>
         
         {activeTab === 'indicators' ? (

@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './AuthContext';
 import { AppDataProvider } from './contexts/AppDataContext';
+import { LanguageProvider } from './i18n/LanguageContext';
 import Layout from './components/Layout';
 import ErrorBoundary from './components/ErrorBoundary';
 import Matrix from './pages/Matrix';
@@ -36,6 +37,7 @@ import Inicio from './pages/Inicio';
 
 import ProcessMap from './pages/ProcessMap';
 import Standards from './pages/Standards';
+import Routines from './pages/Routines';
 
 const ProtectedRoute = ({ children, requireAdmin = false, requireSupervisor = false, requireGlobalAdmin = false }: { children: React.ReactNode, requireAdmin?: boolean, requireSupervisor?: boolean, requireGlobalAdmin?: boolean }) => {
   const { user, dbUser, loading, isAdmin, isSupervisor, isGlobalAdmin } = useAuth();
@@ -330,52 +332,55 @@ const Login = () => {
 export default function App() {
   return (
     <ErrorBoundary>
-      <Toaster position="top-right" />
-      <AuthProvider>
-        <AppDataProvider>
-          <Router>
-            <Routes>
-              <Route path="/login" element={<Login />} />
-              
-              {/* Main Menu (No Sidebar) */}
-              <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
-              
-              {/* Master Admin Routes (No Sidebar) */}
-              <Route path="admin/master-users" element={<ProtectedRoute requireGlobalAdmin><MasterUsers /></ProtectedRoute>} />
-              
-              {/* Application Layout (With Sidebar) */}
-              <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-                <Route path="inicio" element={<Inicio />} />
-                <Route path="matrix" element={<Matrix />} />
-                <Route path="process-map" element={<ProcessMap />} />
-                <Route path="standards" element={<Standards />} />
-                <Route path="incidents" element={<Incidents />} />
-                <Route path="training" element={<TrainingActions />} />
-                <Route path="action-plan" element={<ActionPlan />} />
-                <Route path="forums" element={<Forums />} />
-                <Route path="forums/:sessionId" element={<ForumSession />} />
-                <Route path="statistics" element={<Statistics />} />
-                <Route path="ohp" element={<OHP />} />
+      <LanguageProvider>
+        <Toaster position="top-right" />
+        <AuthProvider>
+          <AppDataProvider>
+            <Router>
+              <Routes>
+                <Route path="/login" element={<Login />} />
                 
-                {/* Admin Routes */}
-                <Route path="admin/forums" element={<ProtectedRoute requireAdmin><AdminForums /></ProtectedRoute>} />
-                <Route path="admin/teams" element={<ProtectedRoute requireAdmin><AdminTeams /></ProtectedRoute>} />
-                <Route path="admin/users" element={<ProtectedRoute requireAdmin><AdminUsers /></ProtectedRoute>} />
-                <Route path="admin/activities" element={<ProtectedRoute requireAdmin><AdminActivities /></ProtectedRoute>} />
-                <Route path="admin/processes" element={<ProtectedRoute requireAdmin><AdminProcesses /></ProtectedRoute>} />
-                <Route path="admin/tasks" element={<ProtectedRoute requireAdmin><AdminTasks /></ProtectedRoute>} />
-                <Route path="admin/standards" element={<ProtectedRoute requireAdmin><AdminStandards /></ProtectedRoute>} />
-                <Route path="admin/criteria" element={<ProtectedRoute requireAdmin><AdminCriteria /></ProtectedRoute>} />
-                <Route path="admin/indicators" element={<ProtectedRoute requireAdmin><AdminIndicators /></ProtectedRoute>} />
-                <Route path="admin/action-categories" element={<ProtectedRoute requireAdmin><AdminActionCategories /></ProtectedRoute>} />
-                <Route path="admin/master-data" element={<ProtectedRoute requireAdmin><AdminMasterData /></ProtectedRoute>} />
-                <Route path="admin/master-groups" element={<ProtectedRoute requireAdmin><AdminMasterGroups /></ProtectedRoute>} />
-                <Route path="admin/parameters" element={<ProtectedRoute requireAdmin><AdminParameters /></ProtectedRoute>} />
-              </Route>
-            </Routes>
-          </Router>
-        </AppDataProvider>
-      </AuthProvider>
+                {/* Main Menu (No Sidebar) */}
+                <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+                
+                {/* Master Admin Routes (No Sidebar) */}
+                <Route path="admin/master-users" element={<ProtectedRoute requireGlobalAdmin><MasterUsers /></ProtectedRoute>} />
+                
+                {/* Application Layout (With Sidebar) */}
+                <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+                  <Route path="inicio" element={<Inicio />} />
+                  <Route path="matrix" element={<Matrix />} />
+                  <Route path="process-map" element={<ProcessMap />} />
+                  <Route path="standards" element={<Standards />} />
+                   <Route path="routines" element={<Routines />} />
+                  <Route path="incidents" element={<Incidents />} />
+                  <Route path="training" element={<TrainingActions />} />
+                  <Route path="action-plan" element={<ActionPlan />} />
+                  <Route path="forums" element={<Forums />} />
+                  <Route path="forums/:sessionId" element={<ForumSession />} />
+                  <Route path="statistics" element={<Statistics />} />
+                  <Route path="ohp" element={<OHP />} />
+                  
+                  {/* Admin Routes */}
+                  <Route path="admin/forums" element={<ProtectedRoute requireAdmin><AdminForums /></ProtectedRoute>} />
+                  <Route path="admin/teams" element={<ProtectedRoute requireAdmin><AdminTeams /></ProtectedRoute>} />
+                  <Route path="admin/users" element={<ProtectedRoute requireAdmin><AdminUsers /></ProtectedRoute>} />
+                  <Route path="admin/activities" element={<ProtectedRoute requireAdmin><AdminActivities /></ProtectedRoute>} />
+                  <Route path="admin/processes" element={<ProtectedRoute requireAdmin><AdminProcesses /></ProtectedRoute>} />
+                  <Route path="admin/tasks" element={<ProtectedRoute requireAdmin><AdminTasks /></ProtectedRoute>} />
+                  <Route path="admin/standards" element={<ProtectedRoute requireAdmin><AdminStandards /></ProtectedRoute>} />
+                  <Route path="admin/criteria" element={<ProtectedRoute requireAdmin><AdminCriteria /></ProtectedRoute>} />
+                  <Route path="admin/indicators" element={<ProtectedRoute requireAdmin><AdminIndicators /></ProtectedRoute>} />
+                  <Route path="admin/action-categories" element={<ProtectedRoute requireAdmin><AdminActionCategories /></ProtectedRoute>} />
+                  <Route path="admin/master-data" element={<ProtectedRoute requireAdmin><AdminMasterData /></ProtectedRoute>} />
+                  <Route path="admin/master-groups" element={<ProtectedRoute requireAdmin><AdminMasterGroups /></ProtectedRoute>} />
+                  <Route path="admin/parameters" element={<ProtectedRoute requireAdmin><AdminParameters /></ProtectedRoute>} />
+                </Route>
+              </Routes>
+            </Router>
+          </AppDataProvider>
+        </AuthProvider>
+      </LanguageProvider>
     </ErrorBoundary>
   );
 }

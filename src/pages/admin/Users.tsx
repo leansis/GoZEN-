@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../AuthContext';
-import { collection, onSnapshot, doc, updateDoc, setDoc, deleteDoc, query, where, writeBatch } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, setDoc, deleteDoc, query, where, writeBatch, or } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { User, Company } from '../../types';
 import { handleFirestoreError, OperationType } from '../../lib/firestore-utils';
@@ -40,7 +40,10 @@ export default function Users() {
   useEffect(() => {
     let q = query(collection(db, 'users'));
     if (activeCompanyId) {
-      q = query(collection(db, 'users'), where('companyId', '==', activeCompanyId));
+      q = query(collection(db, 'users'), or(
+        where('companyId', '==', activeCompanyId),
+        where('companyIds', 'array-contains', activeCompanyId)
+      ));
     }
 
     const unsubscribeUsers = onSnapshot(q, (snapshot) => {
@@ -74,25 +77,29 @@ export default function Users() {
         // Use email as document ID for pending users to facilitate migration on first login
         const docId = newUser.email.toLowerCase().trim();
         
+        const companyIdVal = newUser.companyId || activeCompanyId || '';
         const userToSave: User = {
           uid: docId, // Use email as temporary UID until first login
           name: newUser.name,
           email: newUser.email,
           role: newUser.role as any || 'user',
           status: newUser.status as any || 'active',
-          companyId: newUser.companyId || ''
+          companyId: companyIdVal,
+          companyIds: newUser.companyIds && newUser.companyIds.length > 0 ? newUser.companyIds : (companyIdVal ? [companyIdVal] : [])
         };
         
         await setDoc(doc(db, 'users', docId), userToSave);
         setIsAddingUser(false);
-        setNewUser({ name: '', email: '', role: 'user', status: 'active', companyId: '' });
+        setNewUser({ name: '', email: '', role: 'user', status: 'active', companyId: activeCompanyId || '', companyIds: [] });
       } else if (editingUser) {
         const userRef = doc(db, 'users', editingUser.id);
+        const companyIdVal = editingUser.companyId || '';
         await updateDoc(userRef, {
           name: editingUser.name,
           role: editingUser.role,
           status: editingUser.status,
-          companyId: editingUser.companyId || ''
+          companyId: companyIdVal,
+          companyIds: editingUser.companyIds && editingUser.companyIds.length > 0 ? editingUser.companyIds : (companyIdVal ? [companyIdVal] : [])
         });
         setEditingUser(null);
       }
@@ -220,7 +227,10 @@ export default function Users() {
           >
             <Plus className="w-6 h-6 rotate-45" />
           </button>
-          <h1 className="text-2xl font-bold text-gray-800">Usuarios</h1>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">Usuarios</h1>
+            <p className="text-sm text-gray-500 mt-1">Gestión, roles y asignación de permisos para los usuarios de la plataforma.</p>
+          </div>
         </div>
         <div className="flex gap-3">
           <input
@@ -338,21 +348,63 @@ export default function Users() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Empresa</label>
-              <select
-                disabled={!isGlobalAdmin}
-                value={isAddingUser ? newUser.companyId : editingUser?.companyId}
-                onChange={(e) => isAddingUser
-                  ? setNewUser({ ...newUser, companyId: e.target.value })
-                  : setEditingUser({ ...editingUser!, companyId: e.target.value })
-                }
-                className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border ${!isGlobalAdmin ? 'bg-gray-50' : ''}`}
-              >
-                <option value="">Seleccionar Empresa...</option>
-                {companies.map(company => (
-                  <option key={company.id} value={company.id}>{company.name}</option>
-                ))}
-              </select>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Empresas Asociadas</label>
+              <div className="border border-gray-200 rounded-lg p-3 max-h-40 overflow-y-auto space-y-2 bg-white">
+                {companies.map(company => {
+                  const currentIds = isAddingUser 
+                    ? (newUser.companyIds || (newUser.companyId ? [newUser.companyId] : (activeCompanyId ? [activeCompanyId] : []))) 
+                    : (editingUser?.companyIds || (editingUser?.companyId ? [editingUser.companyId] : []));
+                  const isChecked = currentIds.includes(company.id);
+
+                  const handleCheckboxChange = (checked: boolean) => {
+                    if (!isGlobalAdmin) return; // Only global admins can edit associations to other companies
+                    let nextIds = [...currentIds];
+                    if (checked) {
+                      if (!nextIds.includes(company.id)) {
+                        nextIds.push(company.id);
+                      }
+                    } else {
+                      nextIds = nextIds.filter(id => id !== company.id);
+                    }
+                    const nextPrimaryId = nextIds[0] || '';
+
+                    if (isAddingUser) {
+                      setNewUser({
+                        ...newUser,
+                        companyIds: nextIds,
+                        companyId: nextPrimaryId
+                      });
+                    } else if (editingUser) {
+                      setEditingUser({
+                        ...editingUser,
+                        companyIds: nextIds,
+                        companyId: nextPrimaryId
+                      });
+                    }
+                  };
+
+                  return (
+                    <label key={company.id} className={`flex items-center gap-2.5 text-sm text-gray-700 ${isGlobalAdmin ? 'hover:bg-gray-50 cursor-pointer' : 'opacity-70'} p-1.5 rounded transition-colors`}>
+                      <input
+                        type="checkbox"
+                        disabled={!isGlobalAdmin}
+                        checked={isChecked}
+                        onChange={(e) => handleCheckboxChange(e.target.checked)}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
+                      />
+                      <span className="font-medium text-gray-900">{company.name}</span>
+                    </label>
+                  );
+                })}
+                {companies.length === 0 && (
+                  <p className="text-xs text-gray-400 italic text-center py-2">No hay empresas registradas</p>
+                )}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                {isGlobalAdmin 
+                  ? 'El usuario podrá alternar entre cualquiera de las empresas seleccionadas.'
+                  : 'Asociado automáticamente a la empresa actual.'}
+              </p>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700">Rol</label>

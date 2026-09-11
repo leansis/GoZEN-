@@ -24,7 +24,8 @@ export default function MasterUsers() {
     email: '',
     role: 'user',
     status: 'active',
-    companyId: ''
+    companyId: '',
+    companyIds: []
   });
   const [loading, setLoading] = useState(true);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -78,19 +79,21 @@ export default function MasterUsers() {
           email: newUser.email,
           role: newUser.role as any || 'user',
           status: newUser.status as any || 'active',
-          companyId: newUser.companyId || ''
+          companyId: newUser.companyId || '',
+          companyIds: newUser.companyIds || []
         };
         
         await setDoc(doc(db, 'users', docId), userToSave);
         setIsAddingUser(false);
-        setNewUser({ name: '', email: '', role: 'user', status: 'active', companyId: '' });
+        setNewUser({ name: '', email: '', role: 'user', status: 'active', companyId: '', companyIds: [] });
       } else if (editingUser) {
         const userRef = doc(db, 'users', editingUser.id);
         await updateDoc(userRef, {
           name: editingUser.name,
           role: editingUser.role,
           status: editingUser.status,
-          companyId: editingUser.companyId || ''
+          companyId: editingUser.companyId || '',
+          companyIds: editingUser.companyIds || []
         });
         setEditingUser(null);
       }
@@ -114,7 +117,11 @@ export default function MasterUsers() {
   const filteredUsers = users.filter(user => {
     const matchesName = user.name.toLowerCase().includes(filters.name.toLowerCase());
     const matchesEmail = user.email.toLowerCase().includes(filters.email.toLowerCase());
-    const matchesCompany = !filters.companyId || user.companyId === filters.companyId;
+    const userCompanyIds = Array.from(new Set([
+      ...(user.companyIds || []),
+      ...(user.companyId ? [user.companyId] : [])
+    ])).filter(Boolean);
+    const matchesCompany = !filters.companyId || userCompanyIds.includes(filters.companyId);
     const matchesRole = !filters.role || user.role === filters.role;
     const matchesStatus = !filters.status || user.status === filters.status;
     return matchesName && matchesEmail && matchesCompany && matchesRole && matchesStatus;
@@ -139,8 +146,8 @@ export default function MasterUsers() {
             <ArrowLeft size={20} />
           </button>
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Gestión Maestra de Usuarios</h1>
-            <p className="text-xs text-gray-500 uppercase tracking-wider">Administración Global</p>
+            <h1 className="text-2xl font-bold text-gray-800">Gestión Maestra de Usuarios</h1>
+            <p className="text-sm text-gray-500 mt-1">Gestión global de los usuarios y permisos maestros del sistema.</p>
           </div>
         </div>
         <div className="flex items-center gap-4">
@@ -261,15 +268,29 @@ export default function MasterUsers() {
                 { header: 'Nombre', accessor: 'name' },
                 { header: 'Email', accessor: 'email' },
                 { 
-                  header: 'Empresa', 
+                  header: 'Empresas', 
                   accessor: (user) => {
-                    const company = companies.find(c => c.id === user.companyId);
-                    return company ? (
-                      <div className="flex items-center text-blue-600 font-medium">
-                        <Building2 className="w-4 h-4 mr-1.5 text-blue-400" />
-                        {company.name}
+                    const userCompanyIds = Array.from(new Set([
+                      ...(user.companyIds || []),
+                      ...(user.companyId ? [user.companyId] : [])
+                    ])).filter(Boolean);
+
+                    const userCompanies = companies.filter(c => userCompanyIds.includes(c.id));
+
+                    if (userCompanies.length === 0) {
+                      return <span className="text-gray-400 italic text-xs">Sin asignar</span>;
+                    }
+
+                    return (
+                      <div className="flex flex-wrap gap-1 max-w-xs">
+                        {userCompanies.map(c => (
+                          <span key={c.id} className="inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-100">
+                            <Building2 className="w-3 h-3 mr-1 text-blue-400 animate-pulse" />
+                            {c.name}
+                          </span>
+                        ))}
                       </div>
-                    ) : <span className="text-gray-400 italic">Sin asignar</span>;
+                    );
                   }
                 },
                 { 
@@ -360,20 +381,57 @@ export default function MasterUsers() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Empresa</label>
-              <select
-                value={isAddingUser ? newUser.companyId : editingUser?.companyId}
-                onChange={(e) => isAddingUser
-                  ? setNewUser({ ...newUser, companyId: e.target.value })
-                  : setEditingUser({ ...editingUser!, companyId: e.target.value })
-                }
-                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-              >
-                <option value="">Seleccionar Empresa...</option>
-                {companies.map(company => (
-                  <option key={company.id} value={company.id}>{company.name}</option>
-                ))}
-              </select>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Empresas Asociadas</label>
+              <div className="border border-gray-200 rounded-lg p-3 max-h-40 overflow-y-auto space-y-2 bg-white">
+                {companies.map(company => {
+                  const currentIds = isAddingUser 
+                    ? (newUser.companyIds || []) 
+                    : (editingUser?.companyIds || (editingUser?.companyId ? [editingUser.companyId] : []));
+                  const isChecked = currentIds.includes(company.id);
+
+                  const handleCheckboxChange = (checked: boolean) => {
+                    let nextIds = [...currentIds];
+                    if (checked) {
+                      if (!nextIds.includes(company.id)) {
+                        nextIds.push(company.id);
+                      }
+                    } else {
+                      nextIds = nextIds.filter(id => id !== company.id);
+                    }
+                    const nextPrimaryId = nextIds[0] || '';
+
+                    if (isAddingUser) {
+                      setNewUser({
+                        ...newUser,
+                        companyIds: nextIds,
+                        companyId: nextPrimaryId
+                      });
+                    } else if (editingUser) {
+                      setEditingUser({
+                        ...editingUser,
+                        companyIds: nextIds,
+                        companyId: nextPrimaryId
+                      });
+                    }
+                  };
+
+                  return (
+                    <label key={company.id} className="flex items-center gap-2.5 text-sm text-gray-700 hover:bg-gray-50 p-1.5 rounded cursor-pointer transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={(e) => handleCheckboxChange(e.target.checked)}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
+                      />
+                      <span className="font-medium text-gray-900">{company.name}</span>
+                    </label>
+                  );
+                })}
+                {companies.length === 0 && (
+                  <p className="text-xs text-gray-400 italic text-center py-2">No hay empresas registradas</p>
+                )}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">El usuario podrá alternar entre cualquiera de las empresas seleccionadas.</p>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>

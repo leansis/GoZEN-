@@ -18,7 +18,8 @@ import { db } from '../firebase';
 import { handleFirestoreError, OperationType } from '../lib/firestore-utils';
 
 export default function Incidents() {
-  const { dbUser, isAdmin } = useAuth();
+  const { dbUser, isAdmin, company } = useAuth();
+  const showSectionHeaders = company?.settings?.showSectionHeaders !== false;
   const { incidents, teams, forums, indicators, loading, actionPlans, users, actionCategories } = useAppData();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterTeamId, setFilterTeamId] = useState('');
@@ -268,12 +269,14 @@ export default function Incidents() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Incidencias</h1>
-          <p className="text-gray-500 mt-1">Gestión y visualización de incidencias detectadas en foros.</p>
+      {showSectionHeaders && (
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">Incidencias</h1>
+            <p className="text-sm text-gray-500 mt-1">Gestión y visualización de incidencias detectadas en foros.</p>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Filters */}
       <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-wrap gap-4 items-center">

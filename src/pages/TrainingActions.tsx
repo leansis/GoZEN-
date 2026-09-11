@@ -9,7 +9,8 @@ import Table from '../components/Table';
 import { format } from 'date-fns';
 
 export default function TrainingActions() {
-  const { dbUser, isAdmin, isSupervisor } = useAuth();
+  const { dbUser, isAdmin, isSupervisor, company } = useAuth();
+  const showSectionHeaders = company?.settings?.showSectionHeaders !== false;
   const appData = useAppData();
   
   const [actions, setActions] = useState<TrainingAction[]>([]);
@@ -168,7 +169,15 @@ export default function TrainingActions() {
   return (
     <div>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-        <h1 className="text-2xl font-bold text-gray-800">Acciones Formativas</h1>
+        {showSectionHeaders && (
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">Acciones Formativas</h1>
+            <p className="text-sm text-gray-500 mt-1">
+              Planificación y seguimiento de la capacitación y desarrollo del personal.
+            </p>
+          </div>
+        )}
+        {!showSectionHeaders && <div />}
         
         <div className="flex items-center space-x-3 bg-white p-2 rounded-lg shadow-sm border border-gray-200">
           <span className="text-sm font-medium text-gray-700 ml-2">Estado:</span>

@@ -5,7 +5,8 @@ import { Team, Process, Task, UserTaskLevel } from '../types';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 
 export default function Statistics() {
-  const { dbUser, isAdmin, isSupervisor } = useAuth();
+  const { dbUser, isAdmin, isSupervisor, company } = useAuth();
+  const showSectionHeaders = company?.settings?.showSectionHeaders !== false;
   const appData = useAppData();
   
   const [teams, setTeams] = useState<Team[]>([]);
@@ -33,8 +34,17 @@ export default function Statistics() {
   if (loading) return <div>Cargando...</div>;
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">Estadísticas</h1>
+    <div className="space-y-6">
+      {showSectionHeaders && (
+        <div className="flex justify-between items-center pb-2 border-b border-gray-100">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">Estadísticas</h1>
+            <p className="text-sm text-gray-500 mt-1">
+              Análisis e indicadores clave de la polivalencia de los equipos de la compañía.
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {teams.length > 0 ? (

@@ -9,7 +9,8 @@ import ConfirmModal from '../../components/ConfirmModal';
 import { Plus } from 'lucide-react';
 
 export default function Processes() {
-  const { dbUser, activeCompanyId } = useAuth();
+  const { dbUser, activeCompanyId, company } = useAuth();
+  const showSectionHeaders = company?.settings?.showSectionHeaders !== false;
   const [processes, setProcesses] = useState<Process[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [editingProcess, setEditingProcess] = useState<Partial<Process> | null>(null);
@@ -119,7 +120,13 @@ export default function Processes() {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Procesos</h1>
+        {showSectionHeaders && (
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">Procesos</h1>
+            <p className="text-sm text-gray-500 mt-1">Gestión y parametrización de los procesos de la compañía.</p>
+          </div>
+        )}
+        {!showSectionHeaders && <div />}
         <button
           onClick={() => setEditingProcess({})}
           className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"

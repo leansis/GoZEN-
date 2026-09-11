@@ -143,7 +143,19 @@ service cloud.firestore {
 
     function belongsToCompany(companyId) {
       let isExplicitAdmin = toSafeString(request.auth.token.get('email', '')).lower() == "leansisproductivity@gmail.com";
-      return isAuthenticated() && (isExplicitAdmin || isGlobalAdmin() || (companyId != null && companyId != "" && getUserCompanyId() == companyId));
+      let email = toSafeString(request.auth.token.get('email', '')).lower();
+      let uid = request.auth.uid;
+      let uidPath = /databases/$(database)/documents/users/$(uid);
+      let emailPath = /databases/$(database)/documents/users/$(email);
+      return isAuthenticated() && (
+        isExplicitAdmin || 
+        isGlobalAdmin() || 
+        (companyId != null && companyId != "" && (
+          getUserCompanyId() == companyId ||
+          (exists(uidPath) && 'companyIds' in get(uidPath).data && companyId in get(uidPath).data.companyIds) ||
+          (email != "" && exists(emailPath) && 'companyIds' in get(emailPath).data && companyId in get(emailPath).data.companyIds)
+        ))
+      );
     }
     function uidUnchanged() {
       return !('uid' in request.resource.data) || request.resource.data.uid == request.auth.uid;
@@ -617,6 +629,20 @@ service cloud.firestore {
       allow create: if isAuthenticated() && belongsToCompany(request.resource.data.companyId) && isValidIncident(request.resource.data);
       allow update: if isAuthenticated() && belongsToCompany(resource.data.companyId) && isValidIncident(request.resource.data) && (request.auth.uid == resource.data.createdBy || isAdmin());
       allow delete: if isAuthenticated() && belongsToCompany(resource.data.companyId) && (request.auth.uid == resource.data.createdBy || isAdmin());
+    }
+
+    match /routines/{routineId} {
+      allow read: if isAuthenticated() && belongsToCompany(resource.data.get('companyId', ''));
+      allow create: if isAuthenticated() && belongsToCompany(request.resource.data.get('companyId', ''));
+      allow update: if isAuthenticated() && belongsToCompany(resource.data.get('companyId', '')) && belongsToCompany(request.resource.data.get('companyId', ''));
+      allow delete: if isAuthenticated() && belongsToCompany(resource.data.get('companyId', ''));
+    }
+
+    match /routineExecutions/{executionId} {
+      allow read: if isAuthenticated() && belongsToCompany(resource.data.get('companyId', ''));
+      allow create: if isAuthenticated() && belongsToCompany(request.resource.data.get('companyId', ''));
+      allow update: if isAuthenticated() && belongsToCompany(resource.data.get('companyId', '')) && belongsToCompany(request.resource.data.get('companyId', ''));
+      allow delete: if isAuthenticated() && belongsToCompany(resource.data.get('companyId', ''));
     }
 
     match /standards/{standardId} {

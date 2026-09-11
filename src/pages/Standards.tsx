@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { useAppData } from '../contexts/AppDataContext';
 import { Standard, Activity, Process, Task } from '../types';
@@ -23,7 +24,8 @@ import ReactMarkdown from 'react-markdown';
 import D3GraphView from '../components/D3GraphView';
 
 export default function Standards() {
-  const { dbUser } = useAuth();
+  const { dbUser, company } = useAuth();
+  const showSectionHeaders = company?.settings?.showSectionHeaders !== false;
   const appData = useAppData();
   
   const activities = useMemo(() => [...appData.activities].sort((a, b) => (a.order || 0) - (b.order || 0)), [appData.activities]);
@@ -33,7 +35,12 @@ export default function Standards() {
   const loading = appData.loading;
 
   // View tabs
-  const [activeTab, setActiveTab] = useState<'map' | 'list' | 'graph'>('graph');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const activeTab = (tabParam === 'map' || tabParam === 'list' || tabParam === 'graph') ? tabParam : 'graph';
+  const setActiveTab = (tab: 'graph' | 'map' | 'list') => {
+    setSearchParams({ tab });
+  };
 
   // Filters
   const [globalSearch, setGlobalSearch] = useState('');
@@ -283,69 +290,31 @@ export default function Standards() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header and main navigation tabs */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800">Estándares</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Visualiza y consulta la documentación y estándares asociados de la compañía.
-          </p>
+    <div className="space-y-4">
+      {showSectionHeaders && (
+        <div className="flex justify-between items-center pb-2 border-b border-gray-100">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">Estándares</h1>
+            <p className="text-sm text-gray-500 mt-1">
+              Visualiza y consulta la documentación y estándares asociados de la compañía.
+            </p>
+          </div>
         </div>
-
-        {/* View Toggle tabs */}
-        <div className="flex bg-gray-100 p-1 rounded-xl border border-gray-200">
-          <button
-            onClick={() => setActiveTab('graph')}
-            className={clsx(
-              "flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all cursor-pointer",
-              activeTab === 'graph' ? "bg-white text-blue-700 shadow-sm" : "text-gray-600 hover:text-gray-900"
-            )}
-          >
-            <Network className="w-4 h-4" />
-            <span>Grafo</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('map')}
-            className={clsx(
-              "flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all cursor-pointer",
-              activeTab === 'map' ? "bg-white text-blue-700 shadow-sm" : "text-gray-600 hover:text-gray-900"
-            )}
-          >
-            <MapIcon className="w-4 h-4" />
-            <span>Mapa de Proceso</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('list')}
-            className={clsx(
-              "flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all cursor-pointer",
-              activeTab === 'list' ? "bg-white text-blue-700 shadow-sm" : "text-gray-600 hover:text-gray-900"
-            )}
-          >
-            <List className="w-4 h-4" />
-            <span>Listado</span>
-          </button>
-        </div>
-      </div>
+      )}
 
       {/* Shared Filter Bar (highly applicable for List & Graph) */}
       {activeTab !== 'map' && (
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-4">
-          <div className="flex items-center gap-2 text-sm font-bold text-gray-700">
-            <Filter className="w-4 h-4 text-gray-500" />
-            <span>Filtros de búsqueda</span>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {/* Search Input */}
             <div className="relative">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-gray-400" />
               <input
                 type="text"
                 placeholder="Buscar por nombre..."
                 value={globalSearch}
                 onChange={(e) => setGlobalSearch(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                className="w-full pl-8 pr-3 py-1.5 border border-gray-200 rounded-lg text-xs bg-gray-50 focus:bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
               />
             </div>
 
@@ -354,7 +323,7 @@ export default function Standards() {
               <select
                 value={selectedAreaId}
                 onChange={(e) => setSelectedAreaId(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-xs bg-gray-50 focus:bg-white focus:ring-1 focus:ring-blue-500 outline-none transition-all"
               >
                 <option value="all">Todas las Áreas</option>
                 {activities.map(act => (
@@ -369,7 +338,7 @@ export default function Standards() {
                 value={selectedProcessId}
                 onChange={(e) => setSelectedProcessId(e.target.value)}
                 disabled={selectedAreaId === 'all' && processes.length > 50}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all disabled:bg-gray-50 disabled:text-gray-400"
+                className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-xs bg-gray-50 focus:bg-white focus:ring-1 focus:ring-blue-500 outline-none transition-all disabled:bg-gray-50 disabled:text-gray-400"
               >
                 <option value="all">
                   {selectedAreaId === 'all' ? 'Todos los Procesos' : 'Filtrar Proceso'}
@@ -385,7 +354,7 @@ export default function Standards() {
               <select
                 value={selectedTaskId}
                 onChange={(e) => setSelectedTaskId(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-xs bg-gray-50 focus:bg-white focus:ring-1 focus:ring-blue-500 outline-none transition-all"
               >
                 <option value="all">Todas las Tareas</option>
                 {availableTasks.map(t => (

@@ -105,7 +105,7 @@ export default function ActionCategories() {
             <Tag className="w-6 h-6 text-blue-600" />
             Categorías de Acción
           </h1>
-          <p className="text-gray-500 text-sm mt-1">Gestiona los tipos de acciones disponibles en el Plan de Acción (Seguridad, Calidad, etc.)</p>
+          <p className="text-sm text-gray-500 mt-1">Gestiona los tipos de acciones disponibles en el Plan de Acción (Seguridad, Calidad, etc.)</p>
         </div>
         <button
           onClick={() => setEditingCategory({})}

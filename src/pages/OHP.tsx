@@ -1,14 +1,18 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Team, Task, UserTaskLevel, User } from '../types';
 import { useAuth } from '../AuthContext';
 import { useAppData } from '../contexts/AppDataContext';
+import { useLanguage } from '../i18n/LanguageContext';
 import { handleFirestoreError, OperationType } from '../lib/firestore-utils';
+import { ZoomIn, ZoomOut, Maximize2, Hand } from 'lucide-react';
 
 export default function OHP() {
-  const { dbUser, isAdmin, activeCompanyId } = useAuth();
+  const { dbUser, isAdmin, activeCompanyId, company } = useAuth();
+  const showSectionHeaders = company?.settings?.showSectionHeaders !== false;
   const appData = useAppData();
+  const { t } = useLanguage();
   
   const [teams, setTeams] = useState<Team[]>([]);
   const tasks = appData.tasks;
@@ -19,10 +23,144 @@ export default function OHP() {
   
   const [editMode, setEditMode] = useState(false);
   const [expandedTeams, setExpandedTeams] = useState<Record<string, boolean>>({});
+  
+  // Pan and Zoom states for the interactive whiteboard
+  const [zoom, setZoom] = useState(0.75);
+  const [pan, setPan] = useState({ x: 60, y: 30 });
+  const [isDragging, setIsDragging] = useState(false);
+  
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const isDraggingRef = useRef(false);
+  const dragStartRef = useRef({ mouseX: 0, mouseY: 0, panX: 0, panY: 0 });
+
+  // Mouse wheel zoom towards cursor
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const zoomFactor = e.deltaY < 0 ? 1.08 : 0.92;
+      const rect = container.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      setZoom(prevZoom => {
+        const nextZoom = Math.min(2.5, Math.max(0.2, Number((prevZoom * zoomFactor).toFixed(2))));
+        if (nextZoom === prevZoom) return prevZoom;
+
+        const scaleChange = nextZoom / prevZoom;
+        setPan(prevPan => ({
+          x: mouseX - (mouseX - prevPan.x) * scaleChange,
+          y: mouseY - (mouseY - prevPan.y) * scaleChange,
+        }));
+
+        return nextZoom;
+      });
+    };
+
+    container.addEventListener('wheel', handleWheel, { passive: false });
+    return () => {
+      container.removeEventListener('wheel', handleWheel);
+    };
+  }, []);
+
+  // Hand drag / pan with global window listeners
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (e.button !== 0) return; // Only left-click
+    const target = e.target as HTMLElement;
+    // Don't drag canvas when clicking buttons, inputs, interactive controls or draggable cards
+    if (target.closest('button, input, select, textarea, [role="button"], a, [draggable="true"]')) {
+      return;
+    }
+
+    isDraggingRef.current = true;
+    setIsDragging(true);
+    dragStartRef.current = {
+      mouseX: e.clientX,
+      mouseY: e.clientY,
+      panX: pan.x,
+      panY: pan.y,
+    };
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDraggingRef.current) return;
+      e.preventDefault();
+      const dx = e.clientX - dragStartRef.current.mouseX;
+      const dy = e.clientY - dragStartRef.current.mouseY;
+      setPan({
+        x: dragStartRef.current.panX + dx,
+        y: dragStartRef.current.panY + dy,
+      });
+    };
+
+    const handleMouseUp = () => {
+      if (isDraggingRef.current) {
+        isDraggingRef.current = false;
+        setIsDragging(false);
+      }
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
+
+  const handleZoomIn = () => {
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const cx = rect.width / 2;
+    const cy = rect.height / 2;
+    setZoom(prev => {
+      const next = Math.min(2.5, Number((prev * 1.15).toFixed(2)));
+      const scaleChange = next / prev;
+      setPan(p => ({
+        x: cx - (cx - p.x) * scaleChange,
+        y: cy - (cy - p.y) * scaleChange,
+      }));
+      return next;
+    });
+  };
+
+  const handleZoomOut = () => {
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const cx = rect.width / 2;
+    const cy = rect.height / 2;
+    setZoom(prev => {
+      const next = Math.max(0.2, Number((prev * 0.85).toFixed(2)));
+      const scaleChange = next / prev;
+      setPan(p => ({
+        x: cx - (cx - p.x) * scaleChange,
+        y: cy - (cy - p.y) * scaleChange,
+      }));
+      return next;
+    });
+  };
+
+  const handleResetView = () => {
+    if (containerRef.current) {
+      const width = containerRef.current.clientWidth;
+      setZoom(0.75);
+      setPan({ x: Math.max(40, width / 2 - 400), y: 30 });
+    } else {
+      setZoom(0.75);
+      setPan({ x: 60, y: 30 });
+    }
+  };
 
   useEffect(() => {
     const data = appData.teams;
     setTeams(data);
+    if (data.length > 0 && containerRef.current) {
+      const width = containerRef.current.clientWidth;
+      setPan({ x: Math.max(40, width / 2 - 400), y: 30 });
+    }
   }, [appData.teams]);
 
   const calculateTeamGap = (team: Team) => {
@@ -406,27 +544,48 @@ export default function OHP() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">OHP - Mapa de Gaps</h1>
-        {isAdmin && (
+      {showSectionHeaders && (
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">{t('ohp.title', 'OHP - Mapa de Gaps')}</h1>
+            <p className="text-sm text-gray-500 mt-1">
+              {t('ohp.subtitle', 'Visualiza el mapa de gaps, equipos y matrices de polivalencia.')}
+            </p>
+          </div>
+          {isAdmin && (
+            <button
+              onClick={() => setEditMode(!editMode)}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors cursor-pointer ${
+                editMode 
+                  ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                  : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+              }`}
+            >
+              {editMode ? t('ohp.exitEditMode', 'Salir de Edición') : t('ohp.editMode', 'Modo Edición')}
+            </button>
+          )}
+        </div>
+      )}
+      {!showSectionHeaders && isAdmin && (
+        <div className="flex justify-end mb-4">
           <button
             onClick={() => setEditMode(!editMode)}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+            className={`px-4 py-2 rounded-lg font-medium transition-colors cursor-pointer ${
               editMode 
                 ? 'bg-blue-600 text-white hover:bg-blue-700' 
                 : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
             }`}
           >
-            {editMode ? 'Salir de Edición' : 'Modo Edición'}
+            {editMode ? t('ohp.exitEditMode', 'Salir de Edición') : t('ohp.editMode', 'Modo Edición')}
           </button>
-        )}
-      </div>
+        </div>
+      )}
       
       <div className="flex flex-1 gap-6 min-h-0">
         {editMode && isAdmin && (
-          <div className="w-64 bg-white p-4 rounded-xl shadow-sm border border-gray-200 overflow-y-auto shrink-0 h-[calc(100vh-160px)] sticky top-6">
-            <h3 className="font-bold text-gray-800 mb-4">Usuarios</h3>
-            <p className="text-xs text-gray-500 mb-4">Arrastra los usuarios a los equipos para asignarlos como líder o miembros.</p>
+          <div className="w-64 bg-white p-4 rounded-xl shadow-sm border border-gray-200 overflow-y-auto shrink-0 h-[calc(100vh-210px)] sticky top-6">
+            <h3 className="font-bold text-gray-800 mb-4">{t('ohp.users', 'Usuarios')}</h3>
+            <p className="text-xs text-gray-500 mb-4">{t('ohp.dragUserHelp', 'Arrastra los usuarios a los equipos para asignarlos como líder o miembros.')}</p>
             <div className="space-y-2">
               {users.map(user => (
                 <div 
@@ -448,13 +607,70 @@ export default function OHP() {
           </div>
         )}
 
-        <div className="flex-1 bg-white p-8 rounded-xl shadow-sm border border-gray-200 overflow-auto">
-          <div className="flex justify-center gap-12 min-w-max">
-            {rootTeams.length > 0 ? (
-              rootTeams.map(team => renderTeamNode(team))
-            ) : (
-              <p className="text-gray-500">No hay equipos configurados.</p>
-            )}
+        <div 
+          ref={containerRef}
+          onMouseDown={handleMouseDown}
+          className={`flex-1 bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden relative select-none min-h-[600px] h-[calc(100vh-210px)] ${
+            isDragging ? 'cursor-grabbing' : 'cursor-grab'
+          }`}
+          style={{
+            backgroundImage: 'radial-gradient(#cbd5e1 1.2px, transparent 1.2px)',
+            backgroundSize: `${24 * zoom}px ${24 * zoom}px`,
+            backgroundPosition: `${pan.x}px ${pan.y}px`,
+          }}
+        >
+          {/* Floating Zoom & Pan Controls */}
+          <div className="absolute top-4 right-4 z-20 flex items-center gap-2 bg-white/95 backdrop-blur-md border border-gray-200/90 rounded-2xl p-1.5 shadow-md">
+            <div className="flex items-center gap-1">
+              <button
+                onClick={handleZoomIn}
+                className="p-2 text-gray-700 hover:bg-gray-100 rounded-xl hover:text-blue-600 transition-colors cursor-pointer"
+                title={t('ohp.zoomIn', 'Acercar')}
+              >
+                <ZoomIn className="w-4 h-4" />
+              </button>
+              <span className="text-xs font-extrabold text-gray-700 min-w-[42px] text-center select-none font-mono">
+                {Math.round(zoom * 100)}%
+              </span>
+              <button
+                onClick={handleZoomOut}
+                className="p-2 text-gray-700 hover:bg-gray-100 rounded-xl hover:text-blue-600 transition-colors cursor-pointer"
+                title={t('ohp.zoomOut', 'Alejar')}
+              >
+                <ZoomOut className="w-4 h-4" />
+              </button>
+              <div className="h-4 w-px bg-gray-200 mx-0.5" />
+              <button
+                onClick={handleResetView}
+                className="p-2 text-gray-700 hover:bg-gray-100 rounded-xl hover:text-blue-600 transition-colors cursor-pointer"
+                title={t('ohp.centerView', 'Centrar tablero')}
+              >
+                <Maximize2 className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 border border-slate-200/80 rounded-xl text-[11px] font-medium text-slate-500">
+              <Hand className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+              <span>{t('ohp.dragHint', 'Arrastra para mover • Rueda para zoom')}</span>
+            </div>
+          </div>
+
+          <div 
+            className="origin-top-left transition-transform"
+            style={{ 
+              transform: `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${zoom})`,
+              transformOrigin: '0 0',
+              willChange: 'transform',
+            }}
+          >
+            <div className="flex justify-center gap-12 min-w-max p-10">
+              {rootTeams.length > 0 ? (
+                rootTeams.map(team => renderTeamNode(team))
+              ) : (
+                <p className="text-gray-500 font-medium bg-white px-6 py-4 rounded-xl border border-gray-200 shadow-sm">
+                  {t('ohp.noTeams', 'No hay equipos configurados.')}
+                </p>
+              )}
+            </div>
           </div>
         </div>
       </div>

@@ -647,13 +647,18 @@ export default function Forums() {
     }
   ];
 
+  const showSectionHeaders = company?.settings?.showSectionHeaders !== false;
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800">Foros</h1>
-          <p className="text-sm text-gray-500">Gestión de foros de equipo y seguimiento de reuniones</p>
-        </div>
+        {showSectionHeaders && (
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">Foros</h1>
+            <p className="text-sm text-gray-500">Gestión de foros de equipo y seguimiento de reuniones</p>
+          </div>
+        )}
+        {!showSectionHeaders && <div />}
         <div className="flex gap-3">
           <div className="flex bg-white border border-gray-200 rounded-xl p-1">
             <button

@@ -179,7 +179,7 @@ export default function ActionPlanPage() {
     return false;
   };
 
-  const companyId = dbUser?.companyId || activeCompanyId;
+  const companyId = activeCompanyId || dbUser?.companyId;
 
   // Filter actions based on permissions and user request
   const filteredActions = React.useMemo(() => {
@@ -1547,13 +1547,18 @@ export default function ActionPlanPage() {
     }
   ];
 
+  const showSectionHeaders = company?.settings?.showSectionHeaders !== false;
+
   return (
-    <div className="space-y-6 pb-20 md:pb-0" style={{ zoom: '1.15' }}>
+    <div className="space-y-6 pb-20 md:pb-0">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800">Plan de Acciones</h1>
-          <p className="text-gray-500 text-sm">Gestiona y realiza seguimiento de las acciones operativas. </p>
-        </div>
+        {showSectionHeaders && (
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">Plan de Acciones</h1>
+            <p className="text-sm text-gray-500 mt-1">Gestiona y realiza seguimiento de las acciones operativas.</p>
+          </div>
+        )}
+        {!showSectionHeaders && <div />}
         <div className="flex flex-wrap items-center gap-3">
           <div className="bg-white border border-gray-200 rounded-lg p-1 flex">
             <button 
@@ -1584,7 +1589,8 @@ export default function ActionPlanPage() {
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-4 bg-white p-4 rounded-2xl border border-gray-100">
+      <div className="space-y-6" style={{ zoom: '1.15' }}>
+        <div className="flex flex-wrap items-center gap-4 bg-white p-4 rounded-2xl border border-gray-100">
         <div className="flex items-center gap-2">
           <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Equipo:</label>
           <select 
@@ -1746,6 +1752,7 @@ export default function ActionPlanPage() {
           )}
         </>
       )}
+      </div>
 
       {/* Action Modal */}
       <Modal

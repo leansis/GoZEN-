@@ -12,6 +12,7 @@ export default function Parameters() {
   const [maxEscalationLevels, setMaxEscalationLevels] = useState<number>(1);
   const [multipleAssigneeMode, setMultipleAssigneeMode] = useState<'multiple' | 'split'>('multiple');
   const [standardReviewNoticeDays, setStandardReviewNoticeDays] = useState<number>(15);
+  const [showSectionHeaders, setShowSectionHeaders] = useState<boolean>(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -30,6 +31,7 @@ export default function Parameters() {
       if (company.settings.standardReviewNoticeDays !== undefined) {
         setStandardReviewNoticeDays(company.settings.standardReviewNoticeDays);
       }
+      setShowSectionHeaders(company.settings.showSectionHeaders !== false);
     }
   }, [company]);
 
@@ -45,7 +47,8 @@ export default function Parameters() {
         'settings.forumVirtualHorizonMonths': horizonMonths,
         'settings.maxEscalationLevels': maxEscalationLevels,
         'settings.actionPlanMultipleAssigneeMode': multipleAssigneeMode,
-        'settings.standardReviewNoticeDays': standardReviewNoticeDays
+        'settings.standardReviewNoticeDays': standardReviewNoticeDays,
+        'settings.showSectionHeaders': showSectionHeaders
       });
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
@@ -72,7 +75,7 @@ export default function Parameters() {
     <div className="max-w-4xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
             <Settings className="text-blue-600" />
             Parámetros de la Empresa
           </h1>
@@ -203,6 +206,41 @@ export default function Parameters() {
                 onChange={(e) => setStandardReviewNoticeDays(parseInt(e.target.value) || 15)}
                 className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-center font-semibold"
               />
+            </div>
+          </div>
+        </div>
+
+        <div className="p-6 border-b border-gray-100 bg-gray-50 border-t">
+          <h2 className="text-lg font-semibold text-gray-800">UX (Experiencia de Usuario)</h2>
+          <p className="text-sm text-gray-500">Configura opciones de visualización de la interfaz</p>
+        </div>
+
+        <div className="p-6 space-y-6">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Mostrar títulos y subtítulos de sección
+              </label>
+              <p className="text-xs text-gray-500">
+                Si se desactiva, se ocultará el bloque de título y subtítulo inicial en cada sección principal del sistema para una vista más compacta.
+              </p>
+            </div>
+            <div>
+              <button
+                type="button"
+                onClick={() => setShowSectionHeaders(!showSectionHeaders)}
+                className={clsx(
+                  "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2",
+                  showSectionHeaders ? "bg-blue-600" : "bg-gray-200"
+                )}
+              >
+                <span
+                  className={clsx(
+                    "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
+                    showSectionHeaders ? "translate-x-5" : "translate-x-0"
+                  )}
+                />
+              </button>
             </div>
           </div>
         </div>
