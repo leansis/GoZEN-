@@ -650,5 +650,99 @@ service cloud.firestore {
       allow create, update: if isAdmin() && isValidStandard(request.resource.data) && belongsToCompany(request.resource.data.get('companyId', ''));
       allow delete: if isAdmin() && belongsToCompany(resource.data.get('companyId', ''));
     }
+
+    // ===============================================================
+    // 5S Module Collections (Multi-tenant company isolated)
+    // ===============================================================
+    match /fiveSProjects/{projectId} {
+      allow read: if isAuthenticated() && belongsToCompany(resource.data.get('companyId', ''));
+      allow create: if isAuthenticated() && belongsToCompany(request.resource.data.get('companyId', ''));
+      allow update: if isAuthenticated() && belongsToCompany(resource.data.get('companyId', '')) && belongsToCompany(request.resource.data.get('companyId', ''));
+      allow delete: if (isAdmin() || isGlobalAdmin()) && belongsToCompany(resource.data.get('companyId', ''));
+    }
+
+    match /fiveSTeams/{teamMemberId} {
+      allow read: if isAuthenticated() && belongsToCompany(resource.data.get('companyId', ''));
+      allow create, update: if isAuthenticated() && belongsToCompany(request.resource.data.get('companyId', ''));
+      allow delete: if isAuthenticated() && belongsToCompany(resource.data.get('companyId', ''));
+    }
+
+    match /fiveSZones/{zoneId} {
+      allow read: if isAuthenticated() && belongsToCompany(resource.data.get('companyId', ''));
+      allow create, update: if isAuthenticated() && belongsToCompany(request.resource.data.get('companyId', ''));
+      allow delete: if isAuthenticated() && belongsToCompany(resource.data.get('companyId', ''));
+    }
+
+    match /fiveSSubzones/{subzoneId} {
+      allow read: if isAuthenticated() && belongsToCompany(resource.data.get('companyId', ''));
+      allow create, update: if isAuthenticated() && belongsToCompany(request.resource.data.get('companyId', ''));
+      allow delete: if isAuthenticated() && belongsToCompany(resource.data.get('companyId', ''));
+    }
+
+    match /fiveSPlanningItems/{itemId} {
+      allow read: if isAuthenticated() && belongsToCompany(resource.data.get('companyId', ''));
+      allow create, update: if isAuthenticated() && belongsToCompany(request.resource.data.get('companyId', ''));
+      allow delete: if isAuthenticated() && belongsToCompany(resource.data.get('companyId', ''));
+    }
+
+    match /fiveSDedications/{dedicationId} {
+      allow read: if isAuthenticated() && belongsToCompany(resource.data.get('companyId', ''));
+      allow create, update: if isAuthenticated() && belongsToCompany(request.resource.data.get('companyId', ''));
+      allow delete: if isAuthenticated() && belongsToCompany(resource.data.get('companyId', ''));
+    }
+
+    match /fiveSFindings/{findingId} {
+      allow read: if isAuthenticated() && belongsToCompany(resource.data.get('companyId', ''));
+      allow create, update: if isAuthenticated() && belongsToCompany(request.resource.data.get('companyId', ''));
+      allow delete: if isAuthenticated() && belongsToCompany(resource.data.get('companyId', ''));
+    }
+
+    match /fiveSRedTags/{tagId} {
+      allow read: if isAuthenticated() && belongsToCompany(resource.data.get('companyId', ''));
+      allow create, update: if isAuthenticated() && belongsToCompany(request.resource.data.get('companyId', ''));
+      allow delete: if isAuthenticated() && belongsToCompany(resource.data.get('companyId', ''));
+    }
+
+    match /fiveSOrderItems/{itemId} {
+      allow read: if isAuthenticated() && belongsToCompany(resource.data.get('companyId', ''));
+      allow create, update: if isAuthenticated() && belongsToCompany(request.resource.data.get('companyId', ''));
+      allow delete: if isAuthenticated() && belongsToCompany(resource.data.get('companyId', ''));
+    }
+
+    match /fiveSCleaningTasks/{taskId} {
+      allow read: if isAuthenticated() && belongsToCompany(resource.data.get('companyId', ''));
+      allow create, update: if isAuthenticated() && belongsToCompany(request.resource.data.get('companyId', ''));
+      allow delete: if isAuthenticated() && belongsToCompany(resource.data.get('companyId', ''));
+    }
+
+    match /fiveSActions/{actionId} {
+      allow read: if isAuthenticated() && belongsToCompany(resource.data.get('companyId', ''));
+      allow create, update: if isAuthenticated() && belongsToCompany(request.resource.data.get('companyId', ''));
+      allow delete: if isAuthenticated() && belongsToCompany(resource.data.get('companyId', ''));
+    }
+
+    match /fiveSStandards/{standardId} {
+      allow read: if isAuthenticated() && belongsToCompany(resource.data.get('companyId', ''));
+      allow create, update: if isAuthenticated() && belongsToCompany(request.resource.data.get('companyId', ''));
+      allow delete: if isAuthenticated() && belongsToCompany(resource.data.get('companyId', ''));
+    }
+
+    match /fiveSAuditTemplates/{templateId} {
+      allow read: if isAuthenticated() && belongsToCompany(resource.data.get('companyId', ''));
+      allow create, update: if isAuthenticated() && belongsToCompany(request.resource.data.get('companyId', ''));
+      allow delete: if isAuthenticated() && belongsToCompany(resource.data.get('companyId', ''));
+    }
+
+    match /fiveSAudits/{auditId} {
+      allow read: if isAuthenticated() && belongsToCompany(resource.data.get('companyId', ''));
+      allow create, update: if isAuthenticated() && belongsToCompany(request.resource.data.get('companyId', ''));
+      allow delete: if isAuthenticated() && belongsToCompany(resource.data.get('companyId', ''));
+    }
+
+    match /fiveSHistory/{historyId} {
+      allow read: if isAuthenticated() && belongsToCompany(resource.data.get('companyId', ''));
+      allow create: if isAuthenticated() && belongsToCompany(request.resource.data.get('companyId', ''));
+      allow update, delete: if (isAdmin() || isGlobalAdmin()) && belongsToCompany(resource.data.get('companyId', ''));
+    }
   }
 }

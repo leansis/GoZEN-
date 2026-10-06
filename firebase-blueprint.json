@@ -399,6 +399,29 @@
         "createdAt": { "type": "string" }
       },
       "required": ["name", "responsibleId", "relationType", "contentType", "companyId", "createdAt"]
+    },
+    "FiveSProject": {
+      "title": "FiveSProject",
+      "description": "A 5S continuous improvement project",
+      "type": "object",
+      "properties": {
+        "companyId": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "plantOrCenter": { "type": "string" },
+        "status": { "type": "string" },
+        "targetScore": { "type": "number" },
+        "currentScore": { "type": "number" },
+        "currentPhase": { "type": "string" },
+        "startDate": { "type": "string" },
+        "targetDate": { "type": "string" },
+        "leaderId": { "type": "string" },
+        "leaderName": { "type": "string" },
+        "responsibleId": { "type": "string" },
+        "responsibleName": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["companyId", "name", "plantOrCenter"]
     }
   },
   "firestore": {
@@ -473,6 +496,30 @@
     "/standards/{standardId}": {
       "schema": { "$ref": "#/entities/Standard" },
       "description": "Standards"
+    },
+    "/fiveSProjects/{projectId}": {
+      "schema": { "$ref": "#/entities/FiveSProject" },
+      "description": "5S Projects"
+    },
+    "/fiveSZones/{zoneId}": {
+      "schema": { "$ref": "#/entities/FiveSProject" },
+      "description": "5S Zones"
+    },
+    "/fiveSActions/{actionId}": {
+      "schema": { "$ref": "#/entities/FiveSProject" },
+      "description": "5S PDCA Actions"
+    },
+    "/fiveSAudits/{auditId}": {
+      "schema": { "$ref": "#/entities/FiveSProject" },
+      "description": "5S Audits"
+    },
+    "/fiveSFindings/{findingId}": {
+      "schema": { "$ref": "#/entities/FiveSProject" },
+      "description": "5S Safari Findings"
+    },
+    "/fiveSRedTags/{tagId}": {
+      "schema": { "$ref": "#/entities/FiveSProject" },
+      "description": "5S Red Tags"
     }
   }
 }

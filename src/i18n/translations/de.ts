@@ -82,6 +82,7 @@ export const de = {
     incidents: 'Vorfälle',
     actionPlan: 'Aktionsplan',
     forums: 'Foren',
+    fiveS: '5S',
     standards: 'Standards',
     graph: 'Graph',
     processMap: 'Prozesslandkarte',

@@ -39,6 +39,19 @@ import ProcessMap from './pages/ProcessMap';
 import Standards from './pages/Standards';
 import Routines from './pages/Routines';
 
+// 5S Module Pages
+import FiveSProjectsList from './modules/fiveS/pages/FiveSProjectsList';
+import FiveSProjectHub from './modules/fiveS/pages/FiveSProjectHub';
+import FiveSTeamPage from './modules/fiveS/pages/FiveSTeamPage';
+import FiveSZonesPage from './modules/fiveS/pages/FiveSZonesPage';
+import FiveSPlanningPage from './modules/fiveS/pages/FiveSPlanningPage';
+import FiveSImplementationPage from './modules/fiveS/pages/FiveSImplementationPage';
+import FiveSActionsPage from './modules/fiveS/pages/FiveSActionsPage';
+import FiveSStandardsPage from './modules/fiveS/pages/FiveSStandardsPage';
+import FiveSAuditsPage from './modules/fiveS/pages/FiveSAuditsPage';
+import FiveSDashboardPage from './modules/fiveS/pages/FiveSDashboardPage';
+import FiveSHistoryPage from './modules/fiveS/pages/FiveSHistoryPage';
+
 const ProtectedRoute = ({ children, requireAdmin = false, requireSupervisor = false, requireGlobalAdmin = false }: { children: React.ReactNode, requireAdmin?: boolean, requireSupervisor?: boolean, requireGlobalAdmin?: boolean }) => {
   const { user, dbUser, loading, isAdmin, isSupervisor, isGlobalAdmin } = useAuth();
 
@@ -360,6 +373,20 @@ export default function App() {
                   <Route path="forums/:sessionId" element={<ForumSession />} />
                   <Route path="statistics" element={<Statistics />} />
                   <Route path="ohp" element={<OHP />} />
+                  
+                  {/* 5S Module Routes */}
+                  <Route path="5s" element={<Navigate to="/5s/projects" replace />} />
+                  <Route path="5s/projects" element={<FiveSProjectsList />} />
+                  <Route path="5s/projects/:projectId" element={<FiveSProjectHub />} />
+                  <Route path="5s/projects/:projectId/team" element={<FiveSTeamPage />} />
+                  <Route path="5s/projects/:projectId/zones" element={<FiveSZonesPage />} />
+                  <Route path="5s/projects/:projectId/planning" element={<FiveSPlanningPage />} />
+                  <Route path="5s/projects/:projectId/implementation" element={<FiveSImplementationPage />} />
+                  <Route path="5s/projects/:projectId/actions" element={<FiveSActionsPage />} />
+                  <Route path="5s/projects/:projectId/standards" element={<FiveSStandardsPage />} />
+                  <Route path="5s/projects/:projectId/audits" element={<FiveSAuditsPage />} />
+                  <Route path="5s/projects/:projectId/dashboard" element={<FiveSDashboardPage />} />
+                  <Route path="5s/projects/:projectId/history" element={<FiveSHistoryPage />} />
                   
                   {/* Admin Routes */}
                   <Route path="admin/forums" element={<ProtectedRoute requireAdmin><AdminForums /></ProtectedRoute>} />

@@ -7,9 +7,19 @@ interface ConfirmModalProps {
   message: string;
   onConfirm: () => void;
   onCancel: () => void;
+  confirmText?: string;
+  confirmButtonClass?: string;
 }
 
-export default function ConfirmModal({ isOpen, title, message, onConfirm, onCancel }: ConfirmModalProps) {
+export default function ConfirmModal({ 
+  isOpen, 
+  title, 
+  message, 
+  onConfirm, 
+  onCancel,
+  confirmText = 'Eliminar',
+  confirmButtonClass = 'bg-red-600 hover:bg-red-700 text-white'
+}: ConfirmModalProps) {
   return (
     <Modal isOpen={isOpen} onClose={onCancel} title={title}>
       <div className="p-4">
@@ -26,9 +36,9 @@ export default function ConfirmModal({ isOpen, title, message, onConfirm, onCanc
               onConfirm();
               onCancel();
             }}
-            className="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md hover:bg-red-700"
+            className={`px-4 py-2 text-sm font-medium border border-transparent rounded-md transition ${confirmButtonClass}`}
           >
-            Eliminar
+            {confirmText}
           </button>
         </div>
       </div>

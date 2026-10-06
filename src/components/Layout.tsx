@@ -30,7 +30,8 @@ import {
   Map as MapIcon, 
   List, 
   Clock, 
-  Filter 
+  Filter,
+  Award 
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -82,6 +83,7 @@ export default function Layout() {
     { name: t('nav.incidents', 'Incidencias'), path: '/incidents', icon: AlertCircle, roles: ['admin', 'supervisor', 'user', 'lean_promotor'] },
     { name: t('nav.actionPlan', 'Plan de acciones'), path: '/action-plan', icon: ClipboardList, roles: ['admin', 'supervisor', 'user', 'lean_promotor'] },
     { name: t('nav.forums', 'Foros'), path: '/forums', icon: MessagesSquare, roles: ['admin', 'supervisor', 'user', 'lean_promotor'] },
+    { name: t('nav.fiveS', '5S'), path: '/5s/projects', icon: Award, roles: ['admin', 'supervisor', 'user', 'lean_promotor'] },
   ];
 
   const adminItems = [
@@ -226,10 +228,10 @@ export default function Layout() {
             )}
           </div>
 
-          {/* Top Level Items Group 2 (Incidencias, Plan de acciones, Foros) */}
+          {/* Top Level Items Group 2 (Incidencias, Plan de acciones, Foros, 5S) */}
           {topLevelItems2.filter(item => item.roles.includes(dbUser?.role || 'user')).map((item) => {
             const Icon = item.icon;
-            const isActive = location.pathname === item.path;
+            const isActive = location.pathname === item.path || (item.path === '/5s/projects' && location.pathname.startsWith('/5s'));
             return (
               <Link
                 key={item.path}
